@@ -75,6 +75,9 @@ export default function Cookbook() {
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState(null)
   const [uploadingDishImage, setUploadingDishImage] = useState(false)
+  const [bulkReimporting, setBulkReimporting] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState(null) // { current, total }
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false)
 
   const [latestIngredients, setLatestIngredients] = useState([])
 
@@ -287,6 +290,22 @@ export default function Cookbook() {
     setIngredients(ingredients.filter((_, i) => i !== index))
   }
 
+  const recipesWithUrl = useMemo(() => recipes.filter(r => r.source_url), [recipes])
+
+  const handleBulkReimport = async () => {
+    setShowBulkConfirm(false)
+    setBulkReimporting(true)
+    const toReimport = recipesWithUrl
+    let completed = 0
+    for (const recipe of toReimport) {
+      setBulkProgress({ current: completed + 1, total: toReimport.length, name: recipe.name })
+      await reimportRecipe(recipe.id, recipe.source_url)
+      completed++
+    }
+    setBulkProgress(null)
+    setBulkReimporting(false)
+  }
+
   const toggleTag = (tag) => {
     setSelectedTags(prev =>
       prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
@@ -321,10 +340,27 @@ export default function Cookbook() {
       {/* Hero Section */}
       <section className="space-y-2">
         <p className="text-section-cookbook font-semibold tracking-wider uppercase text-xs">Digital Concierge</p>
-        <h2 className="font-heading text-4xl font-extrabold tracking-tight editorial-gutter">Family Cookbook</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-heading text-4xl font-extrabold tracking-tight editorial-gutter">Family Cookbook</h2>
+          {recipesWithUrl.length > 0 && (
+            <button
+              onClick={() => setShowBulkConfirm(true)}
+              disabled={bulkReimporting}
+              className="text-warmgray-400 hover:text-section-cookbook transition-colors disabled:opacity-40"
+              title="Re-import all recipes from source URLs"
+            >
+              <span className={`material-symbols-outlined text-xl ${bulkReimporting ? 'animate-spin' : ''}`}>sync</span>
+            </button>
+          )}
+        </div>
         <p className="text-charcoal-light text-sm max-w-[80%] leading-relaxed">
           Curated flavors and household secrets, organized for your kitchen.
         </p>
+        {bulkReimporting && bulkProgress && (
+          <div className="bg-section-cookbook/10 text-section-cookbook rounded-xl px-4 py-3 text-sm font-medium">
+            Re-importing {bulkProgress.current} of {bulkProgress.total}: {bulkProgress.name}
+          </div>
+        )}
       </section>
 
       {/* Search & Add Bento */}
@@ -875,6 +911,32 @@ export default function Cookbook() {
             </div>
           )}
         </section>
+      )}
+
+      {/* Bulk Re-import Confirmation */}
+      {showBulkConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm editorial-shadow">
+            <h3 className="text-lg font-heading font-semibold text-charcoal mb-2">Refresh All Recipes?</h3>
+            <p className="text-warmgray-600 text-sm mb-6">
+              This will re-import {recipesWithUrl.length} recipe{recipesWithUrl.length !== 1 ? 's' : ''} from their original URLs to update ingredient sections and data.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBulkConfirm(false)}
+                className="flex-1 py-2 px-4 bg-cream text-warmgray-600 rounded-xl font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkReimport}
+                className="flex-1 py-2 px-4 bg-section-cookbook text-white rounded-xl font-medium"
+              >
+                Refresh All
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
