@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useRecipes } from '../hooks/useRecipes'
 import { useIngredientCoverage } from '../hooks/useIngredientCoverage'
+import { useRecipeSuggestions } from '../hooks/useRecipeSuggestions'
 import { supabase } from '../lib/supabase'
 
 const TAG_ICONS = {
@@ -49,6 +50,7 @@ export default function Cookbook() {
   const householdId = profile?.household_id
   const { recipes, loading, importRecipe, reimportRecipe, createRecipe } = useRecipes(householdId)
   const coverage = useIngredientCoverage(householdId, recipes)
+  const { suggestions, loading: suggestionsLoading, error: suggestionsError, fetchSuggestions } = useRecipeSuggestions(householdId)
 
   const [showAdd, setShowAdd] = useState(false)
   const [addMode, setAddMode] = useState('url')
@@ -63,12 +65,16 @@ export default function Cookbook() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [sourceImageUrl, setSourceImageUrl] = useState('')
   const [servings, setServings] = useState('')
   const [prepTime, setPrepTime] = useState('')
   const [cookTime, setCookTime] = useState('')
   const [tags, setTags] = useState('')
   const [instructions, setInstructions] = useState('')
   const [ingredients, setIngredients] = useState([{ name: '', qty: '', unit: '', notes: '' }])
+  const [scanning, setScanning] = useState(false)
+  const [scanError, setScanError] = useState(null)
+  const [uploadingDishImage, setUploadingDishImage] = useState(false)
 
   const [latestIngredients, setLatestIngredients] = useState([])
 
@@ -134,12 +140,104 @@ export default function Cookbook() {
     setRefreshingId(null)
   }
 
+  const handleRecipeScan = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setScanning(true)
+    setScanError(null)
+
+    try {
+      // Upload source image to storage
+      const ext = file.name.split('.').pop()
+      const path = `${householdId}/source-${Date.now()}.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('recipe-images')
+        .upload(path, file, { upsert: true })
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage
+          .from('recipe-images')
+          .getPublicUrl(path)
+        setSourceImageUrl(urlData.publicUrl)
+      }
+
+      // Convert to base64 for OCR
+      const reader = new FileReader()
+      const base64 = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result.split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+
+      const response = await fetch('/.netlify/functions/parse-recipe-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_base64: base64,
+          media_type: file.type || 'image/jpeg',
+        }),
+      })
+
+      if (!response.ok) {
+        setScanError('Failed to scan recipe image')
+        setScanning(false)
+        return
+      }
+
+      const parsed = await response.json()
+
+      // Pre-fill form with extracted data
+      if (parsed.name) setName(parsed.name)
+      if (parsed.description) setDescription(parsed.description)
+      if (parsed.servings) setServings(String(parsed.servings))
+      if (parsed.prep_time) setPrepTime(String(parsed.prep_time))
+      if (parsed.cook_time) setCookTime(String(parsed.cook_time))
+      if (parsed.tags && parsed.tags.length > 0) setTags(parsed.tags.join(', '))
+      if (parsed.instructions) setInstructions(parsed.instructions)
+      if (parsed.ingredients && parsed.ingredients.length > 0) {
+        setIngredients(parsed.ingredients.map(ing => ({
+          name: ing.name || '',
+          qty: ing.qty ? String(ing.qty) : '',
+          unit: ing.unit || '',
+          notes: ing.notes || '',
+        })))
+      }
+    } catch (err) {
+      setScanError('Error scanning recipe: ' + err.message)
+    }
+
+    setScanning(false)
+  }
+
+  const handleDishImageUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadingDishImage(true)
+    const ext = file.name.split('.').pop()
+    const path = `${householdId}/dish-${Date.now()}.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('recipe-images')
+      .upload(path, file, { upsert: true })
+
+    if (!uploadError) {
+      const { data } = supabase.storage
+        .from('recipe-images')
+        .getPublicUrl(path)
+      setImageUrl(data.publicUrl)
+    }
+    setUploadingDishImage(false)
+  }
+
   const handleManualCreate = async (e) => {
     e.preventDefault()
     const recipe = {
       name: name.trim(),
       description: description.trim() || null,
       image_url: imageUrl.trim() || null,
+      source_image_url: sourceImageUrl.trim() || null,
       servings: servings ? Number(servings) : null,
       prep_time: prepTime ? Number(prepTime) : null,
       cook_time: cookTime ? Number(cookTime) : null,
@@ -149,8 +247,9 @@ export default function Cookbook() {
     }
     const { error } = await createRecipe(recipe, user.id)
     if (!error) {
-      setName(''); setDescription(''); setImageUrl(''); setServings('')
-      setPrepTime(''); setCookTime(''); setTags(''); setInstructions('')
+      setName(''); setDescription(''); setImageUrl(''); setSourceImageUrl('')
+      setServings(''); setPrepTime(''); setCookTime(''); setTags('')
+      setInstructions(''); setScanError(null)
       setIngredients([{ name: '', qty: '', unit: '', notes: '' }])
       setShowAdd(false)
     }
@@ -277,9 +376,52 @@ export default function Cookbook() {
             </form>
           ) : (
             <form onSubmit={handleManualCreate} className="space-y-3">
+              {/* Scan Recipe Image */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-warmgray-600">Scan a Recipe Image</label>
+                <p className="text-xs text-warmgray-400">Upload a photo of a recipe card, cookbook page, or screenshot to auto-fill the form.</p>
+                {sourceImageUrl && (
+                  <img src={sourceImageUrl} alt="Recipe source" className="w-full h-32 object-cover rounded-xl" />
+                )}
+                <label className="block cursor-pointer">
+                  <div className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-section-cookbook/30 text-section-cookbook text-sm font-medium ${scanning ? 'opacity-40' : 'hover:border-section-cookbook/60'}`}>
+                    <span className="material-symbols-outlined text-lg">{scanning ? 'progress_activity' : 'document_scanner'}</span>
+                    {scanning ? 'Scanning recipe...' : sourceImageUrl ? 'Rescan Image' : 'Scan Recipe Photo'}
+                  </div>
+                  <input type="file" accept="image/*" onChange={handleRecipeScan} disabled={scanning} className="hidden" />
+                </label>
+                {scanError && (
+                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded-xl">{scanError}</div>
+                )}
+              </div>
+
+              <div className="border-t border-warmgray-100 pt-3" />
+
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Recipe name" className="input-field focus:ring-section-cookbook" required />
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" className="input-field focus:ring-section-cookbook min-h-[60px]" rows={2} />
-              <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Image URL (optional)" className="input-field focus:ring-section-cookbook" />
+
+              {/* Finished Dish Image */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-warmgray-600">Finished Dish Photo</label>
+                {imageUrl && (
+                  <div className="relative">
+                    <img src={imageUrl} alt="Finished dish" className="w-full h-32 object-cover rounded-xl" />
+                    <button type="button" onClick={() => setImageUrl('')} className="absolute top-2 right-2 w-6 h-6 bg-red-500/80 rounded-full flex items-center justify-center">
+                      <span className="material-symbols-outlined text-white text-sm">close</span>
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <label className="flex-1 cursor-pointer">
+                    <div className={`text-center py-2 rounded-xl border border-warmgray-200 text-sm font-medium text-warmgray-600 ${uploadingDishImage ? 'opacity-40' : 'hover:border-section-cookbook'}`}>
+                      {uploadingDishImage ? 'Uploading...' : imageUrl ? 'Replace Photo' : 'Upload Photo'}
+                    </div>
+                    <input type="file" accept="image/*" onChange={handleDishImageUpload} disabled={uploadingDishImage} className="hidden" />
+                  </label>
+                </div>
+                <input type="url" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Or paste image URL" className="input-field focus:ring-section-cookbook text-xs" />
+              </div>
+
               <div className="flex gap-2">
                 <input type="number" value={servings} onChange={(e) => setServings(e.target.value)} placeholder="Servings" className="input-field focus:ring-section-cookbook flex-1" inputMode="numeric" />
                 <input type="number" value={prepTime} onChange={(e) => setPrepTime(e.target.value)} placeholder="Prep (min)" className="input-field focus:ring-section-cookbook flex-1" inputMode="numeric" />
@@ -581,6 +723,105 @@ export default function Cookbook() {
               )
             })}
           </div>
+        </section>
+      )}
+
+      {/* AI Recipe Suggestions */}
+      {!isSearching && (
+        <section className="space-y-4 pb-8">
+          <div className="flex justify-between items-end px-1">
+            <div>
+              <h3 className="font-heading text-xl font-bold">What Can I Make?</h3>
+              <p className="text-charcoal-light text-xs mt-1">AI suggestions from your pantry, fridge, and freezer</p>
+            </div>
+          </div>
+
+          {suggestions.length === 0 && !suggestionsLoading && (
+            <button
+              onClick={fetchSuggestions}
+              disabled={suggestionsLoading}
+              className="w-full bg-gradient-to-r from-section-cookbook to-section-cookbook/80 text-white py-4 rounded-full font-bold text-sm tracking-wide active:scale-95 transition-all shadow-dark-md"
+            >
+              Get Recipe Ideas
+            </button>
+          )}
+
+          {suggestionsLoading && (
+            <div className="flex items-center justify-center py-8 gap-3">
+              <div className="w-6 h-6 border-3 border-section-cookbook border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-warmgray-500">Checking your inventory...</span>
+            </div>
+          )}
+
+          {suggestionsError && (
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-xl">{suggestionsError}</div>
+          )}
+
+          {suggestions.length > 0 && (
+            <div className="space-y-3">
+              {suggestions.map((suggestion, i) => {
+                const totalIngredients = suggestion.matched_ingredients.length + suggestion.missing_ingredients.length
+                const matchPct = totalIngredients > 0 ? Math.round((suggestion.matched_ingredients.length / totalIngredients) * 100) : 0
+
+                return (
+                  <div key={i} className="bg-dark-surface rounded-2xl p-4 shadow-dark space-y-3 border border-warmgray-100">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-heading font-bold text-charcoal">{suggestion.name}</h4>
+                        <p className="text-xs text-charcoal-light mt-1">{suggestion.description}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 ml-3">
+                        <span className={`text-xs font-bold ${matchPct >= 80 ? 'text-section-grocery' : matchPct >= 50 ? 'text-section-pantry' : 'text-warmgray-400'}`}>
+                          {matchPct}% match
+                        </span>
+                        <span className="text-[10px] text-warmgray-400">{suggestion.time_estimate}m</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-1.5 bg-warmgray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${matchPct >= 80 ? 'bg-section-grocery' : matchPct >= 50 ? 'bg-section-pantry' : 'bg-warmgray-300'}`}
+                          style={{ width: `${matchPct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-warmgray-400">{suggestion.matched_ingredients.length}/{totalIngredients}</span>
+                    </div>
+
+                    {suggestion.tags && suggestion.tags.length > 0 && (
+                      <div className="flex gap-1 flex-wrap">
+                        {suggestion.tags.map(tag => (
+                          <span key={tag} className="px-2 py-0.5 bg-section-cookbook/10 text-section-cookbook text-[10px] rounded-full font-medium">
+                            {tag}
+                          </span>
+                        ))}
+                        <span className="px-2 py-0.5 bg-cream text-warmgray-500 text-[10px] rounded-full font-medium">
+                          {suggestion.difficulty}
+                        </span>
+                      </div>
+                    )}
+
+                    {suggestion.missing_ingredients.length > 0 && (
+                      <div className="pt-2 border-t border-warmgray-100">
+                        <p className="text-[10px] font-medium text-warmgray-500 mb-1">Missing:</p>
+                        <p className="text-xs text-warmgray-400">
+                          {suggestion.missing_ingredients.join(', ')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              <button
+                onClick={fetchSuggestions}
+                disabled={suggestionsLoading}
+                className="w-full py-3 text-sm font-medium text-section-cookbook border border-section-cookbook/30 rounded-full active:scale-95 transition-all"
+              >
+                Refresh Suggestions
+              </button>
+            </div>
+          )}
         </section>
       )}
     </div>

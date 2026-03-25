@@ -121,6 +121,7 @@ export function useRecipes(householdId) {
         name: recipe.name,
         description: recipe.description || null,
         image_url: recipe.image_url || null,
+        source_image_url: recipe.source_image_url || null,
         servings: recipe.servings || null,
         prep_time: recipe.prep_time || null,
         cook_time: recipe.cook_time || null,
@@ -211,6 +212,50 @@ export function useRecipes(householdId) {
     }
   }
 
+  const updateRecipe = async (id, updates, ingredients) => {
+    const updateData = {
+      name: updates.name,
+      description: updates.description || null,
+      image_url: updates.image_url || null,
+      servings: updates.servings || null,
+      prep_time: updates.prep_time || null,
+      cook_time: updates.cook_time || null,
+      instructions: updates.instructions || null,
+      tags: updates.tags || [],
+    }
+    if ('source_image_url' in updates) {
+      updateData.source_image_url = updates.source_image_url || null
+    }
+    const { error: recipeError } = await supabase
+      .from('recipes')
+      .update(updateData)
+      .eq('id', id)
+
+    if (recipeError) return { error: recipeError }
+
+    // Delete and reinsert ingredients (same pattern as reimportRecipe)
+    await supabase.from('recipe_ingredients').delete().eq('recipe_id', id)
+
+    if (ingredients && ingredients.length > 0) {
+      const rows = ingredients.map((ing, i) => ({
+        recipe_id: id,
+        name: ing.name,
+        qty: ing.qty || null,
+        unit: ing.unit || null,
+        notes: ing.notes || null,
+        position: i,
+      }))
+
+      const { error: ingredientsError } = await supabase
+        .from('recipe_ingredients')
+        .insert(rows)
+
+      if (ingredientsError) return { error: ingredientsError }
+    }
+
+    return { data: true }
+  }
+
   const deleteRecipe = async (id) => {
     const { error } = await supabase.from('recipes').delete().eq('id', id)
     return { error }
@@ -223,6 +268,7 @@ export function useRecipes(householdId) {
     importRecipe,
     reimportRecipe,
     createRecipe,
+    updateRecipe,
     deleteRecipe,
   }
 }

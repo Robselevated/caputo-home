@@ -19,14 +19,14 @@ Return ONLY a valid JSON array. No markdown, no explanation.`,
   pantry: `You are analyzing a photo of items in a pantry. Identify every food item visible. Count the exact number of each item you can see.
 For each item return a JSON object with these keys:
 - "name": generic name, no brand
-- "category": MUST be one of: Pasta, Canned Goods, Dry Goods, Sauces & Condiments, Spices, Snacks, Baking, Beverages, Other
+- "category": MUST be one of: Pasta, Bread, Canned Goods, Dry Goods, Sauces & Condiments, Spices, Snacks, Baking, Beverages, Other
 - "subcategory": for Pasta only (Spaghetti, Penne, Bow Tie (Farfalle), Elbow, Fettuccine, Linguine, Angel Hair, Rigatoni, Rotini, Lasagna, Orzo, Other), null for other categories
 - "qty": integer count of how many you see, minimum 1
-- "unit": cans for canned goods, boxes for pasta/dry goods, bags for snacks/baking, jars for spices, bottles for sauces/beverages
+- "unit": cans for canned goods, boxes for pasta/dry goods, bags for snacks/baking, jars for spices, bottles for sauces/beverages, count for bread
 - "confidence": high/medium/low
 - "needs_verification": boolean
 - "verification_prompt": string if low confidence, null otherwise
-Choose the MOST SPECIFIC category. Salsa, ketchup, mustard, hot sauce = "Sauces & Condiments". Canned beans, soups, tomatoes = "Canned Goods". Rice, flour, sugar, oats = "Dry Goods". Only use "Other" if no other category fits.
+Choose the MOST SPECIFIC category. Bread, bagels, buns, rolls, tortillas, naan, pita, English muffins, hamburger buns, hot dog buns = "Bread". Salsa, ketchup, mustard, hot sauce = "Sauces & Condiments". Canned beans, soups, tomatoes = "Canned Goods". Rice, flour, sugar, oats = "Dry Goods". Only use "Other" if no other category fits.
 Return ONLY a valid JSON array. No markdown, no explanation.`,
 
   fridge: `You are analyzing a photo of items in a fridge. Identify every food item visible. Count the exact number of each item you can see.

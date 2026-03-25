@@ -7,6 +7,7 @@ import Fridge from './pages/Fridge'
 import Pantry from './pages/Pantry'
 import Cookbook from './pages/Cookbook'
 import RecipeDetail from './pages/RecipeDetail'
+import RecipeEdit from './pages/RecipeEdit'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
                 <Route path="/fridge" element={<Fridge />} />
                 <Route path="/pantry" element={<Pantry />} />
                 <Route path="/cookbook" element={<Cookbook />} />
+                <Route path="/cookbook/:id/edit" element={<RecipeEdit />} />
                 <Route path="/cookbook/:id" element={<RecipeDetail />} />
                 <Route path="*" element={<Navigate to="/grocery" replace />} />
               </Routes>

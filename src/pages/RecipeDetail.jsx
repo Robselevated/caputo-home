@@ -99,6 +99,14 @@ export default function RecipeDetail() {
             </svg>
           </button>
           <h1 className="text-2xl font-heading font-bold text-charcoal flex-1">{recipe.name}</h1>
+          <button
+            onClick={() => navigate(`/cookbook/${id}/edit`)}
+            className="text-warmgray-400 hover:text-section-cookbook"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
           {recipe.source_url && (
             <button
               onClick={handleRefresh}
@@ -203,6 +211,13 @@ export default function RecipeDetail() {
                 ))
               })()}
             </ol>
+          </div>
+        )}
+
+        {recipe.source_image_url && (
+          <div className="card mt-4">
+            <h2 className="font-heading font-semibold text-charcoal mb-3">Recipe Source</h2>
+            <img src={recipe.source_image_url} alt="Recipe source" className="w-full rounded-xl" />
           </div>
         )}
 

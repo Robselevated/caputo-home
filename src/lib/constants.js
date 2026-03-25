@@ -66,6 +66,7 @@ export const TAXONOMY = {
   },
   pantry: {
     'Pasta': ['Spaghetti', 'Penne', 'Bow Tie (Farfalle)', 'Elbow', 'Fettuccine', 'Linguine', 'Angel Hair', 'Rigatoni', 'Rotini', 'Lasagna', 'Orzo', 'Other'],
+    'Bread': null,
     'Canned Goods': null,
     'Dry Goods': null,
     'Sauces & Condiments': null,
@@ -104,6 +105,7 @@ export const DEFAULT_UNITS = {
   },
   pantry: {
     'Pasta': 'boxes',
+    'Bread': 'count',
     'Canned Goods': 'cans',
     'Dry Goods': 'bags',
     'Sauces & Condiments': 'bottles',
