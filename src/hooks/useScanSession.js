@@ -76,13 +76,19 @@ export function useScanSession(householdId) {
             { onConflict: 'household_id,name' }
           )
         } else {
-          const { data: existing } = await supabase
+          const { data: matches, error: lookupErr } = await supabase
             .from('inventory_items')
             .select('id, qty')
             .eq('household_id', householdId)
             .eq('location', location)
             .ilike('name', item.name)
-            .single()
+
+          if (lookupErr) {
+            errors.push(`${item.name}: ${lookupErr.message}`)
+            continue
+          }
+
+          const existing = matches && matches.length > 0 ? matches[0] : null
 
           if (existing) {
             const { error: updateErr } = await supabase.from('inventory_items').update({
