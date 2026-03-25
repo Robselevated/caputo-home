@@ -14,6 +14,7 @@ Extract as much structured recipe information as you can. Return a JSON object w
 - "tags": array of relevant tags like cuisine type, meal type, dietary (string array, can be empty)
 - "instructions": full step-by-step instructions as text with numbered steps (string or null)
 - "ingredients": array of ingredient objects, each with:
+  - "section": ingredient group heading like "Chicken", "Sauce", "Green Sauce", "For the marinade" (string or null). Many recipes group ingredients under sub-headings. When ingredients are grouped this way, set the section field to the group name. When there are no sub-groups, set to null.
   - "name": ingredient name (string)
   - "qty": numeric quantity as a decimal number (e.g. 0.5 not "1/2") (number or null)
   - "unit": measurement unit standardized to one of: cup, tbsp, tsp, oz, lb, gram, kg, count, slices, can, package, pinch, dash, bunch, clove, sprig (string or null)
@@ -23,6 +24,7 @@ Important:
 - Convert all fractions to decimals (1/2 = 0.5, 1/3 = 0.333, 1/4 = 0.25, 3/4 = 0.75)
 - If text is partially illegible, extract what you can and mark unclear parts with [unclear] in the notes
 - If you cannot determine a field, set it to null
+- Preserve the order of ingredient sections as they appear in the original recipe
 - Return ONLY a valid JSON object. No markdown, no explanation.`
 
 export async function handler(event) {

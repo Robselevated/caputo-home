@@ -107,7 +107,7 @@ create table recently_bought (
 
 -- ============================================================
 -- INVENTORY ITEMS
--- location: freezer | pantry | fridge
+-- location: freezer | pantry | fridge | home_goods
 -- category + subcategory structure defined in taxonomy below
 -- subcategory is NULL for flat categories (most pantry items)
 -- ============================================================
@@ -122,7 +122,7 @@ create table inventory_items (
   --   freezer other = 'bags' | 'packages' | 'count'
   --   pantry = 'cans' | 'boxes' | 'bags' | 'jars' | 'count'
   --   fridge = 'count' | 'packages' | 'lbs'
-  location text not null check (location in ('freezer', 'pantry', 'fridge')),
+  location text not null check (location in ('freezer', 'pantry', 'fridge', 'home_goods')),
   category text not null,
   subcategory text,                -- null for flat categories
   notes text,
@@ -180,6 +180,7 @@ create table recipe_ingredients (
   qty numeric,
   unit text,
   notes text,                      -- substitution notes per ingredient
+  section text,                    -- ingredient group heading (e.g. 'Sauce', 'Chicken', 'Green Sauce')
   position integer default 0       -- display order within recipe
 );
 

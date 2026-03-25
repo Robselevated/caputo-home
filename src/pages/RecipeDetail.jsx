@@ -10,7 +10,7 @@ export default function RecipeDetail() {
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
   const { getRecipe, reimportRecipe, deleteRecipe } = useRecipes(householdId)
-  const { matchIngredients, addMissingToGroceryList } = useRecipeMatch(householdId)
+  const { matchIngredients, addMissingToGroceryList, useRecipe, addDepletedToGroceryList } = useRecipeMatch(householdId)
 
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -20,6 +20,8 @@ export default function RecipeDetail() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [successMessage, setSuccessMessage] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [useResult, setUseResult] = useState(null)
+  const [using, setUsing] = useState(false)
 
   useEffect(() => {
     loadRecipe()
@@ -51,6 +53,24 @@ export default function RecipeDetail() {
     setShowMakeThis(false)
     setSuccessMessage(`Added ${matchResult.missing.length} item${matchResult.missing.length !== 1 ? 's' : ''} to grocery list`)
     setTimeout(() => setSuccessMessage(null), 3000)
+  }
+
+  const handleUseRecipe = async () => {
+    if (!matchResult) return
+    setUsing(true)
+    const result = await useRecipe(matchResult, recipe.name, user.id)
+    setUseResult(result)
+    setUsing(false)
+  }
+
+  const handleAddDepletedToGroceryList = async () => {
+    if (!useResult?.nowOut || useResult.nowOut.length === 0) return
+    await addDepletedToGroceryList(useResult.nowOut, recipe.name, user.id)
+    setShowMakeThis(false)
+    setUseResult(null)
+    setMatchResult(null)
+    setSuccessMessage(`Inventory updated. Added ${useResult.nowOut.length} depleted item${useResult.nowOut.length !== 1 ? 's' : ''} to grocery list.`)
+    setTimeout(() => setSuccessMessage(null), 4000)
   }
 
   const handleRefresh = async () => {
@@ -170,17 +190,40 @@ export default function RecipeDetail() {
           <h2 className="font-heading font-semibold text-charcoal mb-3">Ingredients</h2>
           <div className="space-y-2">
             {recipe.ingredients && recipe.ingredients.length > 0 ? (
-              recipe.ingredients.map((ing, i) => (
-                <div key={i} className="flex items-baseline gap-2 text-sm">
-                  <span className="w-1.5 h-1.5 bg-section-cookbook rounded-full shrink-0 mt-1.5" />
-                  <span className="text-charcoal">
-                    {ing.qty && <span className="font-medium">{ing.qty} </span>}
-                    {ing.unit && <span className="text-warmgray-600">{ing.unit} </span>}
-                    {ing.name}
-                    {ing.notes && <span className="text-warmgray-500"> ({ing.notes})</span>}
-                  </span>
-                </div>
-              ))
+              (() => {
+                // Group ingredients by section, preserving order
+                const sections = []
+                let currentSection = null
+                for (const ing of recipe.ingredients) {
+                  const sectionName = ing.section || null
+                  if (sections.length === 0 || sectionName !== currentSection) {
+                    sections.push({ name: sectionName, items: [ing] })
+                    currentSection = sectionName
+                  } else {
+                    sections[sections.length - 1].items.push(ing)
+                  }
+                }
+                return sections.map((section, si) => (
+                  <div key={si} className={si > 0 ? 'pt-2' : ''}>
+                    {section.name && (
+                      <h3 className="text-sm font-semibold text-section-cookbook mb-2">{section.name}</h3>
+                    )}
+                    <div className="space-y-1.5">
+                      {section.items.map((ing, i) => (
+                        <div key={i} className="flex items-baseline gap-2 text-sm">
+                          <span className="w-1.5 h-1.5 bg-section-cookbook rounded-full shrink-0 mt-1.5" />
+                          <span className="text-charcoal">
+                            {ing.qty && <span className="font-medium">{ing.qty} </span>}
+                            {ing.unit && <span className="text-warmgray-600">{ing.unit} </span>}
+                            {ing.name}
+                            {ing.notes && <span className="text-warmgray-500"> ({ing.notes})</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              })()
             ) : (
               <p className="text-warmgray-400 text-sm">No ingredients listed</p>
             )}
@@ -307,16 +350,94 @@ export default function RecipeDetail() {
               )}
             </div>
 
-            {matchResult.missing.length > 0 && (
-              <div className="sticky bottom-0 bg-dark-surface px-6 py-4 border-t border-warmgray-100">
+            {/* Depletion Summary (after "I Made This") */}
+            {useResult && (
+              <div className="px-6 py-4 space-y-4 border-t border-warmgray-100">
+                <h4 className="font-heading font-semibold text-charcoal">Inventory Updated</h4>
+
+                {useResult.decremented.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-warmgray-500 uppercase tracking-wider mb-2">Decremented</p>
+                    <div className="space-y-1">
+                      {useResult.decremented.map((item, i) => (
+                        <div key={i} className={`flex items-center justify-between text-sm ${item.newQty === 0 ? 'text-red-400' : 'text-charcoal'}`}>
+                          <span>{item.name}</span>
+                          <span className="text-xs">
+                            {item.oldQty} → <span className={`font-bold ${item.newQty === 0 ? 'text-red-400' : 'text-green-500'}`}>{item.newQty}</span> {item.inventoryItem?.unit}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {useResult.nowOut.length > 0 && (
+                  <div className="bg-red-900/10 rounded-xl p-3">
+                    <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Now Out of Stock</p>
+                    <p className="text-sm text-red-400">
+                      {useResult.nowOut.map(item => item.name).join(', ')}
+                    </p>
+                  </div>
+                )}
+
+                {useResult.skipped.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-warmgray-400 uppercase tracking-wider mb-2">Skipped (unit mismatch)</p>
+                    <div className="space-y-1">
+                      {useResult.skipped.map((item, i) => (
+                        <div key={i} className="flex items-center justify-between text-sm text-warmgray-400">
+                          <span>{item.name}</span>
+                          <span className="text-xs">{item.reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="sticky bottom-0 bg-dark-surface px-6 py-4 border-t border-warmgray-100 space-y-2">
+              {/* Show "Add Missing" if there are missing items and we haven't used yet */}
+              {!useResult && matchResult.missing.length > 0 && (
                 <button
                   onClick={handleAddToGroceryList}
                   className="btn-primary bg-section-cookbook w-full"
                 >
                   Add Missing to Grocery List
                 </button>
-              </div>
-            )}
+              )}
+
+              {/* Show "I Made This" if we haven't used yet and there are matched items */}
+              {!useResult && matchResult.inInventory.length > 0 && (
+                <button
+                  onClick={handleUseRecipe}
+                  disabled={using}
+                  className="btn-primary bg-section-grocery w-full disabled:opacity-40"
+                >
+                  {using ? 'Updating inventory...' : 'I Made This'}
+                </button>
+              )}
+
+              {/* Show "Add Depleted to Grocery List" after use if items are now out */}
+              {useResult && useResult.nowOut.length > 0 && (
+                <button
+                  onClick={handleAddDepletedToGroceryList}
+                  className="btn-primary bg-red-500 w-full"
+                >
+                  Add {useResult.nowOut.length} Depleted Item{useResult.nowOut.length !== 1 ? 's' : ''} to Grocery List
+                </button>
+              )}
+
+              {/* Done button after use */}
+              {useResult && (
+                <button
+                  onClick={() => { setShowMakeThis(false); setUseResult(null); setMatchResult(null) }}
+                  className="w-full py-3 text-sm font-medium text-warmgray-500 border border-warmgray-200 rounded-xl"
+                >
+                  Done
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

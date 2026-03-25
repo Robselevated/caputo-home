@@ -97,6 +97,7 @@ export function useRecipes(householdId) {
           qty: ing.qty || null,
           unit: ing.unit || null,
           notes: ing.notes || null,
+          section: ing.section || null,
           position: i,
         }))
 
@@ -142,6 +143,7 @@ export function useRecipes(householdId) {
         qty: ing.qty || null,
         unit: ing.unit || null,
         notes: ing.notes || null,
+        section: ing.section || null,
         position: i,
       }))
 
@@ -196,6 +198,7 @@ export function useRecipes(householdId) {
           qty: ing.qty || null,
           unit: ing.unit || null,
           notes: ing.notes || null,
+          section: ing.section || null,
           position: i,
         }))
 
@@ -243,6 +246,7 @@ export function useRecipes(householdId) {
         qty: ing.qty || null,
         unit: ing.unit || null,
         notes: ing.notes || null,
+        section: ing.section || null,
         position: i,
       }))
 

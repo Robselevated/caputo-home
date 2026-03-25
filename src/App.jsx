@@ -6,6 +6,7 @@ import Freezer from './pages/Freezer'
 import Fridge from './pages/Fridge'
 import Pantry from './pages/Pantry'
 import Cookbook from './pages/Cookbook'
+import HomeGoods from './pages/HomeGoods'
 import RecipeDetail from './pages/RecipeDetail'
 import RecipeEdit from './pages/RecipeEdit'
 
@@ -22,6 +23,7 @@ export default function App() {
                 <Route path="/freezer" element={<Freezer />} />
                 <Route path="/fridge" element={<Fridge />} />
                 <Route path="/pantry" element={<Pantry />} />
+                <Route path="/home-goods" element={<HomeGoods />} />
                 <Route path="/cookbook" element={<Cookbook />} />
                 <Route path="/cookbook/:id/edit" element={<RecipeEdit />} />
                 <Route path="/cookbook/:id" element={<RecipeDetail />} />

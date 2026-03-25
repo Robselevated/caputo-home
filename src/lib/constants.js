@@ -37,6 +37,7 @@ export const SECTION_COLORS = {
   fridge: { bg: 'bg-section-fridge', text: 'text-section-fridge', light: 'bg-section-fridge/10', ring: 'ring-section-fridge', border: 'border-section-fridge' },
   pantry: { bg: 'bg-section-pantry', text: 'text-section-pantry', light: 'bg-section-pantry/10', ring: 'ring-section-pantry', border: 'border-section-pantry' },
   cookbook: { bg: 'bg-section-cookbook', text: 'text-section-cookbook', light: 'bg-section-cookbook/10', ring: 'ring-section-cookbook', border: 'border-section-cookbook' },
+  home_goods: { bg: 'bg-section-homegoods', text: 'text-section-homegoods', light: 'bg-section-homegoods/10', ring: 'ring-section-homegoods', border: 'border-section-homegoods' },
 }
 
 // Full taxonomy: categories and subcategories per location
@@ -79,6 +80,15 @@ export const TAXONOMY = {
     'Beverages': null,
     'Other': null,
   },
+  home_goods: {
+    'Paper Products': null,
+    'Cleaning': null,
+    'Trash & Storage': null,
+    'Personal Care': null,
+    'Medicine': null,
+    'Laundry': null,
+    'Other': null,
+  },
 }
 
 // Default units per category per location
@@ -119,6 +129,15 @@ export const DEFAULT_UNITS = {
     'Snacks': 'bags',
     'Baking': 'bags',
     'Beverages': 'count',
+    'Other': 'count',
+  },
+  home_goods: {
+    'Paper Products': 'rolls',
+    'Cleaning': 'bottles',
+    'Trash & Storage': 'boxes',
+    'Personal Care': 'count',
+    'Medicine': 'count',
+    'Laundry': 'count',
     'Other': 'count',
   },
 }

@@ -12,7 +12,13 @@ const RECIPE_PROMPT = `You are parsing a recipe from content. Extract the follow
 - tags: Array of relevant tags (cuisine type, meal type, dietary restrictions, etc.)
 - instructions: Complete cooking instructions as numbered steps, one step per line (e.g. "1. Do this\n2. Do that\n3. Then this")
 - image_url: Main recipe image URL (full URL, not relative path)
-- ingredients: Array of objects with structure: { "name": "ingredient name", "qty": number, "unit": "measurement unit", "notes": "optional notes like 'chopped' or 'divided'" }
+- ingredients: Array of objects with structure: { "section": "group name or null", "name": "ingredient name", "qty": number, "unit": "measurement unit", "notes": "optional notes like 'chopped' or 'divided'" }
+
+For ingredient sections:
+- Many recipes group ingredients under sub-headings like "Chicken:", "Sauce:", "For the marinade:", "Dry ingredients:", "Green Sauce:", etc.
+- When ingredients are grouped this way, set the "section" field to the group name (e.g., "Chicken", "Sauce", "Green Sauce")
+- When a recipe has no sub-groups (all ingredients in one flat list), set section to null for all ingredients
+- Preserve the order of sections as they appear in the original recipe
 
 For ingredients:
 - Extract the quantity as a number (convert fractions to decimals: 1/2 = 0.5, 1/4 = 0.25, 3/4 = 0.75)

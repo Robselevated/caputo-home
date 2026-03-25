@@ -25,7 +25,7 @@ export default function RecipeEdit() {
   const [cookTime, setCookTime] = useState('')
   const [tags, setTags] = useState('')
   const [instructions, setInstructions] = useState('')
-  const [ingredients, setIngredients] = useState([{ name: '', qty: '', unit: '', notes: '' }])
+  const [ingredients, setIngredients] = useState([{ name: '', qty: '', unit: '', notes: '', section: '' }])
 
   useEffect(() => {
     loadRecipe()
@@ -56,6 +56,7 @@ export default function RecipeEdit() {
         qty: ing.qty ? String(ing.qty) : '',
         unit: ing.unit || '',
         notes: ing.notes || '',
+        section: ing.section || '',
       })))
     }
 
@@ -118,8 +119,27 @@ export default function RecipeEdit() {
     navigate(`/cookbook/${id}`)
   }
 
-  const addIngredientRow = () => {
-    setIngredients([...ingredients, { name: '', qty: '', unit: '', notes: '' }])
+  const addIngredientRow = (section = '') => {
+    // When adding an ingredient, inherit the section of the last ingredient
+    const lastSection = section || (ingredients.length > 0 ? ingredients[ingredients.length - 1].section : '')
+    setIngredients([...ingredients, { name: '', qty: '', unit: '', notes: '', section: lastSection }])
+  }
+
+  const addSection = () => {
+    setIngredients([...ingredients, { name: '', qty: '', unit: '', notes: '', section: 'New Section' }])
+  }
+
+  const renameSection = (oldName, newName) => {
+    setIngredients(ingredients.map(ing =>
+      ing.section === oldName ? { ...ing, section: newName } : ing
+    ))
+  }
+
+  const removeSection = (sectionName) => {
+    // Remove section header but keep ingredients (set section to empty)
+    setIngredients(ingredients.map(ing =>
+      ing.section === sectionName ? { ...ing, section: '' } : ing
+    ))
   }
 
   const updateIngredient = (index, field, value) => {
@@ -276,58 +296,102 @@ export default function RecipeEdit() {
           {/* Ingredients */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-warmgray-600">Ingredients</label>
-            {ingredients.map((ing, i) => (
-              <div key={i} className="space-y-2 pb-2 border-b border-warmgray-100 last:border-0">
-                <div className="flex gap-2 items-start">
-                  <input
-                    type="text"
-                    value={ing.name}
-                    onChange={(e) => updateIngredient(i, 'name', e.target.value)}
-                    placeholder="Ingredient name"
-                    className="input-field focus:ring-section-cookbook flex-1"
-                  />
-                  {ingredients.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeIngredient(i)}
-                      className="text-red-500 hover:text-red-600 mt-3 shrink-0"
-                    >
-                      <span className="material-symbols-outlined text-xl">close</span>
-                    </button>
+            {(() => {
+              // Group ingredients by section for rendering
+              const sections = []
+              let currentSection = null
+              ingredients.forEach((ing, i) => {
+                const sectionName = ing.section || ''
+                if (sections.length === 0 || sectionName !== currentSection) {
+                  sections.push({ name: sectionName, items: [{ ...ing, _index: i }] })
+                  currentSection = sectionName
+                } else {
+                  sections[sections.length - 1].items.push({ ...ing, _index: i })
+                }
+              })
+              return sections.map((section, si) => (
+                <div key={si} className={`space-y-2 ${si > 0 ? 'pt-3 border-t-2 border-section-cookbook/20' : ''}`}>
+                  {section.name && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={section.name}
+                        onChange={(e) => renameSection(section.name, e.target.value)}
+                        className="input-field focus:ring-section-cookbook flex-1 font-semibold text-section-cookbook"
+                        placeholder="Section name"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeSection(section.name)}
+                        className="text-warmgray-400 hover:text-red-500 shrink-0"
+                        title="Remove section grouping"
+                      >
+                        <span className="material-symbols-outlined text-lg">link_off</span>
+                      </button>
+                    </div>
                   )}
+                  {section.items.map((ing) => (
+                    <div key={ing._index} className="space-y-2 pb-2 border-b border-warmgray-100 last:border-0">
+                      <div className="flex gap-2 items-start">
+                        <input
+                          type="text"
+                          value={ing.name}
+                          onChange={(e) => updateIngredient(ing._index, 'name', e.target.value)}
+                          placeholder="Ingredient name"
+                          className="input-field focus:ring-section-cookbook flex-1"
+                        />
+                        {ingredients.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeIngredient(ing._index)}
+                            className="text-red-500 hover:text-red-600 mt-3 shrink-0"
+                          >
+                            <span className="material-symbols-outlined text-xl">close</span>
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={ing.qty}
+                          onChange={(e) => updateIngredient(ing._index, 'qty', e.target.value)}
+                          placeholder="Qty"
+                          className="input-field focus:ring-section-cookbook w-20"
+                          inputMode="decimal"
+                        />
+                        <input
+                          type="text"
+                          value={ing.unit}
+                          onChange={(e) => updateIngredient(ing._index, 'unit', e.target.value)}
+                          placeholder="Unit (cup, tbsp...)"
+                          className="input-field focus:ring-section-cookbook flex-1"
+                        />
+                        <input
+                          type="text"
+                          value={ing.notes}
+                          onChange={(e) => updateIngredient(ing._index, 'notes', e.target.value)}
+                          placeholder="Notes"
+                          className="input-field focus:ring-section-cookbook flex-1"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => addIngredientRow(section.name)}
+                    className="text-sm text-section-cookbook font-medium"
+                  >
+                    + Add Ingredient
+                  </button>
                 </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={ing.qty}
-                    onChange={(e) => updateIngredient(i, 'qty', e.target.value)}
-                    placeholder="Qty"
-                    className="input-field focus:ring-section-cookbook w-20"
-                    inputMode="decimal"
-                  />
-                  <input
-                    type="text"
-                    value={ing.unit}
-                    onChange={(e) => updateIngredient(i, 'unit', e.target.value)}
-                    placeholder="Unit (cup, tbsp...)"
-                    className="input-field focus:ring-section-cookbook flex-1"
-                  />
-                  <input
-                    type="text"
-                    value={ing.notes}
-                    onChange={(e) => updateIngredient(i, 'notes', e.target.value)}
-                    placeholder="Notes"
-                    className="input-field focus:ring-section-cookbook flex-1"
-                  />
-                </div>
-              </div>
-            ))}
+              ))
+            })()}
             <button
               type="button"
-              onClick={addIngredientRow}
-              className="text-sm text-section-cookbook font-medium"
+              onClick={addSection}
+              className="text-sm text-warmgray-500 font-medium border border-dashed border-warmgray-300 rounded-lg py-2 w-full"
             >
-              + Add Ingredient
+              + Add Section
             </button>
           </div>
 

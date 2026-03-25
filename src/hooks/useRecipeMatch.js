@@ -70,9 +70,57 @@ export function useRecipeMatch(householdId) {
     }
   }
 
+  const useRecipe = async (matchResult, recipeName, userId) => {
+    const decremented = []
+    const nowOut = []
+    const skipped = []
+
+    for (const item of matchResult.inInventory) {
+      const inv = item.inventoryItem
+      const unitsMatch = !item.unit || !inv.unit || item.unit === inv.unit
+
+      if (unitsMatch) {
+        const newQty = Math.max(0, inv.qty - (item.qty || 1))
+        await supabase.from('inventory_items').update({
+          qty: newQty,
+          updated_by: userId,
+          updated_at: new Date().toISOString(),
+        }).eq('id', inv.id)
+        decremented.push({ ...item, oldQty: inv.qty, newQty })
+        if (newQty === 0) nowOut.push(item)
+      } else {
+        skipped.push({ ...item, reason: `${item.unit} vs ${inv.unit}` })
+      }
+    }
+
+    return { decremented, nowOut, skipped }
+  }
+
+  const addDepletedToGroceryList = async (depletedItems, recipeName, userId) => {
+    const groceryItems = depletedItems.map(item => ({
+      household_id: householdId,
+      name: item.name,
+      qty: item.inventoryItem?.qty || 1,
+      unit: item.inventoryItem?.unit || item.unit,
+      store: null,
+      notes: `Ran out making: ${recipeName}`,
+      checked: false,
+      added_by: userId,
+      updated_by: userId,
+    }))
+
+    const { error } = await supabase
+      .from('grocery_items')
+      .insert(groceryItems)
+
+    return { error }
+  }
+
   return {
     loading,
     matchIngredients,
     addMissingToGroceryList,
+    useRecipe,
+    addDepletedToGroceryList,
   }
 }

@@ -5,10 +5,10 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   safelist: [
-    { pattern: /bg-section-(grocery|freezer|fridge|pantry|cookbook)/ },
-    { pattern: /text-section-(grocery|freezer|fridge|pantry|cookbook)/ },
-    { pattern: /ring-section-(grocery|freezer|fridge|pantry|cookbook)/ },
-    { pattern: /border-section-(grocery|freezer|fridge|pantry|cookbook)/ },
+    { pattern: /bg-section-(grocery|freezer|fridge|pantry|cookbook|homegoods)/ },
+    { pattern: /text-section-(grocery|freezer|fridge|pantry|cookbook|homegoods)/ },
+    { pattern: /ring-section-(grocery|freezer|fridge|pantry|cookbook|homegoods)/ },
+    { pattern: /border-section-(grocery|freezer|fridge|pantry|cookbook|homegoods)/ },
   ],
   theme: {
     extend: {
@@ -33,6 +33,7 @@ export default {
         'section-fridge': '#006A6A',
         'section-pantry': '#C08B30',
         'section-cookbook': '#9128ad',
+        'section-homegoods': '#9B6B7A',
         'cookbook-container': '#ea8cff',
       },
       fontFamily: {
