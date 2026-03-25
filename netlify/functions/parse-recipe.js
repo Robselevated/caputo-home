@@ -20,7 +20,7 @@ For ingredient sections:
 - When a recipe has no sub-groups (all ingredients in one flat list), set section to null for all ingredients
 - Preserve the order of sections as they appear in the original recipe
 - CRITICAL: The JSON-LD structured data often lists ingredients as a FLAT array without sections. You MUST check the HTML for ingredient group headers. Common patterns:
-  - WPRM plugin: <span class="wprm-recipe-group-name">Chicken:</span> followed by ingredient list items
+  - WPRM plugin: <span class="wprm-recipe-group-name">Chicken:</span> or <h4 class="wprm-recipe-group-name">Seasoning</h4> followed by ingredient list items
   - Bold headings within ingredient lists: <strong>For the sauce:</strong> or <b>Marinade:</b>
   - HTML headings: <h3>, <h4> tags within the ingredient section
   - Div groups: <div class="wprm-recipe-ingredient-group"> wrapping a group name + ingredients
@@ -79,16 +79,26 @@ function extractJsonLdRecipe(html) {
 }
 
 function extractByClass(html, className) {
-  const idx = html.indexOf(className)
-  if (idx === -1) return null
+  // Match class name within an HTML class attribute to skip CSS/JS/href references
+  const regex = new RegExp(`class="[^"]*${className}[^"]*"`, 'i')
+  const match = regex.exec(html)
+  if (!match) return null
 
-  // Walk backwards to find the opening < of this tag
-  const tagStart = html.lastIndexOf('<', idx)
+  const tagStart = html.lastIndexOf('<', match.index)
   if (tagStart === -1) return null
 
-  // Take a generous chunk from the container start
   const chunk = html.slice(tagStart, tagStart + 50000)
   return chunk.length > 200 ? chunk : null
+}
+
+function extractSectionHints(html) {
+  const hints = []
+  const regex = /class="[^"]*wprm-recipe-group-name[^"]*"[^>]*>([^<]+)</gi
+  let match
+  while ((match = regex.exec(html)) !== null) {
+    hints.push(match[1].trim().replace(/:$/, ''))
+  }
+  return hints
 }
 
 function stripPageChrome(html) {
@@ -223,6 +233,12 @@ export async function handler(event) {
     }
 
     contextParts.push(`\n--- RECIPE HTML (check for ingredient group headers) ---\n${recipeHtml.slice(0, 40000)}`)
+
+    // Extract ingredient section hints from WPRM markup and tell Claude directly
+    const sectionHints = extractSectionHints(content)
+    if (sectionHints.length > 0) {
+      contextParts.push(`\n--- DETECTED INGREDIENT SECTIONS ---\nThe recipe HTML has these ingredient group headers: ${sectionHints.map(s => `"${s}"`).join(', ')}. You MUST assign each ingredient to the correct section.\n---`)
+    }
 
     // Call Claude API to parse the recipe
     const response = await anthropic.messages.create({
