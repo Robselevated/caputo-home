@@ -3,20 +3,20 @@ import Anthropic from '@anthropic-ai/sdk'
 const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY })
 
 const SYSTEM_PROMPTS = {
-  freezer: `You are analyzing a photo of items in a freezer. Identify every food item visible.
-For each item return: name (generic, no brand — e.g. "Black Beans" not "Bush's Black Beans"), category, subcategory (if applicable from the freezer taxonomy: Beef, Pork, Chicken, Turkey, Ground Meat, Fish, Seafood, Frozen Produce, Frozen Meals, Other), estimated qty visible, unit (lbs for meats, bags/count for others), confidence level (high/medium/low), needs_verification boolean, and verification_prompt if low confidence.
+  freezer: `You are analyzing a photo of items in a freezer. Identify every food item visible. Count the exact number of each item you can see.
+For each item return a JSON object with these keys: "name" (generic, no brand — e.g. "Black Beans" not "Bush's Black Beans"), "category", "subcategory" (if applicable: Beef, Pork, Chicken, Turkey, Ground Meat, Fish, Seafood, Frozen Produce, Frozen Meals, Other), "qty" (integer count of how many you see, minimum 1), "unit" (lbs for meats, bags/count for others), "confidence" (high/medium/low), "needs_verification" (boolean), "verification_prompt" (string if low confidence, null otherwise).
 Return ONLY a valid JSON array. No markdown, no explanation.`,
 
-  pantry: `You are analyzing a photo of items in a pantry. Identify every food item visible.
-For each item return: name (generic, no brand), category (Pasta, Canned Goods, Dry Goods, Sauces & Condiments, Spices, Snacks, Baking, Beverages, Other), subcategory (for Pasta only: Spaghetti, Penne, etc), estimated qty visible, unit (cans/boxes/bags/jars/bottles as appropriate), confidence level (high/medium/low), needs_verification boolean, and verification_prompt if low confidence.
+  pantry: `You are analyzing a photo of items in a pantry. Identify every food item visible. Count the exact number of each item you can see.
+For each item return a JSON object with these keys: "name" (generic, no brand), "category" (Pasta, Canned Goods, Dry Goods, Sauces & Condiments, Spices, Snacks, Baking, Beverages, Other), "subcategory" (for Pasta only: Spaghetti, Penne, etc), "qty" (integer count of how many you see, minimum 1), "unit" (cans/boxes/bags/jars/bottles as appropriate), "confidence" (high/medium/low), "needs_verification" (boolean), "verification_prompt" (string if low confidence, null otherwise).
 Return ONLY a valid JSON array. No markdown, no explanation.`,
 
-  fridge: `You are analyzing a photo of items in a fridge. Identify every food item visible.
-For each item return: name (generic, no brand), category (Deli Meat, Bacon, Lettuce, Apples, Oranges, Pears, Dairy, Produce (Other), Other), subcategory (if applicable from fridge taxonomy), estimated qty visible, unit (lbs for deli meat, count for produce), confidence level (high/medium/low), needs_verification boolean, and verification_prompt if low confidence.
+  fridge: `You are analyzing a photo of items in a fridge. Identify every food item visible. Count the exact number of each item you can see.
+For each item return a JSON object with these keys: "name" (generic, no brand), "category" (Deli Meat, Bacon, Lettuce, Apples, Oranges, Pears, Dairy, Produce (Other), Other), "subcategory" (if applicable), "qty" (integer count of how many you see, minimum 1), "unit" (lbs for deli meat, count for produce), "confidence" (high/medium/low), "needs_verification" (boolean), "verification_prompt" (string if low confidence, null otherwise).
 Return ONLY a valid JSON array. No markdown, no explanation.`,
 
   receipt: `You are reading a grocery receipt. Extract every food/beverage line item. Exclude taxes, fees, non-food items (paper towels, cleaning supplies, etc).
-For each item return: name (generic product name), qty (number purchased), unit (count unless weight is shown).
+For each item return a JSON object with these keys: "name" (generic product name), "qty" (integer, number purchased, minimum 1), "unit" (count unless weight is shown).
 Return ONLY a valid JSON array. No markdown, no explanation.`,
 }
 
