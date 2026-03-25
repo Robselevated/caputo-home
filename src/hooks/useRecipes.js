@@ -1,0 +1,170 @@
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
+
+export function useRecipes(householdId) {
+  const [recipes, setRecipes] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchRecipes = useCallback(async () => {
+    if (!householdId) return
+    const { data, error } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('household_id', householdId)
+      .order('created_at', { ascending: false })
+
+    if (!error && data) setRecipes(data)
+    setLoading(false)
+  }, [householdId])
+
+  useEffect(() => {
+    fetchRecipes()
+
+    const channel = supabase
+      .channel('recipes_changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'recipes',
+        filter: `household_id=eq.${householdId}`,
+      }, () => {
+        fetchRecipes()
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [householdId, fetchRecipes])
+
+  const getRecipe = async (id) => {
+    const { data: recipe, error: recipeError } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (recipeError) return { error: recipeError }
+
+    const { data: ingredients, error: ingredientsError } = await supabase
+      .from('recipe_ingredients')
+      .select('*')
+      .eq('recipe_id', id)
+      .order('position', { ascending: true })
+
+    if (ingredientsError) return { error: ingredientsError }
+
+    return { data: { ...recipe, ingredients } }
+  }
+
+  const importRecipe = async (url, userId) => {
+    try {
+      const response = await fetch('/.netlify/functions/parse-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+
+      if (!response.ok) {
+        const error = await response.text()
+        return { error: error || 'Failed to parse recipe' }
+      }
+
+      const parsed = await response.json()
+
+      const { data: recipe, error: recipeError } = await supabase
+        .from('recipes')
+        .insert({
+          household_id: householdId,
+          name: parsed.name,
+          description: parsed.description || null,
+          image_url: parsed.image || null,
+          servings: parsed.servings || null,
+          prep_time: parsed.prepTime || null,
+          cook_time: parsed.cookTime || null,
+          instructions: parsed.instructions || null,
+          tags: parsed.tags || [],
+          source_url: url,
+          created_by: userId,
+        })
+        .select()
+        .single()
+
+      if (recipeError) return { error: recipeError }
+
+      if (parsed.ingredients && parsed.ingredients.length > 0) {
+        const ingredients = parsed.ingredients.map((ing, i) => ({
+          recipe_id: recipe.id,
+          name: ing.name,
+          qty: ing.qty || null,
+          unit: ing.unit || null,
+          notes: ing.notes || null,
+          position: i,
+        }))
+
+        const { error: ingredientsError } = await supabase
+          .from('recipe_ingredients')
+          .insert(ingredients)
+
+        if (ingredientsError) return { error: ingredientsError }
+      }
+
+      return { data: recipe }
+    } catch (err) {
+      return { error: err.message }
+    }
+  }
+
+  const createRecipe = async (recipe, userId) => {
+    const { data: newRecipe, error: recipeError } = await supabase
+      .from('recipes')
+      .insert({
+        household_id: householdId,
+        name: recipe.name,
+        description: recipe.description || null,
+        image_url: recipe.image_url || null,
+        servings: recipe.servings || null,
+        prep_time: recipe.prep_time || null,
+        cook_time: recipe.cook_time || null,
+        instructions: recipe.instructions || null,
+        tags: recipe.tags || [],
+        source_url: null,
+        created_by: userId,
+      })
+      .select()
+      .single()
+
+    if (recipeError) return { error: recipeError }
+
+    if (recipe.ingredients && recipe.ingredients.length > 0) {
+      const ingredients = recipe.ingredients.map((ing, i) => ({
+        recipe_id: newRecipe.id,
+        name: ing.name,
+        qty: ing.qty || null,
+        unit: ing.unit || null,
+        notes: ing.notes || null,
+        position: i,
+      }))
+
+      const { error: ingredientsError } = await supabase
+        .from('recipe_ingredients')
+        .insert(ingredients)
+
+      if (ingredientsError) return { error: ingredientsError }
+    }
+
+    return { data: newRecipe }
+  }
+
+  const deleteRecipe = async (id) => {
+    const { error } = await supabase.from('recipes').delete().eq('id', id)
+    return { error }
+  }
+
+  return {
+    recipes,
+    loading,
+    getRecipe,
+    importRecipe,
+    createRecipe,
+    deleteRecipe,
+  }
+}
