@@ -82,8 +82,8 @@ export function useInventory(householdId, location) {
     await supabase.from('grocery_items').insert({
       household_id: householdId,
       name: item.name,
-      qty: null,
-      unit: null,
+      qty: item.qty || 1,
+      unit: item.unit || null,
       store: null,
       notes: null,
       checked: false,

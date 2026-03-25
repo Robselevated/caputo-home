@@ -93,7 +93,13 @@ export function useGroceryList(householdId) {
   }
 
   const deleteItem = async (id) => {
-    await supabase.from('grocery_items').delete().eq('id', id)
+    // Optimistic removal so UI updates immediately
+    setItems(prev => prev.filter(i => i.id !== id))
+    const { error } = await supabase.from('grocery_items').delete().eq('id', id)
+    if (error) {
+      console.error('Delete failed:', error)
+      fetchItems() // Revert by re-fetching
+    }
   }
 
   const updateItem = async (id, changes, userId) => {

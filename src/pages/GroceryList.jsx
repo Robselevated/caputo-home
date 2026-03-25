@@ -17,7 +17,7 @@ const TABS = ['List', 'Recently Bought']
 export default function GroceryList() {
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
-  const { items, loading, addItem, checkItem, deleteItem, clearChecked } = useGroceryList(householdId)
+  const { items, loading, addItem, checkItem, deleteItem, updateItem, clearChecked } = useGroceryList(householdId)
   const { items: recentItems, addBackToList } = useRecentlyBought(householdId)
   const { getSuggestions } = useItemHistory(householdId)
   const { scanning, results, error: scanError, uploadAndScan, confirmItems, cancelScan } = useScanSession(householdId)
@@ -72,10 +72,15 @@ export default function GroceryList() {
     'Store': 'bg-blue-500',
   }
 
+  const handleAdjustQty = async (item, delta) => {
+    const newQty = Math.max(1, (item.qty || 1) + delta)
+    await updateItem(item.id, { qty: newQty }, user.id)
+  }
+
   const handleAdd = async (e) => {
     e.preventDefault()
     if (!name.trim()) return
-    await addItem({ name, qty: qty ? Number(qty) : null, unit, store, notes, userId: user.id })
+    await addItem({ name, qty: qty ? Number(qty) : 1, unit, store, notes, userId: user.id })
     sendPushNotification(householdId, user.id, `${profile?.name || 'Someone'} added ${name} to the grocery list`)
     setName('')
     setQty('')
@@ -289,25 +294,38 @@ export default function GroceryList() {
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium ${item.checked ? 'line-through text-gray-400' : 'text-gray-900'}`}>
                           {item.name}
-                          {item.qty && (
-                            <span className="text-gray-400 font-normal ml-1">
-                              x{item.qty}{item.unit ? ` ${item.unit}` : ''}
-                            </span>
+                          {item.unit && (
+                            <span className="text-gray-400 font-normal text-xs ml-1">{item.unit}</span>
                           )}
                         </p>
                         {item.notes && (
                           <p className="text-xs text-gray-400 truncate">{item.notes}</p>
                         )}
                       </div>
-                      {/* User avatar */}
-                      <span className="w-6 h-6 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0">
-                        {item.added_by_user?.name?.[0] || '?'}
-                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => handleAdjustQty(item, -1)}
+                          className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+                          </svg>
+                        </button>
+                        <span className="w-8 text-center text-sm font-bold">{item.qty || 1}</span>
+                        <button
+                          onClick={() => handleAdjustQty(item, 1)}
+                          className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
+                      </div>
                       <button
                         onClick={() => deleteItem(item.id)}
-                        className="text-gray-300 hover:text-red-400 shrink-0"
+                        className="text-red-300 active:text-red-500 shrink-0 p-1"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
