@@ -1,8 +1,6 @@
 import { useState } from 'react'
 
-export default function CategorySection({ category, items, colorClass, onUpdateQty, onDelete, onAddToGrocery, userId }) {
-  const [expanded, setExpanded] = useState(false)
-
+export default function CategorySection({ category, items, colorClass, accentColor, textColor, onUpdateQty, onDelete, onAddToGrocery, userId }) {
   const totalItems = items.length
   const zeroQtyCount = items.filter(i => i.qty === 0).length
 
@@ -18,71 +16,67 @@ export default function CategorySection({ category, items, colorClass, onUpdateQ
   }
 
   return (
-    <div className="mb-3">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className={`w-full flex items-center justify-between px-4 py-3 ${colorClass} rounded-2xl transition-colors`}
-      >
+    <div className="space-y-4">
+      {/* Section Header */}
+      <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
-          <svg
-            className={`w-4 h-4 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-          <span className="font-heading font-semibold text-charcoal">{category}</span>
+          <div className={`w-1 h-6 ${accentColor || 'bg-warmgray-400'} rounded-full`} />
+          <h3 className="font-heading text-xl font-bold text-charcoal">{category}</h3>
         </div>
         <div className="flex items-center gap-2">
           {zeroQtyCount > 0 && (
-            <span className="bg-red-900/30 text-red-400 text-xs px-2 py-0.5 rounded-full font-medium">
-              {zeroQtyCount} empty
+            <span className="bg-red-50 text-red-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
+              {zeroQtyCount} out
             </span>
           )}
-          <span className="text-xs text-warmgray-500 bg-dark-surface px-2 py-0.5 rounded-full">
-            {totalItems}
+          <span className={`${colorClass} ${textColor || ''} text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider`}>
+            {totalItems} item{totalItems !== 1 ? 's' : ''}
           </span>
         </div>
-      </button>
+      </div>
 
-      {expanded && (
-        <div className="mt-1 bg-dark-surface rounded-2xl border border-warmgray-100 overflow-hidden shadow-dark-sm animate-expand">
-          {hasSubcategories ? (
-            Object.entries(groups).map(([sub, subItems]) => (
-              <div key={sub}>
-                <div className="px-4 py-1.5 bg-cream text-xs font-medium text-warmgray-500 uppercase tracking-wider">
-                  {sub}
-                </div>
-                {subItems.map(item => (
-                  <InventoryItem
-                    key={item.id}
-                    item={item}
-                    onUpdateQty={onUpdateQty}
-                    onDelete={onDelete}
-                    onAddToGrocery={onAddToGrocery}
-                    userId={userId}
-                  />
-                ))}
+      {/* Items */}
+      <div className="space-y-3">
+        {hasSubcategories ? (
+          Object.entries(groups).map(([sub, subItems]) => (
+            <div key={sub} className="space-y-3">
+              <div className="px-1 py-1">
+                <span className="text-[10px] font-bold text-warmgray-500 uppercase tracking-widest">{sub}</span>
               </div>
-            ))
-          ) : (
-            items.map(item => (
-              <InventoryItem
-                key={item.id}
-                item={item}
-                onUpdateQty={onUpdateQty}
-                onDelete={onDelete}
-                onAddToGrocery={onAddToGrocery}
-                userId={userId}
-              />
-            ))
-          )}
-        </div>
-      )}
+              {subItems.map(item => (
+                <InventoryItem
+                  key={item.id}
+                  item={item}
+                  accentColor={accentColor}
+                  textColor={textColor}
+                  onUpdateQty={onUpdateQty}
+                  onDelete={onDelete}
+                  onAddToGrocery={onAddToGrocery}
+                  userId={userId}
+                />
+              ))}
+            </div>
+          ))
+        ) : (
+          items.map(item => (
+            <InventoryItem
+              key={item.id}
+              item={item}
+              accentColor={accentColor}
+              textColor={textColor}
+              onUpdateQty={onUpdateQty}
+              onDelete={onDelete}
+              onAddToGrocery={onAddToGrocery}
+              userId={userId}
+            />
+          ))
+        )}
+      </div>
     </div>
   )
 }
 
-function InventoryItem({ item, onUpdateQty, onDelete, onAddToGrocery, userId }) {
+function InventoryItem({ item, accentColor, textColor, onUpdateQty, onDelete, onAddToGrocery, userId }) {
   const [editing, setEditing] = useState(false)
   const [editQty, setEditQty] = useState(String(item.qty))
 
@@ -93,26 +87,31 @@ function InventoryItem({ item, onUpdateQty, onDelete, onAddToGrocery, userId }) 
   }
 
   return (
-    <div className={`flex items-center gap-2 px-4 py-3 border-b border-warmgray-50 last:border-0 ${item.qty === 0 ? 'bg-red-900/20' : ''}`}>
+    <div className={`bg-white p-4 rounded-lg flex items-center gap-3 editorial-shadow active:scale-[0.98] transition-transform ${item.qty === 0 ? 'ring-1 ring-red-200' : ''}`}>
+      {/* Left accent bar */}
+      <div className={`w-1 self-stretch ${item.qty === 0 ? 'bg-red-400' : (accentColor || 'bg-warmgray-300')} rounded-full shrink-0`} />
+
+      {/* Item info */}
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-charcoal text-sm">
+        <p className="font-semibold text-charcoal text-sm">
           {item.name}
           {item.qty === 0 && (
-            <span className="ml-2 text-[10px] bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded font-medium">OUT</span>
+            <span className="ml-2 text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-bold uppercase">Out</span>
           )}
         </p>
-        {item.notes && <p className="text-xs text-warmgray-400 truncate">{item.notes}</p>}
+        {item.notes && <p className="text-xs text-warmgray-400 truncate mt-0.5">{item.notes}</p>}
+        {item.subcategory && !item.notes && (
+          <p className="text-xs text-warmgray-400 mt-0.5">{item.subcategory}</p>
+        )}
       </div>
 
       {/* Qty controls */}
       <div className="flex items-center gap-1 shrink-0">
         <button
           onClick={() => onUpdateQty(item.id, item.qty - 1, userId)}
-          className="w-7 h-7 rounded-lg bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
+          className="w-8 h-8 rounded-full bg-cream flex items-center justify-center text-charcoal-light hover:bg-warmgray-200 transition-colors"
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-          </svg>
+          <span className="material-symbols-outlined text-sm">remove</span>
         </button>
 
         {editing ? (
@@ -129,20 +128,18 @@ function InventoryItem({ item, onUpdateQty, onDelete, onAddToGrocery, userId }) 
         ) : (
           <button
             onClick={() => { setEditQty(String(item.qty)); setEditing(true) }}
-            className="w-12 text-center text-sm font-semibold text-charcoal"
+            className="w-10 text-center"
           >
-            {item.qty}
+            <span className={`text-sm font-bold ${textColor || 'text-charcoal'}`}>{item.qty}</span>
             <span className="text-[10px] text-warmgray-400 block leading-none">{item.unit}</span>
           </button>
         )}
 
         <button
           onClick={() => onUpdateQty(item.id, item.qty + 1, userId)}
-          className="w-7 h-7 rounded-lg bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
+          className={`w-8 h-8 rounded-full ${accentColor || 'bg-warmgray-400'} text-white flex items-center justify-center hover:opacity-90 transition-colors`}
         >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <span className="material-symbols-outlined text-sm">add</span>
         </button>
       </div>
 
@@ -152,17 +149,13 @@ function InventoryItem({ item, onUpdateQty, onDelete, onAddToGrocery, userId }) 
         className="text-section-grocery shrink-0"
         title="Add to grocery list"
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-        </svg>
+        <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
       </button>
       <button
         onClick={() => onDelete(item.id)}
-        className="text-warmgray-300 hover:text-red-400 shrink-0"
+        className="text-warmgray-300 hover:text-red-500 shrink-0 transition-colors"
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
+        <span className="material-symbols-outlined text-lg">delete_outline</span>
       </button>
     </div>
   )

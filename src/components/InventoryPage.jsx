@@ -7,7 +7,11 @@ import CategorySection from './CategorySection'
 import PhotoScanner from './PhotoScanner'
 import ScanReview from '../pages/ScanReview'
 
-export default function InventoryPage({ location, title, colorClass, bgClass, lightBg, ringClass }) {
+export default function InventoryPage({
+  location, title, colorClass, bgClass, lightBg, ringClass,
+  heroLabel, heroAccentWord, heroSubtitle, heroShowStat,
+  heroTitleInColor, gutterClass, sectionIcon,
+}) {
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
   const { items, loading, addItem, updateQty, deleteItem, addToGroceryList } = useInventory(householdId, location)
@@ -15,6 +19,7 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
 
   const [showAdd, setShowAdd] = useState(false)
   const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState(null)
 
   // Add form
   const [name, setName] = useState('')
@@ -29,19 +34,22 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
 
   const subcategories = category && taxonomy[category] ? taxonomy[category] : null
 
-  // Group items by category, filtered by search
+  // Group items by category, filtered by search + category filter
   const grouped = useMemo(() => {
-    const filtered = search
-      ? items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
-      : items
-
+    let filtered = items
+    if (search) {
+      filtered = filtered.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+    }
+    if (categoryFilter) {
+      filtered = filtered.filter(i => i.category === categoryFilter)
+    }
     const groups = {}
     for (const item of filtered) {
       if (!groups[item.category]) groups[item.category] = []
       groups[item.category].push(item)
     }
     return groups
-  }, [items, search])
+  }, [items, search, categoryFilter])
 
   const handleAdd = async (e) => {
     e.preventDefault()
@@ -65,7 +73,6 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
     setShowAdd(false)
   }
 
-  // Update unit default when category changes
   const handleCategoryChange = (cat) => {
     setCategory(cat)
     setSubcategory('')
@@ -80,42 +87,86 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
     )
   }
 
+  // Build title display
+  const titleBase = heroAccentWord ? title.replace(heroAccentWord, '').trim() : title
+
   return (
-    <div className="px-4 pt-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h1 className={`text-2xl font-heading font-bold ${colorClass}`}>{title}</h1>
-        <div className="flex items-center gap-2">
-          <PhotoScanner
-            onCapture={(file) => uploadAndScan(file, location, user.id)}
-            scanning={scanning}
-            colorClass={bgClass}
-          />
-          <button
-            onClick={() => setShowAdd(!showAdd)}
-            className={`w-10 h-10 ${bgClass} text-white rounded-full flex items-center justify-center shadow-dark active:scale-95 transition-transform`}
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showAdd ? "M6 18L18 6M6 6l12 12" : "M12 4v16m8-8H4"} />
-            </svg>
-          </button>
+    <div className="px-6 space-y-8">
+
+      {/* Hero Section */}
+      <section className="space-y-2">
+        {heroLabel && (
+          <p className={`${colorClass} font-semibold tracking-wider uppercase text-xs`}>{heroLabel}</p>
+        )}
+        <div className="flex items-baseline justify-between">
+          <h2 className={`font-heading text-4xl font-extrabold tracking-tight ${gutterClass || ''} ${heroTitleInColor ? colorClass : 'text-charcoal'}`}>
+            {heroAccentWord ? (
+              <>{titleBase} <span className={colorClass}>{heroAccentWord}</span></>
+            ) : title}
+          </h2>
+          {heroShowStat && (
+            <span className={`text-sm font-medium ${colorClass}`}>
+              {items.length} Item{items.length !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
+        {heroSubtitle && (
+          <p className="text-charcoal-light text-sm max-w-[80%] leading-relaxed">{heroSubtitle}</p>
+        )}
+      </section>
+
+      {/* Search & Add Bento */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="col-span-3 bg-cream rounded-xl p-4 flex items-center gap-3 editorial-shadow">
+          <span className={`material-symbols-outlined ${colorClass}`}>search</span>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={`Search ${title.toLowerCase()}...`}
+            className="bg-transparent border-none focus:ring-0 p-0 text-sm font-medium placeholder:text-warmgray-300 w-full text-charcoal"
+          />
+        </div>
+        <button
+          onClick={() => setShowAdd(!showAdd)}
+          className={`col-span-1 ${bgClass} rounded-xl flex items-center justify-center text-white shadow-dark-md active:scale-95 transition-transform`}
+        >
+          <span className="material-symbols-outlined">{showAdd ? 'close' : 'add'}</span>
+        </button>
       </div>
 
-      {/* Search */}
-      <div className="mb-4">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={`Search ${title.toLowerCase()}...`}
-          className={`input-field ${ringClass}`}
-        />
-      </div>
+      {/* Category Filter Pills */}
+      {categories.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-6 px-6">
+          <button
+            onClick={() => setCategoryFilter(null)}
+            className={`px-5 py-2.5 rounded-full text-sm font-medium shrink-0 transition-colors ${
+              !categoryFilter
+                ? `${bgClass} text-white editorial-shadow`
+                : 'bg-white border border-warmgray-200 text-warmgray-500 editorial-shadow'
+            }`}
+          >
+            All Items
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
+              className={`px-5 py-2.5 rounded-full text-sm font-medium shrink-0 transition-colors ${
+                categoryFilter === cat
+                  ? `${bgClass} text-white editorial-shadow`
+                  : 'bg-white border border-warmgray-200 text-warmgray-500 editorial-shadow'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Add Form */}
       {showAdd && (
-        <form onSubmit={handleAdd} className="card mb-4 space-y-3 animate-slide-down">
+        <form onSubmit={handleAdd} className="bg-dark-surface rounded-xl p-4 space-y-3 border border-warmgray-100 editorial-shadow animate-slide-down">
           <input
             type="text"
             value={name}
@@ -182,35 +233,39 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
       {/* Categories */}
       {Object.keys(grouped).length === 0 ? (
         <div className="text-center py-16 text-warmgray-400">
-          <svg className="w-16 h-16 mx-auto mb-3 opacity-50 animate-float" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
-          <p className="font-medium">
-            {search ? 'No items match your search' : `${title} is empty`}
+          <span className="material-symbols-outlined text-6xl mb-3 opacity-50 block animate-float">
+            {sectionIcon || 'inventory_2'}
+          </span>
+          <p className="font-medium text-charcoal-light">
+            {search || categoryFilter ? 'No items match your filters' : `${title} is empty`}
           </p>
-          {!search && <p className="text-sm mt-1">Tap + to add items</p>}
+          {!search && !categoryFilter && <p className="text-sm mt-1">Tap + to add items</p>}
         </div>
       ) : (
-        categories.map(cat => {
-          if (!grouped[cat]) return null
-          return (
-            <CategorySection
-              key={cat}
-              category={cat}
-              items={grouped[cat]}
-              colorClass={lightBg}
-              onUpdateQty={updateQty}
-              onDelete={deleteItem}
-              onAddToGrocery={addToGroceryList}
-              userId={user.id}
-            />
-          )
-        })
+        <div className="space-y-8">
+          {categories.map(cat => {
+            if (!grouped[cat]) return null
+            return (
+              <CategorySection
+                key={cat}
+                category={cat}
+                items={grouped[cat]}
+                colorClass={lightBg}
+                accentColor={bgClass}
+                textColor={colorClass}
+                onUpdateQty={updateQty}
+                onDelete={deleteItem}
+                onAddToGrocery={addToGroceryList}
+                userId={user.id}
+              />
+            )
+          })}
+        </div>
       )}
 
       {/* Scan Error */}
       {scanError && (
-        <div className="card bg-red-900/20 border-red-800 text-red-400 text-sm mb-4">
+        <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-4 text-sm">
           Scan failed: {scanError}
         </div>
       )}
@@ -223,6 +278,17 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
           onCancel={cancelScan}
           location={location}
         />
+      )}
+
+      {/* FAB: Photo Scanner */}
+      {!showAdd && (
+        <div className="fixed bottom-24 right-6 z-40">
+          <PhotoScanner
+            onCapture={(file) => uploadAndScan(file, location, user.id)}
+            scanning={scanning}
+            colorClass={bgClass}
+          />
+        </div>
       )}
     </div>
   )

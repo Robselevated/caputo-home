@@ -276,7 +276,7 @@ export default function GroceryList() {
 
           {/* Expanded Add Form */}
           {showAddForm && (
-            <form onSubmit={handleAdd} className="mt-3 bg-dark-surface rounded-xl p-4 space-y-3 shadow-dark-sm animate-slide-down border border-warmgray-100">
+            <form onSubmit={handleAdd} className="mt-3 bg-dark-surface rounded-xl p-4 space-y-3 editorial-shadow animate-slide-down border border-warmgray-100">
               <div className="flex gap-2">
                 <input
                   type="number"
@@ -339,7 +339,7 @@ export default function GroceryList() {
             <button
               onClick={() => setStoreFilter(null)}
               className={`px-4 py-2 rounded-full text-sm font-medium shrink-0 transition-colors ${
-                !storeFilter ? 'bg-section-grocery text-white shadow-sm' : 'bg-dark-surface border border-warmgray-200 text-warmgray-500'
+                !storeFilter ? 'bg-section-grocery text-white shadow-sm' : 'bg-white border border-warmgray-200 text-warmgray-500 editorial-shadow'
               }`}
             >
               All Items
@@ -353,7 +353,7 @@ export default function GroceryList() {
                   className={`px-4 py-2 rounded-full text-sm font-medium shrink-0 transition-colors ${
                     storeFilter === s
                       ? `${accent.bar} text-white shadow-sm`
-                      : 'bg-dark-surface border border-warmgray-200 text-warmgray-500'
+                      : 'bg-white border border-warmgray-200 text-warmgray-500 editorial-shadow'
                   }`}
                 >
                   {s}
@@ -391,10 +391,13 @@ export default function GroceryList() {
                     {storeItems.map(item => (
                       <div
                         key={item.id}
-                        className={`bg-dark-surface p-4 rounded-lg flex items-center gap-4 active:scale-[0.98] transition-all shadow-dark-sm ${
+                        className={`bg-dark-surface p-5 rounded-lg flex items-center gap-4 active:scale-[0.98] transition-all editorial-shadow ${
                           item.checked ? 'opacity-40' : ''
                         }`}
                       >
+                        {/* Left Accent Bar */}
+                        <div className={`w-1 self-stretch ${accent.bar} rounded-full shrink-0`} />
+
                         {/* Checkbox */}
                         <button
                           onClick={() => handleCheck(item)}
@@ -488,7 +491,7 @@ export default function GroceryList() {
           {checkedCount > 0 && (
             <button
               onClick={() => clearChecked(user.id)}
-              className="w-full py-3 text-sm font-medium text-red-600 bg-red-50 rounded-xl"
+              className="w-full py-3 text-sm font-medium text-red-600 bg-red-50 rounded-xl editorial-shadow"
             >
               Clear {checkedCount} checked item{checkedCount !== 1 ? 's' : ''}
             </button>
@@ -511,7 +514,7 @@ export default function GroceryList() {
                   <button
                     key={item.id}
                     onClick={() => handleAddBack(item)}
-                    className="flex-shrink-0 w-32 bg-cream p-4 rounded-lg flex flex-col items-center text-center active:scale-95 transition-transform"
+                    className="flex-shrink-0 w-32 bg-white p-4 rounded-lg flex flex-col items-center text-center active:scale-95 transition-transform editorial-shadow"
                   >
                     <div className="w-12 h-12 bg-dark-surface rounded-full flex items-center justify-center mb-3">
                       <span className="material-symbols-outlined text-section-grocery">shopping_basket</span>
@@ -550,7 +553,7 @@ export default function GroceryList() {
                       <div key={dateKey}>
                         <button
                           onClick={() => toggleDay(dateKey)}
-                          className="w-full flex items-center justify-between px-4 py-2.5 bg-cream rounded-xl text-sm font-medium text-charcoal active:bg-warmgray-100 transition-colors"
+                          className="w-full flex items-center justify-between px-4 py-2.5 bg-white rounded-xl text-sm font-medium text-charcoal active:bg-warmgray-100 transition-colors editorial-shadow"
                         >
                           <span className="font-heading">{formatDateLabel(dateKey)}</span>
                           <div className="flex items-center gap-2">
@@ -565,7 +568,7 @@ export default function GroceryList() {
                             {dayItems.map(item => {
                               const accent = storeAccentColors[item.store] || defaultAccent
                               return (
-                                <div key={item.id} className="bg-dark-surface rounded-lg p-4 flex items-center gap-3 shadow-dark-sm">
+                                <div key={item.id} className="bg-white rounded-lg p-4 flex items-center gap-3 editorial-shadow">
                                   <div className="flex-1 min-w-0">
                                     <p className="font-semibold text-charcoal text-sm">
                                       {item.name}
@@ -602,7 +605,7 @@ export default function GroceryList() {
 
         {/* Scan Error */}
         {scanError && (
-          <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-4 text-sm mt-4">
+          <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-4 text-sm mt-4 editorial-shadow">
             Scan failed: {scanError}
           </div>
         )}

@@ -68,6 +68,40 @@
     padding-left: 1.5rem;
     border-left: 4px solid #9128ad;
   }
+
+  /* Per-section editorial gutters */
+  .editorial-gutter-grocery {
+    padding-left: 1.5rem;
+    border-left: 4px solid #176a21;
+  }
+  .editorial-gutter-freezer {
+    padding-left: 1.5rem;
+    border-left: 4px solid #005f99;
+  }
+  .editorial-gutter-fridge {
+    padding-left: 1.5rem;
+    border-left: 4px solid #006A6A;
+  }
+  .editorial-gutter-pantry {
+    padding-left: 1.5rem;
+    border-left: 4px solid #C08B30;
+  }
+  .editorial-gutter-homegoods {
+    padding-left: 1.5rem;
+    border-left: 4px solid #9B6B7A;
+  }
+
+  /* Editorial shadow for Stitch cards */
+  .editorial-shadow {
+    box-shadow: 0 2px 8px rgba(44, 47, 48, 0.06), 0 0 1px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Glass panel effect */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
 }
 
 /* Respect reduced motion preferences */
