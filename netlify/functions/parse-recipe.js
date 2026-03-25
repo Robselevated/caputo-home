@@ -78,33 +78,64 @@ function extractJsonLdRecipe(html) {
   return null
 }
 
-function extractRecipeHtml(html) {
-  // Try WPRM recipe container first (most common recipe plugin)
-  const wprmMatch = html.match(/<div[^>]*class="[^"]*wprm-recipe-container[^"]*"[^>]*>[\s\S]*?<\/div>\s*(?:<\/div>\s*){0,5}(?=<div[^>]*class="(?!wprm))/i)
-  if (wprmMatch) return stripScriptsAndStyles(wprmMatch[0])
+function extractByClass(html, className) {
+  const idx = html.indexOf(className)
+  if (idx === -1) return null
 
-  // Try broader WPRM match (grab everything between recipe container start and a clear boundary)
-  const wprmStart = html.indexOf('wprm-recipe-container')
-  if (wprmStart !== -1) {
-    // Find the start of this div
-    const divStart = html.lastIndexOf('<div', wprmStart)
-    if (divStart !== -1) {
-      // Take a generous chunk from the recipe container
-      const chunk = html.slice(divStart, divStart + 30000)
-      return stripScriptsAndStyles(chunk)
-    }
+  // Walk backwards to find the opening < of this tag
+  const tagStart = html.lastIndexOf('<', idx)
+  if (tagStart === -1) return null
+
+  // Take a generous chunk from the container start
+  const chunk = html.slice(tagStart, tagStart + 50000)
+  return chunk.length > 200 ? chunk : null
+}
+
+function stripPageChrome(html) {
+  let cleaned = html
+    .replace(/<header[\s\S]*?<\/header>/gi, '')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, '')
+    .replace(/<aside[\s\S]*?<\/aside>/gi, '')
+    .replace(/<div[^>]*class="[^"]*sidebar[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/<div[^>]*class="[^"]*widget[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/<div[^>]*class="[^"]*(?:adthrive|ad-container|advertisement|sponsored)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/<div[^>]*class="[^"]*(?:social-share|share-buttons|post-share)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+    .replace(/<div[^>]*class="[^"]*(?:related-posts|you-might-also|recommended)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '')
+
+  cleaned = stripScriptsAndStyles(cleaned)
+  cleaned = cleaned.replace(/\s{3,}/g, '\n')
+  return cleaned
+}
+
+function extractRecipeHtml(html) {
+  // Try recipe plugin containers in order of popularity
+  const pluginClasses = [
+    'wprm-recipe-container',   // WP Recipe Maker
+    'tasty-recipes',           // Tasty Recipes
+    'mv-create-card',          // Mediavine Create
+    'recipe-card',             // Generic recipe card themes
+    'easyrecipe',              // EasyRecipe
+    'zlrecipe-container',      // ZipList/Zip Recipes
+    'wprm-recipe',             // WPRM alternate class
+    'recipe-content',          // Common generic class
+  ]
+
+  for (const cls of pluginClasses) {
+    const result = extractByClass(html, cls)
+    if (result) return stripScriptsAndStyles(result)
   }
 
-  // Try Tasty Recipes plugin
-  const tastyMatch = html.match(/<div[^>]*class="[^"]*tasty-recipes[^"]*"[^>]*>[\s\S]{500,30000}?<\/div>\s*<\/div>/i)
-  if (tastyMatch) return stripScriptsAndStyles(tastyMatch[0])
+  // Try schema.org Recipe itemtype (microdata)
+  const schemaMatch = html.match(/<[^>]*itemtype="[^"]*schema\.org\/Recipe[^"]*"[^>]*>/i)
+  if (schemaMatch) {
+    const startIdx = html.indexOf(schemaMatch[0])
+    const chunk = html.slice(startIdx, startIdx + 50000)
+    if (chunk.length > 200) return stripScriptsAndStyles(chunk)
+  }
 
-  // Try schema.org Recipe itemtype
-  const schemaMatch = html.match(/<[^>]*itemtype="[^"]*schema\.org\/Recipe[^"]*"[^>]*>[\s\S]{500,30000}?<\/(?:div|article)>/i)
-  if (schemaMatch) return stripScriptsAndStyles(schemaMatch[0])
-
-  // Fallback: return full content (will be truncated by caller)
-  return stripScriptsAndStyles(html)
+  // Fallback: strip page chrome (nav, sidebar, ads, etc.) for cleaner content
+  return stripPageChrome(html)
 }
 
 function stripScriptsAndStyles(html) {
@@ -113,6 +144,7 @@ function stripScriptsAndStyles(html) {
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
 }
 
 async function fetchContent(url) {
