@@ -14,12 +14,25 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray
 }
 
+const pushSupported = typeof window !== 'undefined'
+  && 'serviceWorker' in navigator
+  && 'PushManager' in window
+  && 'Notification' in window
+
+function getPermission() {
+  try {
+    return pushSupported ? Notification.permission : 'denied'
+  } catch {
+    return 'denied'
+  }
+}
+
 export function usePushNotifications(userId) {
-  const [permission, setPermission] = useState(Notification?.permission || 'default')
+  const [permission, setPermission] = useState(getPermission)
   const [subscribed, setSubscribed] = useState(false)
 
   useEffect(() => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+    if (!pushSupported) return
     checkSubscription()
   }, [])
 
@@ -34,14 +47,18 @@ export function usePushNotifications(userId) {
   }
 
   const requestPermission = async () => {
-    if (!('Notification' in window)) return false
+    if (!pushSupported) return false
 
-    const result = await Notification.requestPermission()
-    setPermission(result)
+    try {
+      const result = await Notification.requestPermission()
+      setPermission(result)
 
-    if (result === 'granted') {
-      await subscribe()
-      return true
+      if (result === 'granted') {
+        await subscribe()
+        return true
+      }
+    } catch (err) {
+      console.warn('Push permission request failed:', err)
     }
     return false
   }
