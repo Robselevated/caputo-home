@@ -238,39 +238,44 @@ export default function Cookbook() {
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">Ingredients</label>
                 {ingredients.map((ing, i) => (
-                  <div key={i} className="flex gap-2 items-start">
-                    <input
-                      type="text"
-                      value={ing.name}
-                      onChange={(e) => updateIngredient(i, 'name', e.target.value)}
-                      placeholder="Name"
-                      className="input-field focus:ring-purple-500 flex-1"
-                    />
-                    <input
-                      type="text"
-                      value={ing.qty}
-                      onChange={(e) => updateIngredient(i, 'qty', e.target.value)}
-                      placeholder="Qty"
-                      className="input-field focus:ring-purple-500 w-16"
-                    />
-                    <input
-                      type="text"
-                      value={ing.unit}
-                      onChange={(e) => updateIngredient(i, 'unit', e.target.value)}
-                      placeholder="Unit"
-                      className="input-field focus:ring-purple-500 w-20"
-                    />
-                    {ingredients.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeIngredient(i)}
-                        className="text-red-400 hover:text-red-600 mt-2"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
+                  <div key={i} className="space-y-2 pb-2 border-b border-gray-100 last:border-0">
+                    <div className="flex gap-2 items-start">
+                      <input
+                        type="text"
+                        value={ing.name}
+                        onChange={(e) => updateIngredient(i, 'name', e.target.value)}
+                        placeholder="Ingredient name"
+                        className="input-field focus:ring-purple-500 flex-1"
+                      />
+                      {ingredients.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeIngredient(i)}
+                          className="text-red-400 hover:text-red-600 mt-3 shrink-0"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={ing.qty}
+                        onChange={(e) => updateIngredient(i, 'qty', e.target.value)}
+                        placeholder="Qty"
+                        className="input-field focus:ring-purple-500 w-20"
+                        inputMode="decimal"
+                      />
+                      <input
+                        type="text"
+                        value={ing.unit}
+                        onChange={(e) => updateIngredient(i, 'unit', e.target.value)}
+                        placeholder="Unit (cup, tbsp...)"
+                        className="input-field focus:ring-purple-500 flex-1"
+                      />
+                    </div>
                   </div>
                 ))}
                 <button
@@ -335,7 +340,7 @@ export default function Cookbook() {
           <p className="text-sm mt-1">Tap + to add your first recipe</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 pb-20">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pb-20">
           {filteredRecipes.map(recipe => (
             <div
               key={recipe.id}
@@ -343,9 +348,9 @@ export default function Cookbook() {
               className="card p-0 overflow-hidden active:scale-95 transition-transform cursor-pointer"
             >
               {recipe.image_url ? (
-                <img src={recipe.image_url} alt={recipe.name} className="w-full h-32 object-cover" />
+                <img src={recipe.image_url} alt={recipe.name} className="w-full h-32 md:h-40 object-cover" />
               ) : (
-                <div className="w-full h-32 bg-purple-100 flex items-center justify-center">
+                <div className="w-full h-32 md:h-40 bg-purple-100 flex items-center justify-center">
                   <svg className="w-12 h-12 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>

@@ -97,7 +97,7 @@ export default function RecipeDetail() {
         </div>
 
         {recipe.image_url && (
-          <img src={recipe.image_url} alt={recipe.name} className="w-full h-48 object-cover rounded-xl mb-4" />
+          <img src={recipe.image_url} alt={recipe.name} className="w-full h-48 md:h-64 lg:h-80 object-cover rounded-xl mb-4" />
         )}
 
         {recipe.description && (
