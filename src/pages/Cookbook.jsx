@@ -2,17 +2,20 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useRecipes } from '../hooks/useRecipes'
+import { useIngredientCoverage } from '../hooks/useIngredientCoverage'
 
 export default function Cookbook() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
-  const { recipes, loading, importRecipe, createRecipe } = useRecipes(householdId)
+  const { recipes, loading, importRecipe, reimportRecipe, createRecipe } = useRecipes(householdId)
+  const coverage = useIngredientCoverage(householdId, recipes)
 
   const [showAdd, setShowAdd] = useState(false)
   const [addMode, setAddMode] = useState('url')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTags, setSelectedTags] = useState([])
+  const [refreshingId, setRefreshingId] = useState(null)
 
   const [url, setUrl] = useState('')
   const [importing, setImporting] = useState(false)
@@ -59,6 +62,14 @@ export default function Cookbook() {
       setShowAdd(false)
       setImporting(false)
     }
+  }
+
+  const handleRefreshImage = async (e, recipe) => {
+    e.stopPropagation()
+    if (!recipe.source_url || refreshingId) return
+    setRefreshingId(recipe.id)
+    await reimportRecipe(recipe.id, recipe.source_url)
+    setRefreshingId(null)
   }
 
   const handleManualCreate = async (e) => {
@@ -112,6 +123,18 @@ export default function Cookbook() {
     )
   }
 
+  function getCoverageColor(pct) {
+    if (pct >= 80) return 'bg-section-grocery'
+    if (pct >= 50) return 'bg-section-pantry'
+    return 'bg-warmgray-300'
+  }
+
+  function getCoverageTextColor(pct) {
+    if (pct >= 80) return 'text-section-grocery'
+    if (pct >= 50) return 'text-section-pantry'
+    return 'text-warmgray-400'
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -121,16 +144,15 @@ export default function Cookbook() {
   }
 
   return (
-    <div className="px-4 pt-4">
+    <div className="px-6">
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-heading font-bold text-section-cookbook">Cookbook</h1>
+        <h2 className="text-3xl font-heading font-extrabold text-charcoal">Cookbook</h2>
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="w-10 h-10 bg-section-cookbook text-white rounded-full flex items-center justify-center shadow-dark active:scale-95 transition-transform"
+          className="w-10 h-10 bg-section-cookbook text-white rounded-full flex items-center justify-center shadow-dark-md active:scale-95 transition-transform"
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showAdd ? "M6 18L18 6M6 6l12 12" : "M12 4v16m8-8H4"} />
-          </svg>
+          <span className="material-symbols-outlined">{showAdd ? 'close' : 'add'}</span>
         </button>
       </div>
 
@@ -166,7 +188,7 @@ export default function Cookbook() {
                 required
               />
               {importError && (
-                <div className="text-sm text-red-400 bg-red-900/20 p-2 rounded-xl">
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded-xl">
                   {importError}
                 </div>
               )}
@@ -251,11 +273,9 @@ export default function Cookbook() {
                         <button
                           type="button"
                           onClick={() => removeIngredient(i)}
-                          className="text-red-400 hover:text-red-600 mt-3 shrink-0"
+                          className="text-red-500 hover:text-red-600 mt-3 shrink-0"
                         >
-                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
+                          <span className="material-symbols-outlined text-xl">close</span>
                         </button>
                       )}
                     </div>
@@ -305,6 +325,7 @@ export default function Cookbook() {
         </div>
       )}
 
+      {/* Search */}
       <input
         type="text"
         value={searchQuery}
@@ -313,8 +334,9 @@ export default function Cookbook() {
         className="input-field focus:ring-section-cookbook mb-3"
       />
 
+      {/* Tag Filters */}
       {allTags.length > 0 && (
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+        <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
           {allTags.map(tag => (
             <button
               key={tag}
@@ -331,54 +353,98 @@ export default function Cookbook() {
         </div>
       )}
 
+      {/* Recipe Grid */}
       {filteredRecipes.length === 0 ? (
         <div className="text-center py-16 text-warmgray-400">
-          <svg className="w-16 h-16 mx-auto mb-3 opacity-50 animate-float" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-          <p className="font-medium">No recipes yet</p>
+          <span className="material-symbols-outlined text-6xl mb-3 opacity-50 block animate-float">menu_book</span>
+          <p className="font-medium text-charcoal-light">No recipes yet</p>
           <p className="text-sm mt-1">Tap + to add your first recipe</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pb-20">
-          {filteredRecipes.map(recipe => (
-            <div
-              key={recipe.id}
-              onClick={() => navigate(`/cookbook/${recipe.id}`)}
-              className="card p-0 overflow-hidden active:scale-[0.97] transition-transform cursor-pointer"
-            >
-              {recipe.image_url ? (
-                <img src={recipe.image_url} alt={recipe.name} className="w-full h-32 md:h-40 object-cover" />
-              ) : (
-                <div className="w-full h-32 md:h-40 bg-section-cookbook/10 flex items-center justify-center">
-                  <svg className="w-12 h-12 text-section-cookbook/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
+        <div className="grid grid-cols-2 gap-3 pb-20">
+          {filteredRecipes.map(recipe => {
+            const cov = coverage[recipe.id]
+            const pct = cov?.percentage ?? 0
+            const showRefresh = recipe.source_url && !recipe.image_url
+            const isRefreshing = refreshingId === recipe.id
+
+            return (
+              <div
+                key={recipe.id}
+                onClick={() => navigate(`/cookbook/${recipe.id}`)}
+                className="bg-dark-surface rounded-lg overflow-hidden shadow-dark-sm active:scale-[0.97] transition-transform cursor-pointer border border-warmgray-100"
+              >
+                {/* Image */}
+                <div className="relative">
+                  {recipe.image_url ? (
+                    <img src={recipe.image_url} alt={recipe.name} className="w-full h-32 object-cover" />
+                  ) : (
+                    <div className="w-full h-32 bg-section-cookbook/10 flex items-center justify-center">
+                      <span className="material-symbols-outlined text-5xl text-section-cookbook/30">menu_book</span>
+                    </div>
+                  )}
+                  {/* Refresh button for imageless recipes */}
+                  {showRefresh && (
+                    <button
+                      onClick={(e) => handleRefreshImage(e, recipe)}
+                      disabled={isRefreshing}
+                      className="absolute top-2 right-2 w-8 h-8 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm active:scale-90 transition-transform"
+                    >
+                      <span className={`material-symbols-outlined text-section-cookbook text-lg ${isRefreshing ? 'animate-spin' : ''}`}>
+                        {isRefreshing ? 'progress_activity' : 'refresh'}
+                      </span>
+                    </button>
+                  )}
                 </div>
-              )}
-              <div className="p-3">
-                <h3 className="font-semibold text-charcoal line-clamp-2 mb-2">{recipe.name}</h3>
-                {recipe.tags && recipe.tags.length > 0 && (
-                  <div className="flex gap-1 mb-2 flex-wrap">
-                    {recipe.tags.slice(0, 2).map(tag => (
-                      <span key={tag} className="px-2 py-0.5 bg-section-cookbook/10 text-section-cookbook text-xs rounded-full">
-                        {tag}
-                      </span>
-                    ))}
-                    {recipe.tags.length > 2 && (
-                      <span className="px-2 py-0.5 bg-cream text-warmgray-600 text-xs rounded-full">
-                        +{recipe.tags.length - 2}
-                      </span>
-                    )}
+
+                <div className="p-3">
+                  <h3 className="font-semibold text-charcoal line-clamp-2 mb-2 text-sm">{recipe.name}</h3>
+
+                  {/* Tags */}
+                  {recipe.tags && recipe.tags.length > 0 && (
+                    <div className="flex gap-1 mb-2 flex-wrap">
+                      {recipe.tags.slice(0, 2).map(tag => (
+                        <span key={tag} className="px-2 py-0.5 bg-section-cookbook/10 text-section-cookbook text-[10px] rounded-full font-medium">
+                          {tag}
+                        </span>
+                      ))}
+                      {recipe.tags.length > 2 && (
+                        <span className="px-2 py-0.5 bg-cream text-warmgray-500 text-[10px] rounded-full font-medium">
+                          +{recipe.tags.length - 2}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Ingredient Coverage Bar */}
+                  {cov && cov.total > 0 && (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${getCoverageTextColor(pct)}`}>
+                          {pct}% on hand
+                        </span>
+                        <span className="text-[10px] text-warmgray-400">
+                          {cov.matched}/{cov.total}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-warmgray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${getCoverageColor(pct)}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Times */}
+                  <div className="flex gap-3 text-[10px] text-warmgray-400 mt-2">
+                    {recipe.prep_time && <span>Prep: {recipe.prep_time}m</span>}
+                    {recipe.cook_time && <span>Cook: {recipe.cook_time}m</span>}
                   </div>
-                )}
-                <div className="flex gap-3 text-xs text-warmgray-500">
-                  {recipe.prep_time && <span>Prep: {recipe.prep_time}m</span>}
-                  {recipe.cook_time && <span>Cook: {recipe.cook_time}m</span>}
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
