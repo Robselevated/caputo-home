@@ -26,16 +26,20 @@ export async function handler(event) {
   }
 
   try {
-    const { image_url, scan_type } = JSON.parse(event.body)
+    const { image_url, image_base64, media_type, scan_type } = JSON.parse(event.body)
 
-    if (!image_url || !scan_type) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing image_url or scan_type' }) }
+    if ((!image_url && !image_base64) || !scan_type) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Missing image (image_url or image_base64) or scan_type' }) }
     }
 
     const systemPrompt = SYSTEM_PROMPTS[scan_type]
     if (!systemPrompt) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Invalid scan_type' }) }
     }
+
+    const imageSource = image_base64
+      ? { type: 'base64', media_type: media_type || 'image/jpeg', data: image_base64 }
+      : { type: 'url', url: image_url }
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -46,7 +50,7 @@ export async function handler(event) {
           content: [
             {
               type: 'image',
-              source: { type: 'url', url: image_url },
+              source: imageSource,
             },
             {
               type: 'text',

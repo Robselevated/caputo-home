@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function ScanReview({ items, sessionId, onConfirm, onCancel, location }) {
+export default function ScanReview({ items, onConfirm, onCancel, location }) {
   const [editableItems, setEditableItems] = useState(
     items.map(item => ({ ...item, included: true }))
   )
@@ -23,7 +23,7 @@ export default function ScanReview({ items, sessionId, onConfirm, onCancel, loca
 
   const handleConfirm = () => {
     const confirmed = editableItems.filter(i => i.included)
-    onConfirm(sessionId, confirmed, location)
+    onConfirm(confirmed, location)
   }
 
   return (
@@ -31,7 +31,7 @@ export default function ScanReview({ items, sessionId, onConfirm, onCancel, loca
       <div className="bg-white w-full max-w-lg max-h-[85vh] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col">
         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-lg font-bold">Review Scan Results</h2>
-          <button onClick={() => onCancel(sessionId)} className="text-gray-400">
+          <button onClick={() => onCancel()} className="text-gray-400">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -102,7 +102,7 @@ export default function ScanReview({ items, sessionId, onConfirm, onCancel, loca
 
         <div className="px-4 py-3 border-t border-gray-100 flex gap-3">
           <button
-            onClick={() => onCancel(sessionId)}
+            onClick={() => onCancel()}
             className="flex-1 py-3 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl"
           >
             Cancel

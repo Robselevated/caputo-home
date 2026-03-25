@@ -381,8 +381,7 @@ export default function GroceryList() {
       {results && (
         <ScanReview
           items={results.items}
-          sessionId={results.sessionId}
-          onConfirm={confirmItems}
+          onConfirm={(confirmed, loc) => confirmItems(confirmed, loc, user.id)}
           onCancel={cancelScan}
           location="receipt"
         />

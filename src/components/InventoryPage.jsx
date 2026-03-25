@@ -219,8 +219,7 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
       {results && (
         <ScanReview
           items={results.items}
-          sessionId={results.sessionId}
-          onConfirm={confirmItems}
+          onConfirm={(confirmed, loc) => confirmItems(confirmed, loc, user.id)}
           onCancel={cancelScan}
           location={location}
         />
