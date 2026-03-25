@@ -35,14 +35,14 @@ export default function ItemAutocomplete({ value, onChange, suggestions, placeho
           if (filtered.length > 0) setShowSuggestions(true)
         }}
         placeholder={placeholder}
-        className="input-field focus:ring-green-500"
+        className="input-field focus:ring-section-grocery"
       />
       {showSuggestions && (
-        <ul className="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+        <ul className="absolute z-20 left-0 right-0 mt-1 bg-dark-surface border border-warmgray-100 rounded-2xl shadow-dark-md max-h-40 overflow-y-auto">
           {filtered.map((name) => (
             <li
               key={name}
-              className="px-4 py-3 text-sm hover:bg-gray-50 active:bg-gray-100 cursor-pointer"
+              className="px-4 py-3 text-sm hover:bg-cream active:bg-warmgray-100 cursor-pointer text-charcoal"
               onMouseDown={() => {
                 onChange(name)
                 setShowSuggestions(false)

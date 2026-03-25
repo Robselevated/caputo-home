@@ -84,7 +84,7 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
     <div className="px-4 pt-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className={`text-2xl font-bold ${colorClass}`}>{title}</h1>
+        <h1 className={`text-2xl font-heading font-bold ${colorClass}`}>{title}</h1>
         <div className="flex items-center gap-2">
           <PhotoScanner
             onCapture={(file) => uploadAndScan(file, location, user.id)}
@@ -93,7 +93,7 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
           />
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className={`w-10 h-10 ${bgClass} text-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform`}
+            className={`w-10 h-10 ${bgClass} text-white rounded-full flex items-center justify-center shadow-dark active:scale-95 transition-transform`}
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showAdd ? "M6 18L18 6M6 6l12 12" : "M12 4v16m8-8H4"} />
@@ -115,7 +115,7 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
 
       {/* Add Form */}
       {showAdd && (
-        <form onSubmit={handleAdd} className="card mb-4 space-y-3">
+        <form onSubmit={handleAdd} className="card mb-4 space-y-3 animate-slide-down">
           <input
             type="text"
             value={name}
@@ -181,8 +181,8 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
 
       {/* Categories */}
       {Object.keys(grouped).length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <svg className="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center py-16 text-warmgray-400">
+          <svg className="w-16 h-16 mx-auto mb-3 opacity-50 animate-float" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
           </svg>
           <p className="font-medium">
@@ -210,7 +210,7 @@ export default function InventoryPage({ location, title, colorClass, bgClass, li
 
       {/* Scan Error */}
       {scanError && (
-        <div className="card bg-red-50 border-red-200 text-red-600 text-sm mb-4">
+        <div className="card bg-red-900/20 border-red-800 text-red-400 text-sm mb-4">
           Scan failed: {scanError}
         </div>
       )}

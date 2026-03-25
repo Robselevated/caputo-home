@@ -9,6 +9,11 @@
 
   body {
     @apply min-h-screen;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
   }
 
   /* Prevent pull-to-refresh on mobile */
@@ -31,14 +36,25 @@
 
 @layer components {
   .btn-primary {
-    @apply px-4 py-3 rounded-xl font-medium text-white transition-colors active:scale-95;
+    @apply px-4 py-3 rounded-2xl font-semibold text-white transition-all active:scale-95;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   }
 
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-4;
+    @apply bg-dark-surface rounded-2xl border border-warmgray-100 p-4;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
   }
 
   .input-field {
-    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow;
+    @apply w-full px-4 py-3 rounded-2xl border border-warmgray-200 bg-dark-surface text-charcoal placeholder-warmgray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow;
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

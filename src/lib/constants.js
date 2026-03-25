@@ -4,13 +4,13 @@ export const STORES = ['Pilgrams', 'Costco', 'Store']
 // Common units
 export const UNITS = ['count', 'lbs', 'oz', 'bags', 'boxes', 'cans', 'jars', 'bottles', 'packages']
 
-// Section colors
+// Section colors (warm palette)
 export const SECTION_COLORS = {
-  grocery: { bg: 'bg-green-500', text: 'text-green-500', light: 'bg-green-50', ring: 'ring-green-500', border: 'border-green-500' },
-  freezer: { bg: 'bg-blue-500', text: 'text-blue-500', light: 'bg-blue-50', ring: 'ring-blue-500', border: 'border-blue-500' },
-  fridge: { bg: 'bg-teal-500', text: 'text-teal-500', light: 'bg-teal-50', ring: 'ring-teal-500', border: 'border-teal-500' },
-  pantry: { bg: 'bg-amber-500', text: 'text-amber-500', light: 'bg-amber-50', ring: 'ring-amber-500', border: 'border-amber-500' },
-  cookbook: { bg: 'bg-purple-500', text: 'text-purple-500', light: 'bg-purple-50', ring: 'ring-purple-500', border: 'border-purple-500' },
+  grocery: { bg: 'bg-section-grocery', text: 'text-section-grocery', light: 'bg-section-grocery/10', ring: 'ring-section-grocery', border: 'border-section-grocery' },
+  freezer: { bg: 'bg-section-freezer', text: 'text-section-freezer', light: 'bg-section-freezer/10', ring: 'ring-section-freezer', border: 'border-section-freezer' },
+  fridge: { bg: 'bg-section-fridge', text: 'text-section-fridge', light: 'bg-section-fridge/10', ring: 'ring-section-fridge', border: 'border-section-fridge' },
+  pantry: { bg: 'bg-section-pantry', text: 'text-section-pantry', light: 'bg-section-pantry/10', ring: 'ring-section-pantry', border: 'border-section-pantry' },
+  cookbook: { bg: 'bg-section-cookbook', text: 'text-section-cookbook', light: 'bg-section-cookbook/10', ring: 'ring-section-cookbook', border: 'border-section-cookbook' },
 }
 
 // Full taxonomy: categories and subcategories per location

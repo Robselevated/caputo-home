@@ -47,15 +47,15 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
-      <div className="bg-white w-full max-w-lg max-h-[85vh] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col">
-        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-          <button onClick={() => onCancel()} className="text-gray-400 text-sm font-medium">
+      <div className="bg-dark-surface w-full max-w-lg max-h-[85vh] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col">
+        <div className="px-4 py-3 border-b border-warmgray-100 flex items-center justify-between">
+          <button onClick={() => onCancel()} className="text-warmgray-400 text-sm font-medium">
             Cancel
           </button>
-          <h2 className="text-base font-bold">Review Items</h2>
+          <h2 className="text-base font-heading font-bold text-charcoal">Review Items</h2>
           <button
             onClick={handleConfirm}
-            className="text-green-600 text-sm font-bold"
+            className="text-section-grocery text-sm font-bold"
           >
             Add to {label}
           </button>
@@ -70,7 +70,7 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
               }`}
             >
               {item.needs_verification && (
-                <div className="flex items-center gap-1.5 text-yellow-600 text-xs font-medium mb-2">
+                <div className="flex items-center gap-1.5 text-yellow-400 text-xs font-medium mb-2">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                   </svg>
@@ -81,7 +81,7 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
                 <button
                   onClick={() => toggleItem(i)}
                   className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 ${
-                    item.included ? 'bg-green-500 border-green-500' : 'border-gray-300'
+                    item.included ? 'bg-section-grocery border-section-grocery' : 'border-warmgray-300'
                   }`}
                 >
                   {item.included && (
@@ -95,9 +95,9 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
                     type="text"
                     value={item.name}
                     onChange={(e) => updateItem(i, 'name', e.target.value)}
-                    className="w-full font-medium text-sm border-b border-gray-200 pb-0.5 focus:outline-none focus:border-green-500"
+                    className="w-full font-medium text-sm border-b border-warmgray-200 pb-0.5 focus:outline-none focus:border-section-grocery text-charcoal"
                   />
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-warmgray-400">
                     {item.category}{item.subcategory ? ` / ${item.subcategory}` : ''}
                     {item.unit ? ` · ${item.unit}` : ''}
                   </span>
@@ -105,16 +105,16 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => adjustQty(i, -1)}
-                    className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200"
+                    className="w-7 h-7 rounded-full bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
                     </svg>
                   </button>
-                  <span className="w-8 text-center text-sm font-bold">{item.qty || 1}</span>
+                  <span className="w-8 text-center text-sm font-bold text-charcoal">{item.qty || 1}</span>
                   <button
                     onClick={() => adjustQty(i, 1)}
-                    className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200"
+                    className="w-7 h-7 rounded-full bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -126,10 +126,10 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
           ))}
         </div>
 
-        <div className="px-4 py-3 border-t border-gray-100">
+        <div className="px-4 py-3 border-t border-warmgray-100">
           <button
             onClick={handleConfirm}
-            className="w-full py-3 text-sm font-bold text-white bg-green-500 rounded-xl active:scale-[0.98] transition-transform"
+            className="w-full py-3 text-sm font-bold text-white bg-section-grocery rounded-2xl active:scale-[0.98] transition-transform shadow-dark"
           >
             Add {includedCount} Item{includedCount !== 1 ? 's' : ''} to {label}
           </button>

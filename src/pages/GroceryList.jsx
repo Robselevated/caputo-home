@@ -67,9 +67,9 @@ export default function GroceryList() {
   }, [items, storeFilter])
 
   const storeColors = {
-    'Pilgrams': 'bg-emerald-500',
-    'Costco': 'bg-red-500',
-    'Store': 'bg-blue-500',
+    'Pilgrams': 'bg-emerald-600',
+    'Costco': 'bg-red-600',
+    'Store': 'bg-section-freezer',
   }
 
   const handleAdjustQty = async (item, delta) => {
@@ -105,7 +105,7 @@ export default function GroceryList() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-section-grocery border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -117,16 +117,16 @@ export default function GroceryList() {
       <div className="px-4 pt-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-green-600">Grocery List</h1>
+        <h1 className="text-2xl font-heading font-bold text-section-grocery">Grocery List</h1>
         <div className="flex items-center gap-2">
           <PhotoScanner
             onCapture={(file) => uploadAndScan(file, 'receipt', user.id)}
             scanning={scanning}
-            colorClass="bg-green-500"
+            colorClass="bg-section-grocery"
           />
           <button
             onClick={() => setShowAdd(!showAdd)}
-            className="w-10 h-10 bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+            className="w-10 h-10 bg-section-grocery text-white rounded-full flex items-center justify-center shadow-dark active:scale-95 transition-transform"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showAdd ? "M6 18L18 6M6 6l12 12" : "M12 4v16m8-8H4"} />
@@ -136,18 +136,18 @@ export default function GroceryList() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-4">
+      <div className="flex gap-1 bg-cream rounded-2xl p-1 mb-4">
         {TABS.map((tab, i) => (
           <button
             key={tab}
             onClick={() => setActiveTab(i)}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-              activeTab === i ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500'
+            className={`flex-1 py-2 text-sm font-medium rounded-xl transition-all ${
+              activeTab === i ? 'bg-dark-surface text-section-grocery shadow-dark-sm' : 'text-warmgray-500'
             }`}
           >
             {tab}
             {i === 1 && recentItems.length > 0 && (
-              <span className="ml-1 text-xs bg-gray-200 px-1.5 py-0.5 rounded-full">
+              <span className="ml-1 text-xs bg-warmgray-100 px-1.5 py-0.5 rounded-full">
                 {recentItems.length}
               </span>
             )}
@@ -157,7 +157,7 @@ export default function GroceryList() {
 
       {/* Add Form */}
       {showAdd && (
-        <form onSubmit={handleAdd} className="card mb-4 space-y-3">
+        <form onSubmit={handleAdd} className="card mb-4 space-y-3 animate-slide-down">
           <ItemAutocomplete
             value={name}
             onChange={setName}
@@ -170,13 +170,13 @@ export default function GroceryList() {
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               placeholder="Qty"
-              className="input-field focus:ring-green-500 w-20"
+              className="input-field focus:ring-section-grocery w-20"
               inputMode="decimal"
             />
             <select
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              className="input-field focus:ring-green-500 flex-1"
+              className="input-field focus:ring-section-grocery flex-1"
             >
               <option value="">Unit</option>
               {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
@@ -190,8 +190,8 @@ export default function GroceryList() {
                 onClick={() => setStore(store === s ? '' : s)}
                 className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   store === s
-                    ? `${storeColors[s] || 'bg-gray-500'} text-white`
-                    : 'bg-gray-100 text-gray-600'
+                    ? `${storeColors[s] || 'bg-warmgray-500'} text-white`
+                    : 'bg-cream text-warmgray-600'
                 }`}
               >
                 {s}
@@ -202,7 +202,7 @@ export default function GroceryList() {
               value={STORES.includes(store) ? '' : store}
               onChange={(e) => setStore(e.target.value)}
               placeholder="Other store"
-              className="input-field focus:ring-green-500 flex-1 min-w-[100px] !py-1.5 text-sm"
+              className="input-field focus:ring-section-grocery flex-1 min-w-[100px] !py-1.5 text-sm"
             />
           </div>
           <input
@@ -210,12 +210,12 @@ export default function GroceryList() {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Notes (substitutions, reminders...)"
-            className="input-field focus:ring-green-500"
+            className="input-field focus:ring-section-grocery"
           />
           <button
             type="submit"
             disabled={!name.trim()}
-            className="btn-primary bg-green-500 hover:bg-green-600 w-full disabled:opacity-40"
+            className="btn-primary bg-section-grocery hover:bg-olive-dark w-full disabled:opacity-40"
           >
             Add to List
           </button>
@@ -230,8 +230,8 @@ export default function GroceryList() {
             <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
               <button
                 onClick={() => setStoreFilter(null)}
-                className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${
-                  !storeFilter ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-600'
+                className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors ${
+                  !storeFilter ? 'bg-section-grocery text-white' : 'bg-cream text-warmgray-600'
                 }`}
               >
                 All
@@ -240,10 +240,10 @@ export default function GroceryList() {
                 <button
                   key={s}
                   onClick={() => setStoreFilter(storeFilter === s ? null : s)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${
+                  className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors ${
                     storeFilter === s
-                      ? `${storeColors[s] || 'bg-gray-500'} text-white`
-                      : 'bg-gray-100 text-gray-600'
+                      ? `${storeColors[s] || 'bg-warmgray-500'} text-white`
+                      : 'bg-cream text-warmgray-600'
                   }`}
                 >
                   {s}
@@ -254,8 +254,8 @@ export default function GroceryList() {
 
           {/* Grouped Items */}
           {Object.keys(grouped).length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
-              <svg className="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="text-center py-16 text-warmgray-400">
+              <svg className="w-16 h-16 mx-auto mb-3 opacity-50 animate-float" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
               </svg>
               <p className="font-medium">List is empty</p>
@@ -265,24 +265,24 @@ export default function GroceryList() {
             Object.entries(grouped).map(([storeName, storeItems]) => (
               <div key={storeName} className="mb-4">
                 <div
-                  className={`${storeColors[storeName] || 'bg-gray-500'} text-white px-4 py-2 rounded-t-xl font-medium text-sm flex items-center justify-between`}
+                  className={`${storeColors[storeName] || 'bg-warmgray-500'} text-white px-4 py-2.5 rounded-t-2xl font-medium text-sm flex items-center justify-between`}
                   onClick={() => setStoreFilter(storeFilter === storeName ? null : storeName)}
                 >
-                  <span>{storeName}</span>
+                  <span className="font-heading">{storeName}</span>
                   <span className="text-xs opacity-80">{storeItems.filter(i => !i.checked).length} items</span>
                 </div>
-                <div className="bg-white rounded-b-xl border border-t-0 border-gray-100 divide-y divide-gray-50">
+                <div className="bg-dark-surface rounded-b-2xl border border-t-0 border-warmgray-100 divide-y divide-warmgray-50 shadow-dark-sm">
                   {storeItems.map(item => (
                     <div
                       key={item.id}
-                      className={`flex items-center gap-3 px-4 py-3 ${item.checked ? 'opacity-40' : ''}`}
+                      className={`flex items-center gap-3 px-4 py-3 transition-opacity ${item.checked ? 'opacity-40' : ''}`}
                     >
                       <button
                         onClick={() => handleCheck(item)}
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
                           item.checked
-                            ? 'bg-green-500 border-green-500'
-                            : 'border-gray-300'
+                            ? 'bg-section-grocery border-section-grocery animate-check-off'
+                            : 'border-warmgray-300'
                         }`}
                       >
                         {item.checked && (
@@ -292,29 +292,29 @@ export default function GroceryList() {
                         )}
                       </button>
                       <div className="flex-1 min-w-0">
-                        <p className={`font-medium ${item.checked ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                        <p className={`font-medium ${item.checked ? 'line-through text-warmgray-400' : 'text-charcoal'}`}>
                           {item.name}
                           {item.unit && (
-                            <span className="text-gray-400 font-normal text-xs ml-1">{item.unit}</span>
+                            <span className="text-warmgray-400 font-normal text-xs ml-1">{item.unit}</span>
                           )}
                         </p>
                         {item.notes && (
-                          <p className="text-xs text-gray-400 truncate">{item.notes}</p>
+                          <p className="text-xs text-warmgray-400 truncate">{item.notes}</p>
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           onClick={() => handleAdjustQty(item, -1)}
-                          className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200"
+                          className="w-7 h-7 rounded-full bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
                           </svg>
                         </button>
-                        <span className="w-8 text-center text-sm font-bold">{item.qty || 1}</span>
+                        <span className="w-8 text-center text-sm font-bold text-charcoal">{item.qty || 1}</span>
                         <button
                           onClick={() => handleAdjustQty(item, 1)}
-                          className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 active:bg-gray-200"
+                          className="w-7 h-7 rounded-full bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -340,7 +340,7 @@ export default function GroceryList() {
           {checkedCount > 0 && (
             <button
               onClick={() => clearChecked(user.id)}
-              className="w-full py-3 text-sm font-medium text-red-500 bg-red-50 rounded-xl mb-4"
+              className="w-full py-3 text-sm font-medium text-red-400 bg-red-900/20 rounded-2xl mb-4"
             >
               Clear {checkedCount} checked item{checkedCount !== 1 ? 's' : ''}
             </button>
@@ -352,7 +352,7 @@ export default function GroceryList() {
       {activeTab === 1 && (
         <div>
           {recentItems.length === 0 ? (
-            <div className="text-center py-16 text-gray-400">
+            <div className="text-center py-16 text-warmgray-400">
               <p className="font-medium">No recent purchases</p>
               <p className="text-sm mt-1">Items you check off will appear here</p>
             </div>
@@ -361,22 +361,22 @@ export default function GroceryList() {
               {recentItems.map(item => (
                 <div key={item.id} className="card flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">
+                    <p className="font-medium text-charcoal">
                       {item.name}
                       {item.qty && (
-                        <span className="text-gray-400 font-normal ml-1">
+                        <span className="text-warmgray-400 font-normal ml-1">
                           x{item.qty}{item.unit ? ` ${item.unit}` : ''}
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-warmgray-400">
                       {item.store && `${item.store} · `}
                       {new Date(item.bought_at).toLocaleDateString()}
                     </p>
                   </div>
                   <button
                     onClick={() => handleAddBack(item)}
-                    className="text-green-500 font-medium text-sm shrink-0 px-3 py-1.5 bg-green-50 rounded-lg"
+                    className="text-section-grocery font-medium text-sm shrink-0 px-3 py-1.5 bg-section-grocery/10 rounded-xl"
                   >
                     + Add Back
                   </button>
@@ -389,7 +389,7 @@ export default function GroceryList() {
 
       {/* Scan Error */}
       {scanError && (
-        <div className="card bg-red-50 border-red-200 text-red-600 text-sm mb-4">
+        <div className="card bg-red-900/20 border-red-800 text-red-400 text-sm mb-4">
           Scan failed: {scanError}
         </div>
       )}

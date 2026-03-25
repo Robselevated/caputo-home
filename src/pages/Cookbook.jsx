@@ -115,7 +115,7 @@ export default function Cookbook() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-section-cookbook border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -123,10 +123,10 @@ export default function Cookbook() {
   return (
     <div className="px-4 pt-4">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-purple-600">Cookbook</h1>
+        <h1 className="text-2xl font-heading font-bold text-section-cookbook">Cookbook</h1>
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="w-10 h-10 bg-purple-500 text-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+          className="w-10 h-10 bg-section-cookbook text-white rounded-full flex items-center justify-center shadow-dark active:scale-95 transition-transform"
         >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showAdd ? "M6 18L18 6M6 6l12 12" : "M12 4v16m8-8H4"} />
@@ -135,20 +135,20 @@ export default function Cookbook() {
       </div>
 
       {showAdd && (
-        <div className="card mb-4 space-y-4">
-          <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
+        <div className="card mb-4 space-y-4 animate-slide-down">
+          <div className="flex gap-2 bg-cream rounded-xl p-1">
             <button
               onClick={() => setAddMode('url')}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                addMode === 'url' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500'
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+                addMode === 'url' ? 'bg-dark-surface text-section-cookbook shadow-dark-sm' : 'text-warmgray-500'
               }`}
             >
               URL Import
             </button>
             <button
               onClick={() => setAddMode('manual')}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-                addMode === 'manual' ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-500'
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+                addMode === 'manual' ? 'bg-dark-surface text-section-cookbook shadow-dark-sm' : 'text-warmgray-500'
               }`}
             >
               Manual Entry
@@ -162,18 +162,18 @@ export default function Cookbook() {
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="Paste recipe URL"
-                className="input-field focus:ring-purple-500"
+                className="input-field focus:ring-section-cookbook"
                 required
               />
               {importError && (
-                <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                <div className="text-sm text-red-400 bg-red-900/20 p-2 rounded-xl">
                   {importError}
                 </div>
               )}
               <button
                 type="submit"
                 disabled={!url.trim() || importing}
-                className="btn-primary bg-purple-500 hover:bg-purple-600 w-full disabled:opacity-40"
+                className="btn-primary bg-section-cookbook w-full disabled:opacity-40"
               >
                 {importing ? 'Importing...' : 'Import Recipe'}
               </button>
@@ -185,14 +185,14 @@ export default function Cookbook() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Recipe name"
-                className="input-field focus:ring-purple-500"
+                className="input-field focus:ring-section-cookbook"
                 required
               />
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Description"
-                className="input-field focus:ring-purple-500 min-h-[60px]"
+                className="input-field focus:ring-section-cookbook min-h-[60px]"
                 rows={2}
               />
               <input
@@ -200,7 +200,7 @@ export default function Cookbook() {
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 placeholder="Image URL (optional)"
-                className="input-field focus:ring-purple-500"
+                className="input-field focus:ring-section-cookbook"
               />
               <div className="flex gap-2">
                 <input
@@ -208,7 +208,7 @@ export default function Cookbook() {
                   value={servings}
                   onChange={(e) => setServings(e.target.value)}
                   placeholder="Servings"
-                  className="input-field focus:ring-purple-500 flex-1"
+                  className="input-field focus:ring-section-cookbook flex-1"
                   inputMode="numeric"
                 />
                 <input
@@ -216,7 +216,7 @@ export default function Cookbook() {
                   value={prepTime}
                   onChange={(e) => setPrepTime(e.target.value)}
                   placeholder="Prep (min)"
-                  className="input-field focus:ring-purple-500 flex-1"
+                  className="input-field focus:ring-section-cookbook flex-1"
                   inputMode="numeric"
                 />
                 <input
@@ -224,7 +224,7 @@ export default function Cookbook() {
                   value={cookTime}
                   onChange={(e) => setCookTime(e.target.value)}
                   placeholder="Cook (min)"
-                  className="input-field focus:ring-purple-500 flex-1"
+                  className="input-field focus:ring-section-cookbook flex-1"
                   inputMode="numeric"
                 />
               </div>
@@ -233,19 +233,19 @@ export default function Cookbook() {
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
                 placeholder="Tags (comma separated)"
-                className="input-field focus:ring-purple-500"
+                className="input-field focus:ring-section-cookbook"
               />
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Ingredients</label>
+                <label className="text-sm font-medium text-warmgray-600">Ingredients</label>
                 {ingredients.map((ing, i) => (
-                  <div key={i} className="space-y-2 pb-2 border-b border-gray-100 last:border-0">
+                  <div key={i} className="space-y-2 pb-2 border-b border-warmgray-100 last:border-0">
                     <div className="flex gap-2 items-start">
                       <input
                         type="text"
                         value={ing.name}
                         onChange={(e) => updateIngredient(i, 'name', e.target.value)}
                         placeholder="Ingredient name"
-                        className="input-field focus:ring-purple-500 flex-1"
+                        className="input-field focus:ring-section-cookbook flex-1"
                       />
                       {ingredients.length > 1 && (
                         <button
@@ -265,7 +265,7 @@ export default function Cookbook() {
                         value={ing.qty}
                         onChange={(e) => updateIngredient(i, 'qty', e.target.value)}
                         placeholder="Qty"
-                        className="input-field focus:ring-purple-500 w-20"
+                        className="input-field focus:ring-section-cookbook w-20"
                         inputMode="decimal"
                       />
                       <input
@@ -273,7 +273,7 @@ export default function Cookbook() {
                         value={ing.unit}
                         onChange={(e) => updateIngredient(i, 'unit', e.target.value)}
                         placeholder="Unit (cup, tbsp...)"
-                        className="input-field focus:ring-purple-500 flex-1"
+                        className="input-field focus:ring-section-cookbook flex-1"
                       />
                     </div>
                   </div>
@@ -281,7 +281,7 @@ export default function Cookbook() {
                 <button
                   type="button"
                   onClick={addIngredientRow}
-                  className="text-sm text-purple-600 font-medium"
+                  className="text-sm text-section-cookbook font-medium"
                 >
                   + Add Ingredient
                 </button>
@@ -290,13 +290,13 @@ export default function Cookbook() {
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
                 placeholder="Instructions"
-                className="input-field focus:ring-purple-500 min-h-[100px]"
+                className="input-field focus:ring-section-cookbook min-h-[100px]"
                 rows={4}
               />
               <button
                 type="submit"
                 disabled={!name.trim()}
-                className="btn-primary bg-purple-500 hover:bg-purple-600 w-full disabled:opacity-40"
+                className="btn-primary bg-section-cookbook w-full disabled:opacity-40"
               >
                 Create Recipe
               </button>
@@ -310,7 +310,7 @@ export default function Cookbook() {
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         placeholder="Search recipes..."
-        className="input-field focus:ring-purple-500 mb-3"
+        className="input-field focus:ring-section-cookbook mb-3"
       />
 
       {allTags.length > 0 && (
@@ -319,10 +319,10 @@ export default function Cookbook() {
             <button
               key={tag}
               onClick={() => toggleTag(tag)}
-              className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 ${
+              className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors ${
                 selectedTags.includes(tag)
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-gray-100 text-gray-600'
+                  ? 'bg-section-cookbook text-white'
+                  : 'bg-cream text-warmgray-600'
               }`}
             >
               {tag}
@@ -332,8 +332,8 @@ export default function Cookbook() {
       )}
 
       {filteredRecipes.length === 0 ? (
-        <div className="text-center py-16 text-gray-400">
-          <svg className="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="text-center py-16 text-warmgray-400">
+          <svg className="w-16 h-16 mx-auto mb-3 opacity-50 animate-float" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
           <p className="font-medium">No recipes yet</p>
@@ -345,34 +345,34 @@ export default function Cookbook() {
             <div
               key={recipe.id}
               onClick={() => navigate(`/cookbook/${recipe.id}`)}
-              className="card p-0 overflow-hidden active:scale-95 transition-transform cursor-pointer"
+              className="card p-0 overflow-hidden active:scale-[0.97] transition-transform cursor-pointer"
             >
               {recipe.image_url ? (
                 <img src={recipe.image_url} alt={recipe.name} className="w-full h-32 md:h-40 object-cover" />
               ) : (
-                <div className="w-full h-32 md:h-40 bg-purple-100 flex items-center justify-center">
-                  <svg className="w-12 h-12 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="w-full h-32 md:h-40 bg-section-cookbook/10 flex items-center justify-center">
+                  <svg className="w-12 h-12 text-section-cookbook/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
                 </div>
               )}
               <div className="p-3">
-                <h3 className="font-semibold text-gray-900 line-clamp-2 mb-2">{recipe.name}</h3>
+                <h3 className="font-semibold text-charcoal line-clamp-2 mb-2">{recipe.name}</h3>
                 {recipe.tags && recipe.tags.length > 0 && (
                   <div className="flex gap-1 mb-2 flex-wrap">
                     {recipe.tags.slice(0, 2).map(tag => (
-                      <span key={tag} className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                      <span key={tag} className="px-2 py-0.5 bg-section-cookbook/10 text-section-cookbook text-xs rounded-full">
                         {tag}
                       </span>
                     ))}
                     {recipe.tags.length > 2 && (
-                      <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
+                      <span className="px-2 py-0.5 bg-cream text-warmgray-600 text-xs rounded-full">
                         +{recipe.tags.length - 2}
                       </span>
                     )}
                   </div>
                 )}
-                <div className="flex gap-3 text-xs text-gray-500">
+                <div className="flex gap-3 text-xs text-warmgray-500">
                   {recipe.prep_time && <span>Prep: {recipe.prep_time}m</span>}
                   {recipe.cook_time && <span>Cook: {recipe.cook_time}m</span>}
                 </div>

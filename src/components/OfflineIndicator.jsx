@@ -3,12 +3,12 @@ export default function OfflineIndicator({ isOnline, pendingCount, syncing, onSy
 
   return (
     <div className={`px-4 py-2 text-sm font-medium flex items-center justify-between ${
-      isOnline ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-100 text-gray-600'
+      isOnline ? 'bg-yellow-900/20 text-yellow-400' : 'bg-warmgray-100 text-warmgray-600'
     }`}>
       <div className="flex items-center gap-2">
         {!isOnline ? (
           <>
-            <div className="w-2 h-2 bg-gray-400 rounded-full" />
+            <div className="w-2 h-2 bg-warmgray-400 rounded-full" />
             <span>Offline mode</span>
           </>
         ) : (
@@ -22,7 +22,7 @@ export default function OfflineIndicator({ isOnline, pendingCount, syncing, onSy
         <button
           onClick={onSync}
           disabled={syncing}
-          className="text-yellow-600 font-semibold text-xs px-3 py-1 bg-yellow-100 rounded-full"
+          className="text-yellow-400 font-semibold text-xs px-3 py-1 bg-yellow-900/30 rounded-full"
         >
           {syncing ? 'Syncing...' : 'Sync Now'}
         </button>

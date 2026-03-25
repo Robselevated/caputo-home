@@ -22,7 +22,7 @@ export default function PhotoScanner({ onCapture, scanning, colorClass }) {
       <button
         onClick={() => fileRef.current?.click()}
         disabled={scanning}
-        className={`w-10 h-10 ${colorClass} text-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform disabled:opacity-50`}
+        className={`w-10 h-10 ${colorClass} text-white rounded-full flex items-center justify-center shadow-dark active:scale-95 transition-transform disabled:opacity-50`}
       >
         {scanning ? (
           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
