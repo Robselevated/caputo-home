@@ -33,6 +33,7 @@ export default {
         'section-fridge': '#006A6A',
         'section-pantry': '#C08B30',
         'section-cookbook': '#9128ad',
+        'cookbook-container': '#ea8cff',
       },
       fontFamily: {
         heading: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],

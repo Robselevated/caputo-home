@@ -58,10 +58,11 @@ export function useScanSession(householdId) {
   }
 
   const confirmItems = async (confirmedItems, location, userId) => {
+    const errors = []
     try {
       for (const item of confirmedItems) {
         if (location === 'receipt') {
-          await supabase.from('recently_bought').insert({
+          const { error: insertErr } = await supabase.from('recently_bought').insert({
             household_id: householdId,
             name: item.name,
             qty: item.qty,
@@ -69,6 +70,7 @@ export function useScanSession(householdId) {
             store: item.store || null,
             bought_by: userId,
           })
+          if (insertErr) { errors.push(`${item.name}: ${insertErr.message}`); continue }
           await supabase.from('item_history').upsert(
             { household_id: householdId, name: item.name },
             { onConflict: 'household_id,name' }
@@ -83,13 +85,14 @@ export function useScanSession(householdId) {
             .single()
 
           if (existing) {
-            await supabase.from('inventory_items').update({
+            const { error: updateErr } = await supabase.from('inventory_items').update({
               qty: existing.qty + (item.qty || 1),
               updated_by: userId,
               updated_at: new Date().toISOString(),
             }).eq('id', existing.id)
+            if (updateErr) errors.push(`${item.name}: ${updateErr.message}`)
           } else {
-            await supabase.from('inventory_items').insert({
+            const { error: insertErr } = await supabase.from('inventory_items').insert({
               household_id: householdId,
               name: item.name,
               qty: item.qty || 1,
@@ -100,10 +103,14 @@ export function useScanSession(householdId) {
               notes: item.notes || null,
               updated_by: userId,
             })
+            if (insertErr) errors.push(`${item.name}: ${insertErr.message}`)
           }
         }
       }
 
+      if (errors.length > 0) {
+        setError(`Failed to add: ${errors.join(', ')}`)
+      }
       setResults(null)
     } catch (err) {
       setError(err.message)

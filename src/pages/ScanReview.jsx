@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { TAXONOMY, DEFAULT_UNITS, UNITS } from '../lib/constants'
 
 const LOCATION_LABELS = {
   pantry: 'Pantry',
@@ -8,14 +9,39 @@ const LOCATION_LABELS = {
 }
 
 export default function ScanReview({ items, onConfirm, onCancel, location }) {
+  const taxonomy = TAXONOMY[location] || {}
+  const categories = Object.keys(taxonomy)
+
   const [editableItems, setEditableItems] = useState(
-    items.map(item => ({ ...item, qty: item.qty || 1, included: true }))
+    items.map(item => ({
+      ...item,
+      qty: item.qty || 1,
+      included: true,
+      category: item.category || 'Other',
+      subcategory: item.subcategory || '',
+      unit: item.unit || DEFAULT_UNITS[location]?.[item.category] || 'count',
+    }))
   )
+
+  const [expandedIndex, setExpandedIndex] = useState(null)
 
   const updateItem = (index, field, value) => {
     setEditableItems(prev => {
       const updated = [...prev]
       updated[index] = { ...updated[index], [field]: value }
+      return updated
+    })
+  }
+
+  const handleCategoryChange = (index, newCategory) => {
+    setEditableItems(prev => {
+      const updated = [...prev]
+      updated[index] = {
+        ...updated[index],
+        category: newCategory,
+        subcategory: '',
+        unit: DEFAULT_UNITS[location]?.[newCategory] || updated[index].unit,
+      }
       return updated
     })
   }
@@ -62,68 +88,113 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {editableItems.map((item, i) => (
-            <div
-              key={i}
-              className={`card ${!item.included ? 'opacity-40' : ''} ${
-                item.needs_verification ? 'border-yellow-300 border-2' : ''
-              }`}
-            >
-              {item.needs_verification && (
-                <div className="flex items-center gap-1.5 text-yellow-400 text-xs font-medium mb-2">
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                  {item.verification_prompt || 'Low confidence. Please verify.'}
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => toggleItem(i)}
-                  className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 ${
-                    item.included ? 'bg-section-grocery border-section-grocery' : 'border-warmgray-300'
-                  }`}
-                >
-                  {item.included && (
-                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <input
-                    type="text"
-                    value={item.name}
-                    onChange={(e) => updateItem(i, 'name', e.target.value)}
-                    className="w-full font-medium text-sm border-b border-warmgray-200 pb-0.5 focus:outline-none focus:border-section-grocery text-charcoal"
-                  />
-                  <span className="text-xs text-warmgray-400">
-                    {item.category}{item.subcategory ? ` / ${item.subcategory}` : ''}
-                    {item.unit ? ` · ${item.unit}` : ''}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
+          {editableItems.map((item, i) => {
+            const subcategories = item.category && taxonomy[item.category] ? taxonomy[item.category] : null
+            const isExpanded = expandedIndex === i
+
+            return (
+              <div
+                key={i}
+                className={`card ${!item.included ? 'opacity-40' : ''} ${
+                  item.needs_verification ? 'border-yellow-300 border-2' : ''
+                }`}
+              >
+                {item.needs_verification && (
+                  <div className="flex items-center gap-1.5 text-yellow-400 text-xs font-medium mb-2">
+                    <span className="material-symbols-outlined text-base">warning</span>
+                    {item.verification_prompt || 'Low confidence. Please verify.'}
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
                   <button
-                    onClick={() => adjustQty(i, -1)}
-                    className="w-7 h-7 rounded-full bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
+                    onClick={() => toggleItem(i)}
+                    className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 ${
+                      item.included ? 'bg-section-grocery border-section-grocery' : 'border-warmgray-300'
+                    }`}
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
-                    </svg>
+                    {item.included && (
+                      <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
                   </button>
-                  <span className="w-8 text-center text-sm font-bold text-charcoal">{item.qty || 1}</span>
-                  <button
-                    onClick={() => adjustQty(i, 1)}
-                    className="w-7 h-7 rounded-full bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
+                  <div className="flex-1 min-w-0">
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) => updateItem(i, 'name', e.target.value)}
+                      className="w-full font-medium text-sm border-b border-warmgray-200 pb-0.5 focus:outline-none focus:border-section-grocery text-charcoal bg-transparent"
+                    />
+                    <button
+                      onClick={() => setExpandedIndex(isExpanded ? null : i)}
+                      className="flex items-center gap-1 mt-1 text-xs text-warmgray-400 active:text-charcoal"
+                    >
+                      <span>{item.category}{item.subcategory ? ` / ${item.subcategory}` : ''}</span>
+                      <span className="text-warmgray-300">{item.unit ? ` \u00b7 ${item.unit}` : ''}</span>
+                      <span className="material-symbols-outlined text-sm">{isExpanded ? 'expand_less' : 'expand_more'}</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => adjustQty(i, -1)}
+                      className="w-7 h-7 rounded-full bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+                      </svg>
+                    </button>
+                    <span className="w-8 text-center text-sm font-bold text-charcoal">{item.qty || 1}</span>
+                    <button
+                      onClick={() => adjustQty(i, 1)}
+                      className="w-7 h-7 rounded-full bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
+
+                {isExpanded && item.included && (
+                  <div className="mt-3 pt-3 border-t border-warmgray-100 space-y-2 animate-slide-down">
+                    {location !== 'receipt' && categories.length > 0 && (
+                      <select
+                        value={item.category}
+                        onChange={(e) => handleCategoryChange(i, e.target.value)}
+                        className="w-full text-xs bg-cream border border-warmgray-200 rounded-xl px-3 py-2 text-charcoal focus:outline-none focus:border-section-grocery"
+                      >
+                        <option value="">Select category</option>
+                        {categories.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    )}
+                    {subcategories && (
+                      <select
+                        value={item.subcategory}
+                        onChange={(e) => updateItem(i, 'subcategory', e.target.value)}
+                        className="w-full text-xs bg-cream border border-warmgray-200 rounded-xl px-3 py-2 text-charcoal focus:outline-none focus:border-section-grocery"
+                      >
+                        <option value="">Subcategory (optional)</option>
+                        {subcategories.map(sub => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                      </select>
+                    )}
+                    <select
+                      value={item.unit}
+                      onChange={(e) => updateItem(i, 'unit', e.target.value)}
+                      className="w-full text-xs bg-cream border border-warmgray-200 rounded-xl px-3 py-2 text-charcoal focus:outline-none focus:border-section-grocery"
+                    >
+                      {UNITS.map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="px-4 py-3 border-t border-warmgray-100">
