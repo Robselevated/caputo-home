@@ -76,10 +76,10 @@ export function useRecipes(householdId) {
           household_id: householdId,
           name: parsed.name,
           description: parsed.description || null,
-          image_url: parsed.image || null,
+          image_url: parsed.image_url || null,
           servings: parsed.servings || null,
-          prep_time: parsed.prepTime || null,
-          cook_time: parsed.cookTime || null,
+          prep_time: parsed.prep_time || null,
+          cook_time: parsed.cook_time || null,
           instructions: parsed.instructions || null,
           tags: parsed.tags || [],
           source_url: url,
@@ -154,6 +154,63 @@ export function useRecipes(householdId) {
     return { data: newRecipe }
   }
 
+  const reimportRecipe = async (id, sourceUrl) => {
+    try {
+      const response = await fetch('/.netlify/functions/parse-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: sourceUrl }),
+      })
+
+      if (!response.ok) {
+        const error = await response.text()
+        return { error: error || 'Failed to parse recipe' }
+      }
+
+      const parsed = await response.json()
+
+      const { error: recipeError } = await supabase
+        .from('recipes')
+        .update({
+          name: parsed.name,
+          description: parsed.description || null,
+          image_url: parsed.image_url || null,
+          servings: parsed.servings || null,
+          prep_time: parsed.prep_time || null,
+          cook_time: parsed.cook_time || null,
+          instructions: parsed.instructions || null,
+          tags: parsed.tags || [],
+        })
+        .eq('id', id)
+
+      if (recipeError) return { error: recipeError }
+
+      // Replace ingredients
+      await supabase.from('recipe_ingredients').delete().eq('recipe_id', id)
+
+      if (parsed.ingredients && parsed.ingredients.length > 0) {
+        const ingredients = parsed.ingredients.map((ing, i) => ({
+          recipe_id: id,
+          name: ing.name,
+          qty: ing.qty || null,
+          unit: ing.unit || null,
+          notes: ing.notes || null,
+          position: i,
+        }))
+
+        const { error: ingredientsError } = await supabase
+          .from('recipe_ingredients')
+          .insert(ingredients)
+
+        if (ingredientsError) return { error: ingredientsError }
+      }
+
+      return { data: true }
+    } catch (err) {
+      return { error: err.message }
+    }
+  }
+
   const deleteRecipe = async (id) => {
     const { error } = await supabase.from('recipes').delete().eq('id', id)
     return { error }
@@ -164,6 +221,7 @@ export function useRecipes(householdId) {
     loading,
     getRecipe,
     importRecipe,
+    reimportRecipe,
     createRecipe,
     deleteRecipe,
   }

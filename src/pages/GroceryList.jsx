@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useGroceryList } from '../hooks/useGroceryList'
 import { useRecentlyBought } from '../hooks/useRecentlyBought'
@@ -10,9 +10,42 @@ import ItemAutocomplete from '../components/ItemAutocomplete'
 import PhotoScanner from '../components/PhotoScanner'
 import ScanReview from './ScanReview'
 import OfflineIndicator from '../components/OfflineIndicator'
-import { STORES, UNITS } from '../lib/constants'
+import { STORES, UNITS, getDefaultStore } from '../lib/constants'
 
-const TABS = ['List', 'Recently Bought']
+// Store accent colors for left bar + badges
+const storeAccentColors = {
+  "Pilgrim's": { bar: 'bg-section-grocery', badge: 'bg-section-grocery/10 text-section-grocery', text: 'text-section-grocery' },
+  'Pilgrams': { bar: 'bg-section-grocery', badge: 'bg-section-grocery/10 text-section-grocery', text: 'text-section-grocery' },
+  'Costco': { bar: 'bg-section-freezer', badge: 'bg-section-freezer/10 text-section-freezer', text: 'text-section-freezer' },
+  'Grocery Store': { bar: 'bg-section-cookbook', badge: 'bg-section-cookbook/10 text-section-cookbook', text: 'text-section-cookbook' },
+  'Store': { bar: 'bg-section-cookbook', badge: 'bg-section-cookbook/10 text-section-cookbook', text: 'text-section-cookbook' },
+}
+
+const defaultAccent = { bar: 'bg-warmgray-400', badge: 'bg-warmgray-100 text-warmgray-500', text: 'text-warmgray-500' }
+
+function formatRelativeTime(dateStr) {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now - date
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function formatDateLabel(dateStr) {
+  const date = new Date(dateStr + 'T00:00:00')
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  if (date.getTime() === today.getTime()) return 'Today'
+  if (date.getTime() === yesterday.getTime()) return 'Yesterday'
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
 
 export default function GroceryList() {
   const { user, profile } = useAuth()
@@ -24,16 +57,12 @@ export default function GroceryList() {
   const { permission, requestPermission, sendPushNotification } = usePushNotifications(user?.id)
   const { isOnline, pendingCount, syncing, syncNow } = useOfflineSync(householdId)
 
-  const [activeTab, setActiveTab] = useState(0)
-  const [showAdd, setShowAdd] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [showRecentHistory, setShowRecentHistory] = useState(false)
   const [storeFilter, setStoreFilter] = useState(null)
-
-  // Request push notification permission on first load
-  useEffect(() => {
-    if (permission === 'default') {
-      requestPermission()
-    }
-  }, [permission])
+  const [openStoreSwitcher, setOpenStoreSwitcher] = useState(null)
+  const [expandedDays, setExpandedDays] = useState({})
+  const storeSwitcherRef = useRef(null)
 
   // Add form state
   const [name, setName] = useState('')
@@ -41,13 +70,40 @@ export default function GroceryList() {
   const [unit, setUnit] = useState('')
   const [store, setStore] = useState('')
   const [notes, setNotes] = useState('')
+  const [userOverrodeStore, setUserOverrodeStore] = useState(false)
+
+  // Request push notification permission on first load
+  useEffect(() => {
+    if (permission === 'default') requestPermission()
+  }, [permission])
+
+  // Close store switcher on outside tap
+  useEffect(() => {
+    if (!openStoreSwitcher) return
+    const handler = (e) => {
+      if (storeSwitcherRef.current && !storeSwitcherRef.current.contains(e.target)) {
+        setOpenStoreSwitcher(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
+  }, [openStoreSwitcher])
+
+  // Auto-select store when item name changes
+  useEffect(() => {
+    if (!userOverrodeStore && name.trim().length >= 2) {
+      setStore(getDefaultStore(name))
+    }
+  }, [name, userOverrodeStore])
 
   // Group items by store
   const grouped = useMemo(() => {
     const groups = {}
-    const filtered = storeFilter
-      ? items.filter(i => i.store === storeFilter)
-      : items
+    const filtered = storeFilter ? items.filter(i => i.store === storeFilter) : items
 
     for (const item of filtered) {
       const key = item.store || 'No Store'
@@ -55,7 +111,6 @@ export default function GroceryList() {
       groups[key].push(item)
     }
 
-    // Sort: unchecked first within each group
     for (const key of Object.keys(groups)) {
       groups[key].sort((a, b) => {
         if (a.checked !== b.checked) return a.checked ? 1 : -1
@@ -66,10 +121,57 @@ export default function GroceryList() {
     return groups
   }, [items, storeFilter])
 
-  const storeColors = {
-    'Pilgrams': 'bg-emerald-600',
-    'Costco': 'bg-red-600',
-    'Store': 'bg-section-freezer',
+  // Recently bought: 14-day filter, group by day, consolidate duplicates
+  const recentByDay = useMemo(() => {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 14)
+    cutoff.setHours(0, 0, 0, 0)
+
+    const filtered = recentItems.filter(item => new Date(item.bought_at) >= cutoff)
+
+    const dayGroups = {}
+    for (const item of filtered) {
+      const dateKey = new Date(item.bought_at).toISOString().split('T')[0]
+      if (!dayGroups[dateKey]) dayGroups[dateKey] = []
+      dayGroups[dateKey].push(item)
+    }
+
+    const consolidated = {}
+    for (const [dateKey, dayItems] of Object.entries(dayGroups)) {
+      const byName = {}
+      for (const item of dayItems) {
+        const key = item.name.toLowerCase()
+        if (byName[key]) {
+          byName[key].totalQty += (item.qty || 1)
+          byName[key].entries.push(item)
+        } else {
+          byName[key] = { ...item, totalQty: item.qty || 1, entries: [item] }
+        }
+      }
+      consolidated[dateKey] = Object.values(byName)
+    }
+
+    return Object.entries(consolidated).sort(([a], [b]) => b.localeCompare(a))
+  }, [recentItems])
+
+  // Flat recent items for carousel (most recent first, max 8)
+  const recentCarousel = useMemo(() => {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 14)
+    return recentItems
+      .filter(item => new Date(item.bought_at) >= cutoff)
+      .slice(0, 8)
+  }, [recentItems])
+
+  // Initialize first day as expanded
+  useEffect(() => {
+    if (recentByDay.length > 0 && Object.keys(expandedDays).length === 0) {
+      setExpandedDays({ [recentByDay[0][0]]: true })
+    }
+  }, [recentByDay])
+
+  const toggleDay = (dateKey) => {
+    setExpandedDays(prev => ({ ...prev, [dateKey]: !prev[dateKey] }))
   }
 
   const handleAdjustQty = async (item, delta) => {
@@ -77,17 +179,27 @@ export default function GroceryList() {
     await updateItem(item.id, { qty: newQty }, user.id)
   }
 
-  const handleAdd = async (e) => {
-    e.preventDefault()
+  const handleStoreChange = async (item, newStore) => {
+    await updateItem(item.id, { store: newStore }, user.id)
+    setOpenStoreSwitcher(null)
+  }
+
+  const handleQuickAdd = async () => {
     if (!name.trim()) return
-    await addItem({ name, qty: qty ? Number(qty) : 1, unit, store, notes, userId: user.id })
+    await addItem({ name, qty: qty ? Number(qty) : 1, unit, store: store || 'Grocery Store', notes, userId: user.id })
     sendPushNotification(householdId, user.id, `${profile?.name || 'Someone'} added ${name} to the grocery list`)
     setName('')
     setQty('')
     setUnit('')
     setStore('')
     setNotes('')
-    setShowAdd(false)
+    setUserOverrodeStore(false)
+    setShowAddForm(false)
+  }
+
+  const handleAdd = async (e) => {
+    e.preventDefault()
+    await handleQuickAdd()
   }
 
   const handleCheck = async (item) => {
@@ -100,6 +212,7 @@ export default function GroceryList() {
   }
 
   const checkedCount = items.filter(i => i.checked).length
+  const totalCount = items.length
   const allStores = [...new Set(items.map(i => i.store || 'No Store'))]
 
   if (loading) {
@@ -114,286 +227,386 @@ export default function GroceryList() {
     <div>
       <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} onSync={syncNow} />
 
-      <div className="px-4 pt-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-heading font-bold text-section-grocery">Grocery List</h1>
-        <div className="flex items-center gap-2">
-          <PhotoScanner
-            onCapture={(file) => uploadAndScan(file, 'receipt', user.id)}
-            scanning={scanning}
-            colorClass="bg-section-grocery"
-          />
-          <button
-            onClick={() => setShowAdd(!showAdd)}
-            className="w-10 h-10 bg-section-grocery text-white rounded-full flex items-center justify-center shadow-dark active:scale-95 transition-transform"
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showAdd ? "M6 18L18 6M6 6l12 12" : "M12 4v16m8-8H4"} />
-            </svg>
-          </button>
+      <div className="px-6">
+        {/* Hero Section */}
+        <section className="mb-8">
+          <div className="flex items-baseline justify-between mb-2">
+            <h2 className="font-heading text-3xl font-extrabold text-charcoal">Grocery List</h2>
+            <span className="text-sm font-medium text-section-grocery">{totalCount} Item{totalCount !== 1 ? 's' : ''} Total</span>
+          </div>
+          <p className="text-charcoal-light leading-relaxed text-sm">Your curated household essentials, organized for efficiency.</p>
+        </section>
+
+        {/* Search / Add Quick Action */}
+        <div className="mb-10">
+          <div className="bg-cream rounded-xl p-1 flex items-center gap-2">
+            <div className="flex-1 flex items-center px-4 py-3 gap-3">
+              <span className="material-symbols-outlined text-warmgray-400">search</span>
+              <ItemAutocomplete
+                value={name}
+                onChange={(val) => {
+                  setName(val)
+                  setUserOverrodeStore(false)
+                }}
+                suggestions={getSuggestions}
+                placeholder="Add milk, eggs, bread..."
+                className="bg-transparent border-none focus:ring-0 w-full placeholder:text-warmgray-400 p-0 text-charcoal"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <PhotoScanner
+                onCapture={(file) => uploadAndScan(file, 'receipt', user.id)}
+                scanning={scanning}
+                colorClass="bg-section-grocery"
+              />
+              <button
+                onClick={() => {
+                  if (name.trim() && !showAddForm) {
+                    handleQuickAdd()
+                  } else {
+                    setShowAddForm(!showAddForm)
+                  }
+                }}
+                className="bg-section-grocery text-white w-12 h-12 rounded-lg flex items-center justify-center shadow-dark-md active:scale-95 transition-transform"
+              >
+                <span className="material-symbols-outlined">{showAddForm ? 'close' : 'add'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Expanded Add Form */}
+          {showAddForm && (
+            <form onSubmit={handleAdd} className="mt-3 bg-dark-surface rounded-xl p-4 space-y-3 shadow-dark-sm animate-slide-down border border-warmgray-100">
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                  placeholder="Qty"
+                  className="input-field focus:ring-section-grocery w-20"
+                  inputMode="decimal"
+                />
+                <select
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="input-field focus:ring-section-grocery flex-1"
+                >
+                  <option value="">Unit</option>
+                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {STORES.map(s => {
+                  const accent = storeAccentColors[s] || defaultAccent
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        setStore(store === s ? '' : s)
+                        setUserOverrodeStore(true)
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        store === s ? `${accent.bar} text-white` : 'bg-cream text-warmgray-600'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                  )
+                })}
+              </div>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Notes (substitutions, reminders...)"
+                className="input-field focus:ring-section-grocery"
+              />
+              <button
+                type="submit"
+                disabled={!name.trim()}
+                className="btn-primary bg-section-grocery hover:bg-olive-dark w-full disabled:opacity-40"
+              >
+                Add to List
+              </button>
+            </form>
+          )}
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 bg-cream rounded-2xl p-1 mb-4">
-        {TABS.map((tab, i) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(i)}
-            className={`flex-1 py-2 text-sm font-medium rounded-xl transition-all ${
-              activeTab === i ? 'bg-dark-surface text-section-grocery shadow-dark-sm' : 'text-warmgray-500'
-            }`}
-          >
-            {tab}
-            {i === 1 && recentItems.length > 0 && (
-              <span className="ml-1 text-xs bg-warmgray-100 px-1.5 py-0.5 rounded-full">
-                {recentItems.length}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Add Form */}
-      {showAdd && (
-        <form onSubmit={handleAdd} className="card mb-4 space-y-3 animate-slide-down">
-          <ItemAutocomplete
-            value={name}
-            onChange={setName}
-            suggestions={getSuggestions}
-            placeholder="Item name"
-          />
-          <div className="flex gap-2">
-            <input
-              type="number"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              placeholder="Qty"
-              className="input-field focus:ring-section-grocery w-20"
-              inputMode="decimal"
-            />
-            <select
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              className="input-field focus:ring-section-grocery flex-1"
+        {/* Store Filter Pills */}
+        {allStores.length > 1 && (
+          <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-1">
+            <button
+              onClick={() => setStoreFilter(null)}
+              className={`px-4 py-2 rounded-full text-sm font-medium shrink-0 transition-colors ${
+                !storeFilter ? 'bg-section-grocery text-white shadow-sm' : 'bg-dark-surface border border-warmgray-200 text-warmgray-500'
+              }`}
             >
-              <option value="">Unit</option>
-              {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {STORES.map(s => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setStore(store === s ? '' : s)}
-                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                  store === s
-                    ? `${storeColors[s] || 'bg-warmgray-500'} text-white`
-                    : 'bg-cream text-warmgray-600'
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-            <input
-              type="text"
-              value={STORES.includes(store) ? '' : store}
-              onChange={(e) => setStore(e.target.value)}
-              placeholder="Other store"
-              className="input-field focus:ring-section-grocery flex-1 min-w-[100px] !py-1.5 text-sm"
-            />
-          </div>
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Notes (substitutions, reminders...)"
-            className="input-field focus:ring-section-grocery"
-          />
-          <button
-            type="submit"
-            disabled={!name.trim()}
-            className="btn-primary bg-section-grocery hover:bg-olive-dark w-full disabled:opacity-40"
-          >
-            Add to List
-          </button>
-        </form>
-      )}
-
-      {/* Active List Tab */}
-      {activeTab === 0 && (
-        <>
-          {/* Store Filter Pills */}
-          {allStores.length > 1 && (
-            <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-              <button
-                onClick={() => setStoreFilter(null)}
-                className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors ${
-                  !storeFilter ? 'bg-section-grocery text-white' : 'bg-cream text-warmgray-600'
-                }`}
-              >
-                All
-              </button>
-              {allStores.map(s => (
+              All Items
+            </button>
+            {allStores.map(s => {
+              const accent = storeAccentColors[s] || defaultAccent
+              return (
                 <button
                   key={s}
                   onClick={() => setStoreFilter(storeFilter === s ? null : s)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium shrink-0 transition-colors ${
+                  className={`px-4 py-2 rounded-full text-sm font-medium shrink-0 transition-colors ${
                     storeFilter === s
-                      ? `${storeColors[s] || 'bg-warmgray-500'} text-white`
-                      : 'bg-cream text-warmgray-600'
+                      ? `${accent.bar} text-white shadow-sm`
+                      : 'bg-dark-surface border border-warmgray-200 text-warmgray-500'
                   }`}
                 >
                   {s}
                 </button>
-              ))}
-            </div>
-          )}
+              )
+            })}
+          </div>
+        )}
 
-          {/* Grouped Items */}
+        {/* Store Groups */}
+        <div className="space-y-8">
           {Object.keys(grouped).length === 0 ? (
             <div className="text-center py-16 text-warmgray-400">
-              <svg className="w-16 h-16 mx-auto mb-3 opacity-50 animate-float" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-              </svg>
-              <p className="font-medium">List is empty</p>
-              <p className="text-sm mt-1">Tap + to add items</p>
+              <span className="material-symbols-outlined text-6xl mb-3 opacity-50 block animate-float">shopping_cart</span>
+              <p className="font-medium text-charcoal-light">List is empty</p>
+              <p className="text-sm mt-1">Type an item above and tap + to add</p>
             </div>
           ) : (
-            Object.entries(grouped).map(([storeName, storeItems]) => (
-              <div key={storeName} className="mb-4">
-                <div
-                  className={`${storeColors[storeName] || 'bg-warmgray-500'} text-white px-4 py-2.5 rounded-t-2xl font-medium text-sm flex items-center justify-between`}
-                  onClick={() => setStoreFilter(storeFilter === storeName ? null : storeName)}
-                >
-                  <span className="font-heading">{storeName}</span>
-                  <span className="text-xs opacity-80">{storeItems.filter(i => !i.checked).length} items</span>
-                </div>
-                <div className="bg-dark-surface rounded-b-2xl border border-t-0 border-warmgray-100 divide-y divide-warmgray-50 shadow-dark-sm">
-                  {storeItems.map(item => (
-                    <div
-                      key={item.id}
-                      className={`flex items-center gap-3 px-4 py-3 transition-opacity ${item.checked ? 'opacity-40' : ''}`}
-                    >
-                      <button
-                        onClick={() => handleCheck(item)}
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
-                          item.checked
-                            ? 'bg-section-grocery border-section-grocery animate-check-off'
-                            : 'border-warmgray-300'
+            Object.entries(grouped).map(([storeName, storeItems]) => {
+              const accent = storeAccentColors[storeName] || defaultAccent
+              const uncheckedCount = storeItems.filter(i => !i.checked).length
+              return (
+                <section key={storeName}>
+                  {/* Store Header */}
+                  <div className="flex items-center gap-2 mb-4 ml-1">
+                    <div className={`w-1 h-6 ${accent.bar} rounded-full`} />
+                    <h3 className="font-heading text-xl font-bold text-charcoal">{storeName}</h3>
+                    <span className={`${accent.badge} text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ml-auto`}>
+                      {uncheckedCount} item{uncheckedCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  {/* Item Cards */}
+                  <div className="space-y-3">
+                    {storeItems.map(item => (
+                      <div
+                        key={item.id}
+                        className={`bg-dark-surface p-4 rounded-lg flex items-center gap-4 active:scale-[0.98] transition-all shadow-dark-sm ${
+                          item.checked ? 'opacity-40' : ''
                         }`}
                       >
-                        {item.checked && (
-                          <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-medium ${item.checked ? 'line-through text-warmgray-400' : 'text-charcoal'}`}>
-                          {item.name}
-                          {item.unit && (
-                            <span className="text-warmgray-400 font-normal text-xs ml-1">{item.unit}</span>
+                        {/* Checkbox */}
+                        <button
+                          onClick={() => handleCheck(item)}
+                          className={`w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+                            item.checked
+                              ? 'bg-section-grocery border-section-grocery animate-check-off'
+                              : 'border-warmgray-200 hover:border-section-grocery/30'
+                          }`}
+                        >
+                          {item.checked && (
+                            <span className="material-symbols-outlined text-white text-sm">check</span>
                           )}
-                        </p>
-                        {item.notes && (
-                          <p className="text-xs text-warmgray-400 truncate">{item.notes}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => handleAdjustQty(item, -1)}
-                          className="w-7 h-7 rounded-full bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
-                          </svg>
                         </button>
-                        <span className="w-8 text-center text-sm font-bold text-charcoal">{item.qty || 1}</span>
+
+                        {/* Item Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold ${item.checked ? 'line-through text-warmgray-400' : 'text-charcoal'}`}>
+                            {item.name}
+                          </p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {item.unit && (
+                              <span className="text-xs text-charcoal-light font-medium">{item.unit}</span>
+                            )}
+                            {item.notes && (
+                              <span className="text-xs text-warmgray-400 truncate">{item.notes}</span>
+                            )}
+                            {/* Store Switcher */}
+                            <div className="relative" ref={openStoreSwitcher === item.id ? storeSwitcherRef : null}>
+                              <button
+                                onClick={() => setOpenStoreSwitcher(openStoreSwitcher === item.id ? null : item.id)}
+                                className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${accent.badge}`}
+                              >
+                                {item.store || 'No Store'}
+                              </button>
+                              {openStoreSwitcher === item.id && (
+                                <div className="absolute left-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[140px]">
+                                  {STORES.map(s => {
+                                    const sAccent = storeAccentColors[s] || defaultAccent
+                                    return (
+                                      <button
+                                        key={s}
+                                        onClick={() => handleStoreChange(item, s)}
+                                        className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
+                                          item.store === s ? 'bg-warmgray-50' : ''
+                                        } active:bg-warmgray-50`}
+                                      >
+                                        <span className={`w-2 h-2 rounded-full ${sAccent.bar}`} />
+                                        <span className="text-charcoal">{s}</span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Qty Controls */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleAdjustQty(item, -1)}
+                            className="w-8 h-8 rounded-full bg-cream flex items-center justify-center text-charcoal-light hover:bg-warmgray-200 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-sm">remove</span>
+                          </button>
+                          <span className="w-8 text-center text-sm font-bold text-charcoal">{item.qty || 1}</span>
+                          <button
+                            onClick={() => handleAdjustQty(item, 1)}
+                            className="w-8 h-8 rounded-full bg-section-grocery text-white flex items-center justify-center hover:opacity-90 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-sm">add</span>
+                          </button>
+                        </div>
+
+                        {/* More / Delete */}
                         <button
-                          onClick={() => handleAdjustQty(item, 1)}
-                          className="w-7 h-7 rounded-full bg-cream flex items-center justify-center text-warmgray-600 active:bg-warmgray-200"
+                          onClick={() => deleteItem(item.id)}
+                          className="text-warmgray-300 hover:text-red-500 shrink-0 transition-colors"
                         >
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                          </svg>
+                          <span className="material-symbols-outlined">more_vert</span>
                         </button>
                       </div>
-                      <button
-                        onClick={() => deleteItem(item.id)}
-                        className="text-red-300 active:text-red-500 shrink-0 p-1"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
+                    ))}
+                  </div>
+                </section>
+              )
+            })
           )}
 
           {/* Clear Checked */}
           {checkedCount > 0 && (
             <button
               onClick={() => clearChecked(user.id)}
-              className="w-full py-3 text-sm font-medium text-red-400 bg-red-900/20 rounded-2xl mb-4"
+              className="w-full py-3 text-sm font-medium text-red-600 bg-red-50 rounded-xl"
             >
               Clear {checkedCount} checked item{checkedCount !== 1 ? 's' : ''}
             </button>
           )}
-        </>
-      )}
 
-      {/* Recently Bought Tab */}
-      {activeTab === 1 && (
-        <div>
-          {recentItems.length === 0 ? (
-            <div className="text-center py-16 text-warmgray-400">
-              <p className="font-medium">No recent purchases</p>
-              <p className="text-sm mt-1">Items you check off will appear here</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {recentItems.map(item => (
-                <div key={item.id} className="card flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-charcoal">
-                      {item.name}
-                      {item.qty && (
-                        <span className="text-warmgray-400 font-normal ml-1">
-                          x{item.qty}{item.unit ? ` ${item.unit}` : ''}
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-warmgray-400">
-                      {item.store && `${item.store} · `}
-                      {new Date(item.bought_at).toLocaleDateString()}
-                    </p>
-                  </div>
+          {/* Recently Bought Section */}
+          {recentCarousel.length > 0 && !showRecentHistory && (
+            <section className="mt-12">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-heading text-lg font-bold text-charcoal">Recently Bought</h3>
+                <button
+                  onClick={() => setShowRecentHistory(true)}
+                  className="text-section-grocery text-sm font-semibold"
+                >
+                  View History
+                </button>
+              </div>
+              <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 -mx-6 px-6">
+                {recentCarousel.map(item => (
                   <button
+                    key={item.id}
                     onClick={() => handleAddBack(item)}
-                    className="text-section-grocery font-medium text-sm shrink-0 px-3 py-1.5 bg-section-grocery/10 rounded-xl"
+                    className="flex-shrink-0 w-32 bg-cream p-4 rounded-lg flex flex-col items-center text-center active:scale-95 transition-transform"
                   >
-                    + Add Back
+                    <div className="w-12 h-12 bg-dark-surface rounded-full flex items-center justify-center mb-3">
+                      <span className="material-symbols-outlined text-section-grocery">shopping_basket</span>
+                    </div>
+                    <p className="text-[11px] font-bold uppercase tracking-tighter text-charcoal-light">{item.name}</p>
+                    <p className="text-[10px] text-warmgray-400 mt-0.5">{formatRelativeTime(item.bought_at)}</p>
                   </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Recently Bought Expanded History */}
+          {showRecentHistory && (
+            <section className="mt-12">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-heading text-lg font-bold text-charcoal">Recently Bought</h3>
+                <button
+                  onClick={() => setShowRecentHistory(false)}
+                  className="text-section-grocery text-sm font-semibold"
+                >
+                  Hide History
+                </button>
+              </div>
+
+              {recentByDay.length === 0 ? (
+                <div className="text-center py-12 text-warmgray-400">
+                  <p className="font-medium text-charcoal-light">No recent purchases</p>
+                  <p className="text-sm mt-1">Items you check off will appear here</p>
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="space-y-3">
+                  {recentByDay.map(([dateKey, dayItems]) => {
+                    const isExpanded = expandedDays[dateKey]
+                    return (
+                      <div key={dateKey}>
+                        <button
+                          onClick={() => toggleDay(dateKey)}
+                          className="w-full flex items-center justify-between px-4 py-2.5 bg-cream rounded-xl text-sm font-medium text-charcoal active:bg-warmgray-100 transition-colors"
+                        >
+                          <span className="font-heading">{formatDateLabel(dateKey)}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-warmgray-400">{dayItems.length} item{dayItems.length !== 1 ? 's' : ''}</span>
+                            <span className={`material-symbols-outlined text-warmgray-400 text-lg transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
+                              expand_more
+                            </span>
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="mt-2 space-y-2">
+                            {dayItems.map(item => {
+                              const accent = storeAccentColors[item.store] || defaultAccent
+                              return (
+                                <div key={item.id} className="bg-dark-surface rounded-lg p-4 flex items-center gap-3 shadow-dark-sm">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-charcoal text-sm">
+                                      {item.name}
+                                      {item.totalQty > 1 && (
+                                        <span className="text-warmgray-400 font-normal ml-1">x{item.totalQty}</span>
+                                      )}
+                                      {item.unit && (
+                                        <span className="text-warmgray-400 font-normal text-xs ml-1">{item.unit}</span>
+                                      )}
+                                    </p>
+                                    {item.store && (
+                                      <span className={`text-xs font-medium ${accent.text}`}>{item.store}</span>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => handleAddBack(item)}
+                                    className="text-section-grocery font-medium text-xs shrink-0 px-3 py-1.5 bg-section-grocery/10 rounded-lg active:scale-95 transition-transform"
+                                  >
+                                    + Add Back
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
           )}
         </div>
-      )}
 
-      {/* Scan Error */}
-      {scanError && (
-        <div className="card bg-red-900/20 border-red-800 text-red-400 text-sm mb-4">
-          Scan failed: {scanError}
-        </div>
-      )}
-    </div>
+        {/* Scan Error */}
+        {scanError && (
+          <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl p-4 text-sm mt-4">
+            Scan failed: {scanError}
+          </div>
+        )}
+      </div>
 
       {/* Scan Review Modal */}
       {results && (

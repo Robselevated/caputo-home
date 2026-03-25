@@ -9,7 +9,7 @@ export default function RecipeDetail() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
-  const { getRecipe, deleteRecipe } = useRecipes(householdId)
+  const { getRecipe, reimportRecipe, deleteRecipe } = useRecipes(householdId)
   const { matchIngredients, addMissingToGroceryList } = useRecipeMatch(householdId)
 
   const [recipe, setRecipe] = useState(null)
@@ -19,6 +19,7 @@ export default function RecipeDetail() {
   const [matching, setMatching] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [successMessage, setSuccessMessage] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     loadRecipe()
@@ -50,6 +51,18 @@ export default function RecipeDetail() {
     setShowMakeThis(false)
     setSuccessMessage(`Added ${matchResult.missing.length} item${matchResult.missing.length !== 1 ? 's' : ''} to grocery list`)
     setTimeout(() => setSuccessMessage(null), 3000)
+  }
+
+  const handleRefresh = async () => {
+    if (!recipe.source_url) return
+    setRefreshing(true)
+    const { error } = await reimportRecipe(recipe.id, recipe.source_url)
+    if (!error) {
+      await loadRecipe()
+      setSuccessMessage('Recipe refreshed from source')
+      setTimeout(() => setSuccessMessage(null), 3000)
+    }
+    setRefreshing(false)
   }
 
   const handleDelete = async () => {
@@ -86,6 +99,17 @@ export default function RecipeDetail() {
             </svg>
           </button>
           <h1 className="text-2xl font-heading font-bold text-charcoal flex-1">{recipe.name}</h1>
+          {recipe.source_url && (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="text-warmgray-400 hover:text-section-cookbook disabled:opacity-40"
+            >
+              <svg className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          )}
           <button
             onClick={() => setShowDeleteConfirm(true)}
             className="text-red-400 hover:text-red-600"
@@ -158,9 +182,27 @@ export default function RecipeDetail() {
         {recipe.instructions && (
           <div className="card">
             <h2 className="font-heading font-semibold text-charcoal mb-3">Instructions</h2>
-            <div className="text-sm text-warmgray-600 whitespace-pre-line">
-              {recipe.instructions}
-            </div>
+            <ol className="space-y-2 text-sm text-warmgray-600 list-decimal list-inside">
+              {(() => {
+                const lines = recipe.instructions
+                  .split(/\n/)
+                  .map(line => line.replace(/^\d+[\.\)]\s*/, '').trim())
+                  .filter(line => line.length > 0)
+                // If it's one big paragraph, split by sentence boundaries
+                if (lines.length === 1 && lines[0].length > 100) {
+                  return lines[0]
+                    .split(/\.\s+(?=[A-Z])/)
+                    .map(s => s.replace(/\.$/, '').trim())
+                    .filter(s => s.length > 0)
+                    .map((step, i) => (
+                      <li key={i} className="leading-relaxed">{step}.</li>
+                    ))
+                }
+                return lines.map((step, i) => (
+                  <li key={i} className="leading-relaxed">{step}</li>
+                ))
+              })()}
+            </ol>
           </div>
         )}
 

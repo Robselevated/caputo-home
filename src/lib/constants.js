@@ -1,8 +1,34 @@
 // Preset stores for grocery list
-export const STORES = ['Pilgrams', 'Costco', 'Store']
+export const STORES = ["Pilgrim's", 'Costco', 'Grocery Store']
+
+// Produce keywords that default to Pilgrim's
+const PRODUCE_KEYWORDS = [
+  'apple', 'apricot', 'avocado', 'banana', 'berry', 'blackberry', 'blueberry',
+  'broccoli', 'cabbage', 'cantaloupe', 'carrot', 'cauliflower', 'celery',
+  'cherry', 'clementine', 'corn', 'cucumber', 'date', 'eggplant', 'fig',
+  'garlic', 'ginger', 'grape', 'grapefruit', 'greens', 'honeydew', 'jalapeno',
+  'kale', 'kiwi', 'leek', 'lemon', 'lettuce', 'lime', 'mango', 'melon',
+  'mushroom', 'nectarine', 'onion', 'orange', 'papaya', 'parsnip', 'peach',
+  'pear', 'pepper', 'pineapple', 'plum', 'pomegranate', 'potato', 'radish',
+  'raspberry', 'romaine', 'scallion', 'shallot', 'spinach', 'sprout', 'squash',
+  'strawberry', 'sweet potato', 'tangerine', 'tomato', 'turnip', 'watermelon',
+  'yam', 'zucchini',
+  // herbs
+  'basil', 'cilantro', 'dill', 'herb', 'mint', 'oregano', 'parsley',
+  'rosemary', 'sage', 'thyme',
+  // general
+  'produce', 'fruit', 'vegetable', 'veggie', 'salad',
+]
+
+export function getDefaultStore(itemName) {
+  if (!itemName) return 'Grocery Store'
+  const lower = itemName.toLowerCase()
+  const isMatch = PRODUCE_KEYWORDS.some(kw => lower.includes(kw))
+  return isMatch ? "Pilgrim's" : 'Grocery Store'
+}
 
 // Common units
-export const UNITS = ['count', 'lbs', 'oz', 'bags', 'boxes', 'cans', 'jars', 'bottles', 'packages']
+export const UNITS = ['count', 'slices', 'lbs', 'oz', 'bags', 'boxes', 'cans', 'jars', 'bottles', 'packages']
 
 // Section colors (warm palette)
 export const SECTION_COLORS = {

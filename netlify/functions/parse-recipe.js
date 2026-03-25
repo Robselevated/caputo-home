@@ -10,17 +10,36 @@ const RECIPE_PROMPT = `You are parsing a recipe from content. Extract the follow
 - prep_time: Prep time in minutes (integer, estimate if range given)
 - cook_time: Cook time in minutes (integer, estimate if range given)
 - tags: Array of relevant tags (cuisine type, meal type, dietary restrictions, etc.)
-- instructions: Complete cooking instructions as a single text block
+- instructions: Complete cooking instructions as numbered steps, one step per line (e.g. "1. Do this\n2. Do that\n3. Then this")
 - image_url: Main recipe image URL (full URL, not relative path)
 - ingredients: Array of objects with structure: { "name": "ingredient name", "qty": number, "unit": "measurement unit", "notes": "optional notes like 'chopped' or 'divided'" }
 
 For ingredients:
 - Extract the quantity as a number (convert fractions to decimals: 1/2 = 0.5, 1/4 = 0.25, 3/4 = 0.75)
-- Use standard units: cup, tbsp, tsp, oz, lb, gram, kg, count, can, package
+- Use standard units: cup, tbsp, tsp, oz, lb, gram, kg, count, slices, can, package
+- For bacon, use "slices" as the unit (not "count")
 - If no quantity is specified, use qty: 1 and unit: "to taste"
 - Put preparation notes (chopped, diced, etc.) in the notes field
 
 Return ONLY a valid JSON object with this exact structure. No markdown, no explanation.`
+
+function extractOgImage(html) {
+  // Try og:image first (most reliable for recipe sites)
+  const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i)
+  if (ogMatch) return ogMatch[1]
+
+  // Try twitter:image
+  const twMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i)
+  if (twMatch) return twMatch[1]
+
+  // Try JSON-LD schema image
+  const ldMatch = html.match(/"image"\s*:\s*"(https?:\/\/[^"]+)"/i)
+  if (ldMatch) return ldMatch[1]
+
+  return null
+}
 
 async function fetchContent(url) {
   // Try direct fetch first
@@ -82,6 +101,9 @@ export async function handler(event) {
 
     const content = await fetchContent(url)
 
+    // Extract og:image from HTML before sending to Claude (most reliable source)
+    const ogImage = extractOgImage(content)
+
     // Call Claude API to parse the recipe
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -118,6 +140,11 @@ export async function handler(event) {
         statusCode: 500,
         body: JSON.stringify({ error: 'Invalid recipe data structure' }),
       }
+    }
+
+    // Use og:image as fallback if Claude didn't extract an image
+    if (!recipe.image_url && ogImage) {
+      recipe.image_url = ogImage
     }
 
     return {
