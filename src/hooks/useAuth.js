@@ -31,13 +31,34 @@ export function useAuth() {
     return () => subscription.unsubscribe()
   }, [fetchProfile])
 
-  const signIn = async (email) => {
-    const { error } = await supabase.auth.signInWithOtp({
+  const signIn = async (email, pin) => {
+    // Try signing in first
+    const { error } = await supabase.auth.signInWithPassword({
       email,
-      options: {
-        emailRedirectTo: window.location.origin,
-      },
+      password: pin,
     })
+
+    if (error?.message?.includes('Invalid login credentials')) {
+      // User doesn't exist yet, create account
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password: pin,
+      })
+      if (signUpError) return { error: signUpError }
+
+      // If email confirmation is required, signUp returns a user but no session
+      // In that case, try signing in immediately after
+      if (!signUpData?.session) {
+        const { error: retryError } = await supabase.auth.signInWithPassword({
+          email,
+          password: pin,
+        })
+        if (retryError) return { error: retryError }
+      }
+
+      return { error: null }
+    }
+
     return { error }
   }
 

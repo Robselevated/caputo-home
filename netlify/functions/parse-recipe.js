@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY })
 
-const RECIPE_PROMPT = `You are parsing a recipe from HTML content. Extract the following information:
+const RECIPE_PROMPT = `You are parsing a recipe from content. Extract the following information:
 
 - name: Recipe title
 - description: Brief description (1-2 sentences)
@@ -22,6 +22,52 @@ For ingredients:
 
 Return ONLY a valid JSON object with this exact structure. No markdown, no explanation.`
 
+async function fetchContent(url) {
+  // Try direct fetch first
+  try {
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      redirect: 'follow',
+    })
+    if (resp.ok) {
+      return await resp.text()
+    }
+  } catch (_) {
+    // Direct fetch failed, try Firecrawl
+  }
+
+  // Fallback: use Firecrawl API to bypass anti-bot protection
+  const firecrawlKey = process.env.FIRECRAWL_API_KEY
+  if (!firecrawlKey) {
+    throw new Error('Site blocked direct access and Firecrawl API key is not configured')
+  }
+
+  const fcResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${firecrawlKey}`,
+    },
+    body: JSON.stringify({
+      url,
+      formats: ['markdown'],
+      onlyMainContent: true,
+    }),
+  })
+
+  if (!fcResp.ok) {
+    const errText = await fcResp.text()
+    throw new Error(`Firecrawl failed: ${errText}`)
+  }
+
+  const fcData = await fcResp.json()
+  return fcData.data?.markdown || fcData.data?.html || ''
+}
+
 export async function handler(event) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method not allowed' }
@@ -34,21 +80,7 @@ export async function handler(event) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Missing url parameter' }) }
     }
 
-    // Fetch HTML content from the URL
-    const htmlResponse = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; RecipeParser/1.0)',
-      },
-    })
-
-    if (!htmlResponse.ok) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: `Failed to fetch URL: ${htmlResponse.statusText}` }),
-      }
-    }
-
-    const html = await htmlResponse.text()
+    const content = await fetchContent(url)
 
     // Call Claude API to parse the recipe
     const response = await anthropic.messages.create({
@@ -60,7 +92,7 @@ export async function handler(event) {
           content: [
             {
               type: 'text',
-              text: `${RECIPE_PROMPT}\n\nHTML Content:\n${html.slice(0, 50000)}`,
+              text: `${RECIPE_PROMPT}\n\nRecipe page content:\n${content.slice(0, 50000)}`,
             },
           ],
         },

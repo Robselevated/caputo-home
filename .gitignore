@@ -5,3 +5,9 @@ dist
 .env.*.local
 *.log
 .DS_Store
+
+# Local Netlify folder
+.netlify
+
+# Firecrawl cache
+.firecrawl
