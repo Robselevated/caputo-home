@@ -338,6 +338,15 @@ export default function Cookbook() {
     return 'text-warmgray-400'
   }
 
+  // Top 5 recipes by ingredient coverage
+  const readyToCook = useMemo(() => {
+    if (Object.keys(coverage).length === 0) return []
+    return recipes
+      .filter(r => coverage[r.id]?.total > 0)
+      .sort((a, b) => (coverage[b.id]?.percentage || 0) - (coverage[a.id]?.percentage || 0))
+      .slice(0, 5)
+  }, [recipes, coverage])
+
   const isSearching = searchQuery || selectedTags.length > 0
 
   if (loading) {
@@ -661,6 +670,54 @@ export default function Cookbook() {
               </button>
             </div>
           )}
+        </section>
+      )}
+
+      {/* Ready to Cook: Top 5 by coverage */}
+      {!isSearching && readyToCook.length > 0 && (
+        <section className="space-y-4">
+          <div className="px-1">
+            <h3 className="font-heading text-xl font-bold">Ready to Cook</h3>
+            <p className="text-charcoal-light text-xs mt-1">Recipes you have the most ingredients for</p>
+          </div>
+          <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-6 px-6 pb-2">
+            {readyToCook.map(recipe => {
+              const cov = coverage[recipe.id]
+              const pct = cov?.percentage ?? 0
+              return (
+                <div
+                  key={recipe.id}
+                  onClick={() => navigate(`/cookbook/${recipe.id}`)}
+                  className="flex-none w-44 bg-dark-surface rounded-2xl overflow-hidden shadow-dark border border-warmgray-100 active:scale-[0.97] transition-transform cursor-pointer"
+                >
+                  <div className="h-28 overflow-hidden">
+                    {recipe.image_url ? (
+                      <img src={recipe.image_url} alt={recipe.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-section-cookbook/10 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-4xl text-section-cookbook/30">menu_book</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <h4 className="font-semibold text-charcoal text-sm line-clamp-2 leading-tight">{recipe.name}</h4>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-[10px] font-bold ${getCoverageTextColor(pct)}`}>{pct}% on hand</span>
+                        <span className="text-[10px] text-warmgray-400">{cov.matched}/{cov.total}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-warmgray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${getCoverageColor(pct)}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </section>
       )}
 
