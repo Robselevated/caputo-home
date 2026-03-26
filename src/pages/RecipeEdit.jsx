@@ -15,6 +15,9 @@ export default function RecipeEdit() {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
+  const [screenshotFiles, setScreenshotFiles] = useState([])
+  const [scanningScreenshots, setScanningScreenshots] = useState(false)
+  const [scanError, setScanError] = useState(null)
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -87,6 +90,65 @@ export default function RecipeEdit() {
 
     setImageUrl(data.publicUrl)
     setUploading(false)
+  }
+
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result
+      const commaIndex = dataUrl.indexOf(',')
+      resolve({ base64: dataUrl.slice(commaIndex + 1), media_type: file.type || 'image/jpeg' })
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+
+  const handleScreenshotScan = async () => {
+    if (screenshotFiles.length === 0) return
+    setScanningScreenshots(true)
+    setScanError(null)
+
+    try {
+      const images = await Promise.all(screenshotFiles.map(f => fileToBase64(f)))
+
+      const response = await fetch('/.netlify/functions/parse-recipe-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ images }),
+      })
+
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}))
+        throw new Error(errBody.error || 'Scan failed')
+      }
+
+      const parsed = await response.json()
+
+      // Populate form fields from scan results
+      if (parsed.name) setName(parsed.name)
+      if (parsed.description) setDescription(parsed.description)
+      if (parsed.servings) setServings(String(parsed.servings))
+      if (parsed.prep_time) setPrepTime(String(parsed.prep_time))
+      if (parsed.cook_time) setCookTime(String(parsed.cook_time))
+      if (parsed.tags?.length) setTags(parsed.tags.join(', '))
+      if (parsed.instructions) setInstructions(parsed.instructions)
+      if (parsed.ingredients?.length) {
+        setIngredients(parsed.ingredients.map(ing => ({
+          name: ing.name || '',
+          qty: ing.qty ? String(ing.qty) : '',
+          unit: ing.unit || '',
+          notes: ing.notes || '',
+          section: ing.section || '',
+        })))
+      }
+      if (parsed.image_url) setImageUrl(parsed.image_url)
+
+      setScreenshotFiles([])
+    } catch (err) {
+      setScanError(err.message)
+    } finally {
+      setScanningScreenshots(false)
+    }
   }
 
   const handleSave = async (e) => {
@@ -256,6 +318,73 @@ export default function RecipeEdit() {
               placeholder="Or paste image URL"
               className="input-field focus:ring-section-cookbook text-sm"
             />
+          </div>
+
+          {/* Scan from Screenshots */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-warmgray-600">Scan from Screenshots</label>
+            <p className="text-xs text-warmgray-400">Upload screenshots of a recipe page to auto-fill this recipe</p>
+            <label className="cursor-pointer block">
+              <div className="border-2 border-dashed border-section-cookbook/30 rounded-xl p-4 text-center hover:border-section-cookbook/60 transition-colors">
+                <span className="material-symbols-outlined text-2xl text-section-cookbook/60 block mb-1">photo_library</span>
+                <span className="text-sm text-warmgray-500">
+                  {screenshotFiles.length > 0
+                    ? `${screenshotFiles.length} screenshot${screenshotFiles.length !== 1 ? 's' : ''} selected`
+                    : 'Tap to select screenshots'}
+                </span>
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => setScreenshotFiles(Array.from(e.target.files || []))}
+                className="hidden"
+              />
+            </label>
+            {screenshotFiles.length > 0 && (
+              <>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                  {screenshotFiles.map((file, i) => (
+                    <img
+                      key={i}
+                      src={URL.createObjectURL(file)}
+                      alt={`Screenshot ${i + 1}`}
+                      className="w-16 h-16 object-cover rounded-lg shrink-0 border border-warmgray-200"
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleScreenshotScan}
+                    disabled={scanningScreenshots}
+                    className="flex-1 btn-primary bg-section-cookbook disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    {scanningScreenshots ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Scanning...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-sm">document_scanner</span>
+                        Scan Screenshots
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setScreenshotFiles([]); setScanError(null) }}
+                    className="px-4 py-2 text-sm text-warmgray-500 bg-cream rounded-xl font-medium"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </>
+            )}
+            {scanError && (
+              <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{scanError}</p>
+            )}
           </div>
 
           <div className="flex gap-2">
