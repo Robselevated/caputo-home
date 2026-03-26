@@ -1,5 +1,21 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { TAXONOMY } from '../lib/constants'
+
+// If Claude puts an item in "Other" with a subcategory that matches a real category, remap it
+function fixCategory(item, location) {
+  const taxonomy = TAXONOMY[location]
+  if (!taxonomy || item.category !== 'Other' || !item.subcategory) return item
+
+  const sub = item.subcategory.toLowerCase()
+  for (const cat of Object.keys(taxonomy)) {
+    if (cat === 'Other') continue
+    if (cat.toLowerCase() === sub || cat.toLowerCase().includes(sub) || sub.includes(cat.toLowerCase())) {
+      return { ...item, category: cat, subcategory: null }
+    }
+  }
+  return item
+}
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -60,7 +76,8 @@ export function useScanSession(householdId) {
   const confirmItems = async (confirmedItems, location, userId) => {
     const errors = []
     try {
-      for (const item of confirmedItems) {
+      for (const rawItem of confirmedItems) {
+        const item = location !== 'receipt' ? fixCategory(rawItem, location) : rawItem
         if (location === 'receipt') {
           const { error: insertErr } = await supabase.from('recently_bought').insert({
             household_id: householdId,

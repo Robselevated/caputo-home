@@ -33,14 +33,14 @@ Return ONLY a valid JSON array. No markdown, no explanation.`,
   fridge: `You are analyzing a photo of items in a fridge. Identify every food item visible. Count the exact number of each item you can see.
 For each item return a JSON object with these keys:
 - "name": generic name, no brand
-- "category": MUST be one of: Deli Meat, Bacon, Dairy, Condiments, Bread, Beverages, Lettuce, Apples, Oranges, Pears, Produce (Other), Other
+- "category": MUST be one of: Deli Meat, Bacon, Dairy, Condiments, Broth/Stock, Bread, Beverages, Lettuce, Apples, Oranges, Pears, Produce (Other), Other
 - "subcategory": for Deli Meat (Black Forest Ham, Honey Ham, Roasted Turkey, Deli Chicken, Salami, Pepperoni, Prosciutto, Other), for Lettuce (Romaine, Iceberg, Green Leaf, Kale, Spinach, Arugula, Mixed Greens, Other), for Apples (Fuji, Gala, Granny Smith, Honeycrisp, Pink Lady, Other), null for other categories
 - "qty": integer count of how many you see, minimum 1
 - "unit": lbs for deli meat, packages for bacon, bottles for condiments, count for produce/dairy/bread/beverages
 - "confidence": high/medium/low
 - "needs_verification": boolean
 - "verification_prompt": string if low confidence, null otherwise
-Choose the MOST SPECIFIC category. Milk, cheese, yogurt, butter, eggs, cream, sour cream, cream cheese = "Dairy". Ketchup, mustard, hot sauce, mayo, mayonnaise, ranch, salad dressing, BBQ sauce, soy sauce, Worcestershire, relish, salsa = "Condiments". Bread, bagels, buns, rolls, tortillas, pita, English muffins, hamburger buns, hot dog buns, wraps = "Bread". Juice, soda, water, beer, wine, kombucha, iced tea, lemonade, energy drinks = "Beverages". Carrots, peppers, celery, tomatoes, berries, cucumbers, broccoli = "Produce (Other)". Only use "Other" if no other category fits.
+Choose the MOST SPECIFIC category. Milk, cheese, yogurt, butter, eggs, cream, sour cream, cream cheese = "Dairy". Ketchup, mustard, hot sauce, mayo, mayonnaise, ranch, salad dressing, BBQ sauce, soy sauce, Worcestershire, relish, salsa = "Condiments". Broth, stock, bouillon, bone broth, chicken broth, beef broth, vegetable broth = "Broth/Stock". Bread, bagels, buns, rolls, tortillas, pita, English muffins, hamburger buns, hot dog buns, wraps = "Bread". Juice, soda, water, beer, wine, kombucha, iced tea, lemonade, energy drinks = "Beverages". Carrots, peppers, celery, tomatoes, berries, cucumbers, broccoli = "Produce (Other)". NEVER put a subcategory on "Other". If you can identify what type of item it is, use the matching category with subcategory null. Only use "Other" if no other category fits.
 Return ONLY a valid JSON array. No markdown, no explanation.`,
 
   receipt: `You are reading a grocery receipt. Extract every food/beverage line item. Exclude taxes, fees, non-food items (paper towels, cleaning supplies, etc).
