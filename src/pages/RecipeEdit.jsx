@@ -320,73 +320,6 @@ export default function RecipeEdit() {
             />
           </div>
 
-          {/* Scan from Screenshots */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-warmgray-600">Scan from Screenshots</label>
-            <p className="text-xs text-warmgray-400">Upload screenshots of a recipe page to auto-fill this recipe</p>
-            <label className="cursor-pointer block">
-              <div className="border-2 border-dashed border-section-cookbook/30 rounded-xl p-4 text-center hover:border-section-cookbook/60 transition-colors">
-                <span className="material-symbols-outlined text-2xl text-section-cookbook/60 block mb-1">photo_library</span>
-                <span className="text-sm text-warmgray-500">
-                  {screenshotFiles.length > 0
-                    ? `${screenshotFiles.length} screenshot${screenshotFiles.length !== 1 ? 's' : ''} selected`
-                    : 'Tap to select screenshots'}
-                </span>
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => setScreenshotFiles(Array.from(e.target.files || []))}
-                className="hidden"
-              />
-            </label>
-            {screenshotFiles.length > 0 && (
-              <>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                  {screenshotFiles.map((file, i) => (
-                    <img
-                      key={i}
-                      src={URL.createObjectURL(file)}
-                      alt={`Screenshot ${i + 1}`}
-                      className="w-16 h-16 object-cover rounded-lg shrink-0 border border-warmgray-200"
-                    />
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleScreenshotScan}
-                    disabled={scanningScreenshots}
-                    className="flex-1 btn-primary bg-section-cookbook disabled:opacity-40 flex items-center justify-center gap-2"
-                  >
-                    {scanningScreenshots ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Scanning...
-                      </>
-                    ) : (
-                      <>
-                        <span className="material-symbols-outlined text-sm">document_scanner</span>
-                        Scan Screenshots
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setScreenshotFiles([]); setScanError(null) }}
-                    className="px-4 py-2 text-sm text-warmgray-500 bg-cream rounded-xl font-medium"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </>
-            )}
-            {scanError && (
-              <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{scanError}</p>
-            )}
-          </div>
-
           <div className="flex gap-2">
             <input
               type="number"
@@ -522,6 +455,74 @@ export default function RecipeEdit() {
             >
               + Add Section
             </button>
+          </div>
+
+          {/* Scan from Screenshots — upload recipe photos to auto-fill ingredients + instructions */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-warmgray-600">Scan Recipe from Photos</label>
+            <p className="text-xs text-warmgray-400">Upload screenshots of ingredients and instructions to auto-fill</p>
+            {screenshotFiles.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                {screenshotFiles.map((file, i) => (
+                  <img
+                    key={i}
+                    src={URL.createObjectURL(file)}
+                    alt={`Screenshot ${i + 1}`}
+                    className="w-16 h-16 object-cover rounded-lg shrink-0 border border-warmgray-200"
+                  />
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <label className="flex-1 cursor-pointer">
+                <div className={`btn-primary bg-section-cookbook/80 text-center text-sm py-2 flex items-center justify-center gap-2 ${scanningScreenshots ? 'opacity-40' : ''}`}>
+                  <span className="material-symbols-outlined text-sm">photo_library</span>
+                  {screenshotFiles.length > 0
+                    ? `${screenshotFiles.length} Photo${screenshotFiles.length !== 1 ? 's' : ''} Selected`
+                    : 'Upload Recipe Photos'}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => setScreenshotFiles(Array.from(e.target.files || []))}
+                  disabled={scanningScreenshots}
+                  className="hidden"
+                />
+              </label>
+              {screenshotFiles.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { setScreenshotFiles([]); setScanError(null) }}
+                  className="px-4 py-2 text-sm text-red-500 bg-red-500/10 rounded-xl font-medium"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {screenshotFiles.length > 0 && (
+              <button
+                type="button"
+                onClick={handleScreenshotScan}
+                disabled={scanningScreenshots}
+                className="w-full btn-primary bg-section-cookbook disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {scanningScreenshots ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Scanning {screenshotFiles.length} photo{screenshotFiles.length !== 1 ? 's' : ''}...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-sm">document_scanner</span>
+                    Scan & Fill Recipe
+                  </>
+                )}
+              </button>
+            )}
+            {scanError && (
+              <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{scanError}</p>
+            )}
           </div>
 
           <textarea
