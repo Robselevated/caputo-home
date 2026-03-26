@@ -103,10 +103,12 @@ export default function GroceryList() {
   // Group items by store
   const grouped = useMemo(() => {
     const groups = {}
-    const filtered = storeFilter ? items.filter(i => i.store === storeFilter) : items
+    const filtered = storeFilter
+      ? items.filter(i => (i.store || 'Grocery Store') === storeFilter)
+      : items
 
     for (const item of filtered) {
-      const key = item.store || 'No Store'
+      const key = item.store || 'Grocery Store'
       if (!groups[key]) groups[key] = []
       groups[key].push(item)
     }
@@ -213,7 +215,7 @@ export default function GroceryList() {
 
   const checkedCount = items.filter(i => i.checked).length
   const totalCount = items.length
-  const allStores = [...new Set(items.map(i => i.store || 'No Store'))]
+  const allStores = [...new Set(items.map(i => i.store || 'Grocery Store'))]
 
   if (loading) {
     return (
@@ -430,7 +432,7 @@ export default function GroceryList() {
                                 onClick={() => setOpenStoreSwitcher(openStoreSwitcher === item.id ? null : item.id)}
                                 className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${accent.badge}`}
                               >
-                                {item.store || 'No Store'}
+                                {item.store || 'Grocery Store'}
                               </button>
                               {openStoreSwitcher === item.id && (
                                 <div className="absolute left-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[140px]">
