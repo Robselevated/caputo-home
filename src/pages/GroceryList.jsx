@@ -528,7 +528,7 @@ export default function GroceryList() {
                         /* Normal Mode */
                         <div
                           key={item.id}
-                          className={`bg-dark-surface p-5 rounded-lg flex items-center gap-4 transition-all editorial-shadow ${
+                          className={`bg-dark-surface p-3 rounded-lg flex items-center gap-3 transition-all editorial-shadow ${
                             item.checked ? 'opacity-40' : ''
                           }`}
                         >
@@ -551,15 +551,12 @@ export default function GroceryList() {
 
                           {/* Item Info */}
                           <div className="flex-1 min-w-0" onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}>
-                            <p className={`font-semibold ${item.checked ? 'line-through text-warmgray-400' : 'text-charcoal'}`}>
+                            <p className={`font-semibold truncate ${item.checked ? 'line-through text-warmgray-400' : 'text-charcoal'}`}>
                               {item.name}
                             </p>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                               {item.unit && (
                                 <span className="text-xs text-charcoal-light font-medium">{item.unit}</span>
-                              )}
-                              {item.notes && expandedItem !== item.id && (
-                                <span className="text-xs text-warmgray-400 truncate">{item.notes}</span>
                               )}
                               {/* Store Switcher */}
                               <div className="relative" ref={openStoreSwitcher === item.id ? storeSwitcherRef : null}>
