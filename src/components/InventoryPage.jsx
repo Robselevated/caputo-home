@@ -132,8 +132,8 @@ export default function InventoryPage({
       </section>
 
       {/* Search & Add Bento */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="col-span-3 bg-cream rounded-xl p-4 flex items-center gap-3 editorial-shadow">
+      <div className="bg-cream rounded-xl p-1 flex items-center gap-2 editorial-shadow">
+        <div className="flex-1 flex items-center px-4 py-3 gap-3">
           <span className={`material-symbols-outlined ${colorClass}`}>search</span>
           <input
             type="text"
@@ -143,12 +143,19 @@ export default function InventoryPage({
             className="bg-transparent border-none focus:ring-0 p-0 text-sm font-medium placeholder:text-warmgray-300 w-full text-charcoal"
           />
         </div>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className={`col-span-1 ${bgClass} rounded-xl flex items-center justify-center text-white shadow-dark-md active:scale-95 transition-transform`}
-        >
-          <span className="material-symbols-outlined">{showAdd ? 'close' : 'add'}</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <PhotoScanner
+            onCapture={(file) => uploadAndScan(file, location, user.id)}
+            scanning={scanning}
+            colorClass={bgClass}
+          />
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className={`${bgClass} text-white w-12 h-12 rounded-lg flex items-center justify-center shadow-dark-md active:scale-95 transition-transform`}
+          >
+            <span className="material-symbols-outlined">{showAdd ? 'close' : 'add'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Category Filter Pills */}
@@ -332,16 +339,6 @@ export default function InventoryPage({
         />
       )}
 
-      {/* FAB: Photo Scanner */}
-      {!showAdd && (
-        <div className="fixed bottom-24 right-6 z-40">
-          <PhotoScanner
-            onCapture={(file) => uploadAndScan(file, location, user.id)}
-            scanning={scanning}
-            colorClass={bgClass}
-          />
-        </div>
-      )}
     </div>
   )
 }
