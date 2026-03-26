@@ -5,7 +5,7 @@ const navItems = [
   { path: '/freezer', label: 'Freezer', icon: 'ac_unit' },
   { path: '/fridge', label: 'Fridge', icon: 'kitchen' },
   { path: '/pantry', label: 'Pantry', icon: 'inventory_2' },
-  { path: '/home-goods', label: 'Home', icon: 'home' },
+  { path: '/planning', label: 'Planning', icon: 'calendar_month' },
   { path: '/cookbook', label: 'Cookbook', icon: 'menu_book' },
 ]
 

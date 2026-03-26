@@ -293,6 +293,30 @@ alter publication supabase_realtime add table recently_bought;
 alter publication supabase_realtime add table recipes;
 
 -- ============================================================
+-- MEAL PICKS (weekly meal planning per household member)
+-- ============================================================
+create table meal_picks (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid references households(id) on delete cascade,
+  user_id uuid references users(id) on delete set null,
+  recipe_id uuid references recipes(id) on delete set null,
+  name text not null,
+  notes text,
+  image_url text,
+  created_at timestamptz default now()
+);
+
+create index idx_meal_picks_household on meal_picks(household_id);
+
+alter table meal_picks enable row level security;
+
+create policy "meal_picks_all" on meal_picks
+  using (household_id = get_my_household_id())
+  with check (household_id = get_my_household_id());
+
+alter publication supabase_realtime add table meal_picks;
+
+-- ============================================================
 -- SUPABASE STORAGE BUCKET
 -- Create manually in dashboard or via this:
 -- ============================================================
