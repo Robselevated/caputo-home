@@ -608,38 +608,36 @@ export default function GroceryList() {
                                     <p className={`font-semibold ${item.checked ? 'line-through text-warmgray-400' : 'text-charcoal'}`}>
                                       {item.name}
                                     </p>
-                                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                                      {/* Store Switcher */}
-                                      <div className="relative" ref={openStoreSwitcher === item.id ? storeSwitcherRef : null}>
-                                        <button
-                                          onClick={() => setOpenStoreSwitcher(openStoreSwitcher === item.id ? null : item.id)}
-                                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${accent.badge}`}
-                                        >
-                                          {item.store || 'Grocery Store'}
-                                        </button>
-                                        {openStoreSwitcher === item.id && (
-                                          <div className="absolute left-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[140px]">
-                                            {STORES.map(s => {
-                                              const sAccent = storeAccentColors[s] || defaultAccent
-                                              return (
-                                                <button
-                                                  key={s}
-                                                  onClick={() => handleStoreChange(item, s)}
-                                                  className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
-                                                    item.store === s ? 'bg-warmgray-50' : ''
-                                                  } active:bg-warmgray-50`}
-                                                >
-                                                  <span className={`w-2 h-2 rounded-full ${sAccent.bar}`} />
-                                                  <span className="text-charcoal">{s}</span>
-                                                </button>
-                                              )
-                                            })}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {expandedItem === item.id && (item.unit || item.notes) && (
-                                      <div className="mt-1.5 space-y-0.5">
+                                    {expandedItem === item.id && (
+                                      <div className="mt-2 pt-2 border-t border-warmgray-100 space-y-1.5">
+                                        {/* Store Switcher */}
+                                        <div className="relative" ref={openStoreSwitcher === item.id ? storeSwitcherRef : null}>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); setOpenStoreSwitcher(openStoreSwitcher === item.id ? null : item.id) }}
+                                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${accent.badge}`}
+                                          >
+                                            {item.store || 'Grocery Store'}
+                                          </button>
+                                          {openStoreSwitcher === item.id && (
+                                            <div className="absolute left-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[140px]">
+                                              {STORES.map(s => {
+                                                const sAccent = storeAccentColors[s] || defaultAccent
+                                                return (
+                                                  <button
+                                                    key={s}
+                                                    onClick={() => handleStoreChange(item, s)}
+                                                    className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
+                                                      item.store === s ? 'bg-warmgray-50' : ''
+                                                    } active:bg-warmgray-50`}
+                                                  >
+                                                    <span className={`w-2 h-2 rounded-full ${sAccent.bar}`} />
+                                                    <span className="text-charcoal">{s}</span>
+                                                  </button>
+                                                )
+                                              })}
+                                            </div>
+                                          )}
+                                        </div>
                                         {item.unit && (
                                           <p className="text-xs text-charcoal-light font-medium">{item.unit}</p>
                                         )}
