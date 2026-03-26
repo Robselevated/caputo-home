@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { hasMatch } from '../lib/ingredientMatch'
 
 export function useIngredientCoverage(householdId, recipes) {
   const [allIngredients, setAllIngredients] = useState([])
@@ -78,7 +79,7 @@ export function useIngredientCoverage(householdId, recipes) {
         continue
       }
 
-      const matched = ingredients.filter(name => inventoryNames.has(name)).length
+      const matched = ingredients.filter(name => hasMatch(name, inventoryNames)).length
       result[recipeId] = {
         total,
         matched,

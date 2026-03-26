@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { findMatch } from '../lib/ingredientMatch'
 
 export function useRecipeMatch(householdId) {
   const [loading, setLoading] = useState(false)
@@ -25,9 +26,7 @@ export function useRecipeMatch(householdId) {
       const missing = []
 
       for (const ingredient of recipeIngredients) {
-        const match = inventoryItems.find(item =>
-          item.name.toLowerCase() === ingredient.name.toLowerCase()
-        )
+        const match = findMatch(ingredient.name, inventoryItems)
 
         if (match) {
           inInventory.push({ ...ingredient, inventoryItem: match })
