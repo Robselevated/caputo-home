@@ -2,18 +2,50 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { TAXONOMY } from '../lib/constants'
 
-// If Claude puts an item in "Other" with a subcategory that matches a real category, remap it
+// Keywords to catch items Claude miscategorizes as "Other"
+const CATEGORY_KEYWORDS = {
+  pantry: {
+    'Bread': ['bread', 'bagel', 'bun', 'roll', 'tortilla', 'naan', 'pita', 'english muffin', 'baguette', 'sourdough', 'ciabatta', 'focaccia', 'croissant', 'loaf', 'wrap'],
+    'Pasta': ['pasta', 'spaghetti', 'penne', 'farfalle', 'elbow', 'fettuccine', 'linguine', 'angel hair', 'rigatoni', 'rotini', 'lasagna', 'orzo', 'macaroni', 'noodle'],
+    'Canned Goods': ['canned', 'can of'],
+    'Snacks': ['chips', 'crackers', 'pretzels', 'popcorn', 'granola bar'],
+  },
+  fridge: {
+    'Dairy': ['milk', 'cheese', 'yogurt', 'butter', 'egg', 'cream', 'sour cream', 'cream cheese'],
+    'Condiments': ['ketchup', 'mustard', 'hot sauce', 'mayo', 'mayonnaise', 'ranch', 'salad dressing', 'bbq sauce', 'soy sauce', 'worcestershire', 'relish', 'salsa'],
+    'Broth/Stock': ['broth', 'stock', 'bouillon', 'bone broth'],
+    'Bread': ['bread', 'bagel', 'bun', 'roll', 'tortilla', 'pita', 'english muffin', 'wrap'],
+    'Beverages': ['juice', 'soda', 'water', 'beer', 'wine', 'kombucha', 'iced tea', 'lemonade'],
+  },
+}
+
+// If Claude puts an item in "Other", try to remap via subcategory match then name keywords
 function fixCategory(item, location) {
   const taxonomy = TAXONOMY[location]
-  if (!taxonomy || item.category !== 'Other' || !item.subcategory) return item
+  if (!taxonomy || item.category !== 'Other') return item
 
-  const sub = item.subcategory.toLowerCase()
-  for (const cat of Object.keys(taxonomy)) {
-    if (cat === 'Other') continue
-    if (cat.toLowerCase() === sub || cat.toLowerCase().includes(sub) || sub.includes(cat.toLowerCase())) {
-      return { ...item, category: cat, subcategory: null }
+  // Pass 1: subcategory matches a real category name
+  if (item.subcategory) {
+    const sub = item.subcategory.toLowerCase()
+    for (const cat of Object.keys(taxonomy)) {
+      if (cat === 'Other') continue
+      if (cat.toLowerCase() === sub || cat.toLowerCase().includes(sub) || sub.includes(cat.toLowerCase())) {
+        return { ...item, category: cat, subcategory: null }
+      }
     }
   }
+
+  // Pass 2: item name contains keywords for a known category
+  const keywords = CATEGORY_KEYWORDS[location]
+  if (keywords) {
+    const nameLower = item.name.toLowerCase()
+    for (const [cat, kws] of Object.entries(keywords)) {
+      if (kws.some(kw => nameLower.includes(kw))) {
+        return { ...item, category: cat, subcategory: null }
+      }
+    }
+  }
+
   return item
 }
 
