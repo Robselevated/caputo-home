@@ -11,6 +11,7 @@ export function useGroceryList(householdId) {
       .from('grocery_items')
       .select('*, added_by_user:users!grocery_items_added_by_fkey(name), updated_by_user:users!grocery_items_updated_by_fkey(name)')
       .eq('household_id', householdId)
+      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true })
 
     if (!error && data) setItems(data)
@@ -36,6 +37,18 @@ export function useGroceryList(householdId) {
   }, [householdId, fetchItems])
 
   const addItem = async ({ name, qty, unit, store, notes, userId }) => {
+    // Get max sort_order for target store so new item lands at the bottom
+    const targetStore = store || 'Grocery Store'
+    const { data: maxData } = await supabase
+      .from('grocery_items')
+      .select('sort_order')
+      .eq('household_id', householdId)
+      .eq('store', targetStore)
+      .order('sort_order', { ascending: false })
+      .limit(1)
+
+    const nextOrder = (maxData?.[0]?.sort_order ?? 0) + 1
+
     const newItem = {
       household_id: householdId,
       name: name.trim(),
@@ -44,6 +57,7 @@ export function useGroceryList(householdId) {
       store: store || null,
       notes: notes || null,
       checked: false,
+      sort_order: nextOrder,
       added_by: userId,
       updated_by: userId,
     }
@@ -125,5 +139,23 @@ export function useGroceryList(householdId) {
     setItems(prev => prev.map(i => i.id === id ? { ...i, checked: false, checked_at: null } : i))
   }
 
-  return { items, loading, addItem, checkItem, uncheckItem, deleteItem, updateItem, clearChecked, markChecked, markUnchecked }
+  const reorderItems = async (orderedIds, userId) => {
+    // Optimistic local update
+    setItems(prev => {
+      const updates = new Map(orderedIds.map((id, idx) => [id, idx]))
+      return prev.map(i => updates.has(i.id) ? { ...i, sort_order: updates.get(i.id) } : i)
+    })
+
+    // Batch update in Supabase
+    const updates = orderedIds.map((id, index) =>
+      supabase.from('grocery_items').update({
+        sort_order: index,
+        updated_by: userId,
+        updated_at: new Date().toISOString(),
+      }).eq('id', id)
+    )
+    await Promise.all(updates)
+  }
+
+  return { items, loading, addItem, checkItem, uncheckItem, deleteItem, updateItem, clearChecked, markChecked, markUnchecked, reorderItems }
 }

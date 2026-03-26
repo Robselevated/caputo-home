@@ -82,6 +82,7 @@ create table grocery_items (
   notes text,                      -- substitution notes, reminders, etc
   checked boolean default false,
   checked_at timestamptz,
+  sort_order integer default 0,
   added_by uuid references users(id) on delete set null,
   updated_by uuid references users(id) on delete set null,
   updated_at timestamptz default now(),

@@ -8,8 +8,12 @@ import { usePushNotifications } from '../hooks/usePushNotifications'
 import { useOfflineSync } from '../hooks/useOfflineSync'
 import ItemAutocomplete from '../components/ItemAutocomplete'
 import PhotoScanner from '../components/PhotoScanner'
-import ScanReview from './ScanReview'
+import ReceiptReview from './ReceiptReview'
 import OfflineIndicator from '../components/OfflineIndicator'
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
+import SortableGroceryItem from '../components/SortableGroceryItem'
 import { STORES, UNITS, getDefaultStore } from '../lib/constants'
 
 // Store accent colors for left bar + badges
@@ -50,7 +54,7 @@ function formatDateLabel(dateStr) {
 export default function GroceryList() {
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
-  const { items, loading, addItem, checkItem, deleteItem, updateItem, clearChecked, markChecked, markUnchecked } = useGroceryList(householdId)
+  const { items, loading, addItem, checkItem, deleteItem, updateItem, clearChecked, markChecked, markUnchecked, reorderItems } = useGroceryList(householdId)
   const { items: recentItems, addBackToList } = useRecentlyBought(householdId)
   const { getSuggestions } = useItemHistory(householdId)
   const { scanning, results, error: scanError, uploadAndScan, confirmItems, cancelScan } = useScanSession(householdId)
@@ -81,6 +85,15 @@ export default function GroceryList() {
   const [store, setStore] = useState('')
   const [notes, setNotes] = useState('')
   const [userOverrodeStore, setUserOverrodeStore] = useState(false)
+
+  // Drag-and-drop sensors
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: 8 },
+  })
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: { delay: 200, tolerance: 5 },
+  })
+  const sensors = useSensors(pointerSensor, touchSensor)
 
   // Request push notification permission on first load
   useEffect(() => {
@@ -142,7 +155,7 @@ export default function GroceryList() {
     for (const key of Object.keys(groups)) {
       groups[key].sort((a, b) => {
         if (a.checked !== b.checked) return a.checked ? 1 : -1
-        return new Date(a.created_at) - new Date(b.created_at)
+        return (a.sort_order || 0) - (b.sort_order || 0) || new Date(a.created_at) - new Date(b.created_at)
       })
     }
 
@@ -208,8 +221,26 @@ export default function GroceryList() {
   }
 
   const handleStoreChange = async (item, newStore) => {
-    await updateItem(item.id, { store: newStore }, user.id)
+    // Put at end of new store group
+    const storeItems = items.filter(i => (i.store || 'Grocery Store') === newStore && !i.checked)
+    const maxOrder = Math.max(0, ...storeItems.map(i => i.sort_order || 0))
+    await updateItem(item.id, { store: newStore, sort_order: maxOrder + 1 }, user.id)
     setOpenStoreSwitcher(null)
+  }
+
+  const handleDragEnd = (storeName) => (event) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const storeItems = grouped[storeName]
+    const unchecked = storeItems.filter(i => !i.checked)
+    const oldIndex = unchecked.findIndex(i => i.id === active.id)
+    const newIndex = unchecked.findIndex(i => i.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const reordered = arrayMove(unchecked, oldIndex, newIndex)
+    reorderItems(reordered.map(i => i.id), user.id)
   }
 
   const handleQuickAdd = async () => {
@@ -319,9 +350,10 @@ export default function GroceryList() {
             </div>
             <div className="flex items-center gap-1.5">
               <PhotoScanner
-                onCapture={(file) => uploadAndScan(file, 'receipt', user.id)}
+                onCapture={(file) => uploadAndScan(file, 'receipt_inventory', user.id)}
                 scanning={scanning}
                 colorClass="bg-section-grocery"
+                icon="receipt_long"
               />
               <button
                 onClick={() => {
@@ -451,195 +483,225 @@ export default function GroceryList() {
                   </div>
 
                   {/* Item Cards */}
-                  <div className="space-y-3">
-                    {storeItems.map(item => (
-                      editingItem === item.id ? (
-                        /* Edit Mode */
-                        <div key={item.id} className="bg-dark-surface p-5 rounded-lg editorial-shadow border-2 border-section-grocery/30 animate-slide-down">
-                          <div className="space-y-3">
-                            <input
-                              type="text"
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              className="input-field focus:ring-section-grocery font-semibold"
-                              placeholder="Item name"
-                              autoFocus
-                            />
-                            <div className="flex gap-2">
-                              <input
-                                type="number"
-                                value={editQty}
-                                onChange={(e) => setEditQty(e.target.value)}
-                                placeholder="Qty"
-                                className="input-field focus:ring-section-grocery w-20"
-                                inputMode="decimal"
-                              />
-                              <select
-                                value={editUnit}
-                                onChange={(e) => setEditUnit(e.target.value)}
-                                className="input-field focus:ring-section-grocery flex-1"
-                              >
-                                <option value="">Unit</option>
-                                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                              </select>
-                            </div>
-                            <div className="flex gap-2 flex-wrap">
-                              {STORES.map(s => {
-                                const sAccent = storeAccentColors[s] || defaultAccent
-                                return (
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd(storeName)}
+                    modifiers={[restrictToVerticalAxis]}
+                  >
+                    <SortableContext
+                      items={storeItems.filter(i => !i.checked).map(i => i.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-3">
+                        {storeItems.map(item => (
+                          editingItem === item.id ? (
+                            /* Edit Mode */
+                            <div key={item.id} className="bg-dark-surface p-5 rounded-lg editorial-shadow border-2 border-section-grocery/30 animate-slide-down">
+                              <div className="space-y-3">
+                                <input
+                                  type="text"
+                                  value={editName}
+                                  onChange={(e) => setEditName(e.target.value)}
+                                  className="input-field focus:ring-section-grocery font-semibold"
+                                  placeholder="Item name"
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <input
+                                    type="number"
+                                    value={editQty}
+                                    onChange={(e) => setEditQty(e.target.value)}
+                                    placeholder="Qty"
+                                    className="input-field focus:ring-section-grocery w-20"
+                                    inputMode="decimal"
+                                  />
+                                  <select
+                                    value={editUnit}
+                                    onChange={(e) => setEditUnit(e.target.value)}
+                                    className="input-field focus:ring-section-grocery flex-1"
+                                  >
+                                    <option value="">Unit</option>
+                                    {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                                  </select>
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                  {STORES.map(s => {
+                                    const sAccent = storeAccentColors[s] || defaultAccent
+                                    return (
+                                      <button
+                                        key={s}
+                                        type="button"
+                                        onClick={() => setEditStore(s)}
+                                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                          editStore === s ? `${sAccent.bar} text-white` : 'bg-cream text-warmgray-600'
+                                        }`}
+                                      >
+                                        {s}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                                <input
+                                  type="text"
+                                  value={editNotes}
+                                  onChange={(e) => setEditNotes(e.target.value)}
+                                  placeholder="Notes"
+                                  className="input-field focus:ring-section-grocery"
+                                />
+                                <div className="flex gap-2">
                                   <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() => setEditStore(s)}
-                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                                      editStore === s ? `${sAccent.bar} text-white` : 'bg-cream text-warmgray-600'
+                                    onClick={() => saveEdit(item.id)}
+                                    disabled={!editName.trim()}
+                                    className="btn-primary bg-section-grocery hover:bg-olive-dark flex-1 disabled:opacity-40"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEdit}
+                                    className="flex-1 py-2.5 text-sm font-medium text-warmgray-500 bg-cream rounded-xl"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Normal Mode */
+                            <SortableGroceryItem key={item.id} id={item.id} disabled={item.checked}>
+                              {({ dragHandleProps }) => (
+                                <div
+                                  className={`bg-dark-surface p-3 rounded-lg flex items-center gap-3 transition-all editorial-shadow ${
+                                    item.checked ? 'opacity-40' : ''
+                                  }`}
+                                >
+                                  {/* Drag Handle */}
+                                  {!item.checked && dragHandleProps && (
+                                    <div
+                                      {...dragHandleProps}
+                                      className="touch-none flex items-center justify-center cursor-grab active:cursor-grabbing p-1 shrink-0"
+                                      aria-label={`Reorder ${item.name}`}
+                                    >
+                                      <span className="material-symbols-outlined text-warmgray-300 text-base">drag_indicator</span>
+                                    </div>
+                                  )}
+
+                                  {/* Left Accent Bar */}
+                                  <div className={`w-1 self-stretch ${accent.bar} rounded-full shrink-0`} />
+
+                                  {/* Checkbox */}
+                                  <button
+                                    onClick={() => handleCheck(item)}
+                                    className={`w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+                                      item.checked
+                                        ? 'bg-section-grocery border-section-grocery'
+                                        : 'border-warmgray-200 hover:border-section-grocery/30'
                                     }`}
                                   >
-                                    {s}
+                                    {item.checked && (
+                                      <span className="material-symbols-outlined text-white text-sm">check</span>
+                                    )}
                                   </button>
-                                )
-                              })}
-                            </div>
-                            <input
-                              type="text"
-                              value={editNotes}
-                              onChange={(e) => setEditNotes(e.target.value)}
-                              placeholder="Notes"
-                              className="input-field focus:ring-section-grocery"
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => saveEdit(item.id)}
-                                disabled={!editName.trim()}
-                                className="btn-primary bg-section-grocery hover:bg-olive-dark flex-1 disabled:opacity-40"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={cancelEdit}
-                                className="flex-1 py-2.5 text-sm font-medium text-warmgray-500 bg-cream rounded-xl"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        /* Normal Mode */
-                        <div
-                          key={item.id}
-                          className={`bg-dark-surface p-3 rounded-lg flex items-center gap-3 transition-all editorial-shadow ${
-                            item.checked ? 'opacity-40' : ''
-                          }`}
-                        >
-                          {/* Left Accent Bar */}
-                          <div className={`w-1 self-stretch ${accent.bar} rounded-full shrink-0`} />
 
-                          {/* Checkbox */}
-                          <button
-                            onClick={() => handleCheck(item)}
-                            className={`w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
-                              item.checked
-                                ? 'bg-section-grocery border-section-grocery'
-                                : 'border-warmgray-200 hover:border-section-grocery/30'
-                            }`}
-                          >
-                            {item.checked && (
-                              <span className="material-symbols-outlined text-white text-sm">check</span>
-                            )}
-                          </button>
-
-                          {/* Item Info */}
-                          <div className="flex-1 min-w-0" onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}>
-                            <p className={`font-semibold truncate ${item.checked ? 'line-through text-warmgray-400' : 'text-charcoal'}`}>
-                              {item.name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              {item.unit && (
-                                <span className="text-xs text-charcoal-light font-medium">{item.unit}</span>
-                              )}
-                              {/* Store Switcher */}
-                              <div className="relative" ref={openStoreSwitcher === item.id ? storeSwitcherRef : null}>
-                                <button
-                                  onClick={() => setOpenStoreSwitcher(openStoreSwitcher === item.id ? null : item.id)}
-                                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${accent.badge}`}
-                                >
-                                  {item.store || 'Grocery Store'}
-                                </button>
-                                {openStoreSwitcher === item.id && (
-                                  <div className="absolute left-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[140px]">
-                                    {STORES.map(s => {
-                                      const sAccent = storeAccentColors[s] || defaultAccent
-                                      return (
+                                  {/* Item Info */}
+                                  <div className="flex-1 min-w-0" onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}>
+                                    <p className={`font-semibold ${item.checked ? 'line-through text-warmgray-400' : 'text-charcoal'}`}>
+                                      {item.name}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                      {/* Store Switcher */}
+                                      <div className="relative" ref={openStoreSwitcher === item.id ? storeSwitcherRef : null}>
                                         <button
-                                          key={s}
-                                          onClick={() => handleStoreChange(item, s)}
-                                          className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
-                                            item.store === s ? 'bg-warmgray-50' : ''
-                                          } active:bg-warmgray-50`}
+                                          onClick={() => setOpenStoreSwitcher(openStoreSwitcher === item.id ? null : item.id)}
+                                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${accent.badge}`}
                                         >
-                                          <span className={`w-2 h-2 rounded-full ${sAccent.bar}`} />
-                                          <span className="text-charcoal">{s}</span>
+                                          {item.store || 'Grocery Store'}
                                         </button>
-                                      )
-                                    })}
+                                        {openStoreSwitcher === item.id && (
+                                          <div className="absolute left-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[140px]">
+                                            {STORES.map(s => {
+                                              const sAccent = storeAccentColors[s] || defaultAccent
+                                              return (
+                                                <button
+                                                  key={s}
+                                                  onClick={() => handleStoreChange(item, s)}
+                                                  className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
+                                                    item.store === s ? 'bg-warmgray-50' : ''
+                                                  } active:bg-warmgray-50`}
+                                                >
+                                                  <span className={`w-2 h-2 rounded-full ${sAccent.bar}`} />
+                                                  <span className="text-charcoal">{s}</span>
+                                                </button>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {expandedItem === item.id && (item.unit || item.notes) && (
+                                      <div className="mt-1.5 space-y-0.5">
+                                        {item.unit && (
+                                          <p className="text-xs text-charcoal-light font-medium">{item.unit}</p>
+                                        )}
+                                        {item.notes && (
+                                          <p className="text-xs text-warmgray-500 leading-relaxed">{item.notes}</p>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                            {expandedItem === item.id && item.notes && (
-                              <p className="text-xs text-warmgray-500 mt-1.5 leading-relaxed">{item.notes}</p>
-                            )}
-                          </div>
 
-                          {/* Qty Controls */}
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={() => handleAdjustQty(item, -1)}
-                              className="w-8 h-8 rounded-full bg-cream flex items-center justify-center text-charcoal-light hover:bg-warmgray-200 transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-sm">remove</span>
-                            </button>
-                            <span className="w-8 text-center text-sm font-bold text-charcoal">{item.qty || 1}</span>
-                            <button
-                              onClick={() => handleAdjustQty(item, 1)}
-                              className="w-8 h-8 rounded-full bg-section-grocery text-white flex items-center justify-center hover:opacity-90 transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-sm">add</span>
-                            </button>
-                          </div>
+                                  {/* Qty Controls */}
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                      onClick={() => handleAdjustQty(item, -1)}
+                                      className="w-8 h-8 rounded-full bg-cream flex items-center justify-center text-charcoal-light hover:bg-warmgray-200 transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-sm">remove</span>
+                                    </button>
+                                    <span className="w-8 text-center text-sm font-bold text-charcoal">{item.qty || 1}</span>
+                                    <button
+                                      onClick={() => handleAdjustQty(item, 1)}
+                                      className="w-8 h-8 rounded-full bg-section-grocery text-white flex items-center justify-center hover:opacity-90 transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-sm">add</span>
+                                    </button>
+                                  </div>
 
-                          {/* More Menu */}
-                          <div className="relative" ref={openMenu === item.id ? menuRef : null}>
-                            <button
-                              onClick={() => setOpenMenu(openMenu === item.id ? null : item.id)}
-                              className="text-warmgray-300 hover:text-charcoal shrink-0 transition-colors"
-                            >
-                              <span className="material-symbols-outlined">more_vert</span>
-                            </button>
-                            {openMenu === item.id && (
-                              <div className="absolute right-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[120px]">
-                                <button
-                                  onClick={() => startEdit(item)}
-                                  className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 active:bg-warmgray-50 text-charcoal"
-                                >
-                                  <span className="material-symbols-outlined text-base">edit</span>
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => { deleteItem(item.id); setOpenMenu(null) }}
-                                  className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 active:bg-warmgray-50 text-red-500"
-                                >
-                                  <span className="material-symbols-outlined text-base">delete</span>
-                                  Delete
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    ))}
-                  </div>
+                                  {/* More Menu */}
+                                  <div className="relative" ref={openMenu === item.id ? menuRef : null}>
+                                    <button
+                                      onClick={() => setOpenMenu(openMenu === item.id ? null : item.id)}
+                                      className="text-warmgray-300 hover:text-charcoal shrink-0 transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined">more_vert</span>
+                                    </button>
+                                    {openMenu === item.id && (
+                                      <div className="absolute right-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[120px]">
+                                        <button
+                                          onClick={() => startEdit(item)}
+                                          className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 active:bg-warmgray-50 text-charcoal"
+                                        >
+                                          <span className="material-symbols-outlined text-base">edit</span>
+                                          Edit
+                                        </button>
+                                        <button
+                                          onClick={() => { deleteItem(item.id); setOpenMenu(null) }}
+                                          className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 active:bg-warmgray-50 text-red-500"
+                                        >
+                                          <span className="material-symbols-outlined text-base">delete</span>
+                                          Delete
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </SortableGroceryItem>
+                          )
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
                 </section>
               )
             })
@@ -769,13 +831,13 @@ export default function GroceryList() {
         )}
       </div>
 
-      {/* Scan Review Modal */}
+      {/* Receipt Review Modal */}
       {results && (
-        <ScanReview
+        <ReceiptReview
           items={results.items}
           onConfirm={(confirmed, loc) => confirmItems(confirmed, loc, user.id)}
           onCancel={cancelScan}
-          location="receipt"
+          householdId={householdId}
         />
       )}
     </div>

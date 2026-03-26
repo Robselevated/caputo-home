@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 
-export default function PhotoScanner({ onCapture, scanning, colorClass }) {
+export default function PhotoScanner({ onCapture, scanning, colorClass, icon = 'photo_camera' }) {
   const fileRef = useRef(null)
 
   const handleFileChange = (e) => {
@@ -27,7 +27,7 @@ export default function PhotoScanner({ onCapture, scanning, colorClass }) {
         {scanning ? (
           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
         ) : (
-          <span className="material-symbols-outlined text-xl">photo_camera</span>
+          <span className="material-symbols-outlined text-xl">{icon}</span>
         )}
       </button>
     </>

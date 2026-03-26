@@ -6,6 +6,17 @@ import { useIngredientCoverage } from '../hooks/useIngredientCoverage'
 import { useRecipeSuggestions } from '../hooks/useRecipeSuggestions'
 import { supabase } from '../lib/supabase'
 
+const COOKBOOK_CATEGORIES = [
+  'Italian',
+  'Korean',
+  'Mexican',
+  'Breakfast',
+  'Dessert',
+  'Chicken',
+  'Ground Beef',
+  'Pork',
+]
+
 const TAG_ICONS = {
   baking: 'bakery_dining',
   seafood: 'set_meal',
@@ -18,6 +29,8 @@ const TAG_ICONS = {
   pasta: 'dinner_dining',
   chicken: 'kebab_dining',
   beef: 'lunch_dining',
+  'ground beef': 'lunch_dining',
+  pork: 'lunch_dining',
   vegetarian: 'eco',
   dessert: 'cake',
   quick: 'timer',
@@ -82,20 +95,16 @@ export default function Cookbook() {
 
   const [latestIngredients, setLatestIngredients] = useState([])
 
-  const allTags = useMemo(() => {
-    const tagSet = new Set()
-    recipes.forEach(recipe => {
-      recipe.tags?.forEach(tag => tagSet.add(tag))
-    })
-    return Array.from(tagSet)
-  }, [recipes])
-
   const filteredRecipes = useMemo(() => {
-    return recipes.filter(recipe => {
-      const matchesSearch = !searchQuery || recipe.name.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesTags = selectedTags.length === 0 || selectedTags.every(tag => recipe.tags?.includes(tag))
-      return matchesSearch && matchesTags
-    })
+    return recipes
+      .filter(recipe => {
+        const matchesSearch = !searchQuery || recipe.name.toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesTags = selectedTags.length === 0 || selectedTags.every(
+          sel => recipe.tags?.some(tag => tag.toLowerCase() === sel.toLowerCase())
+        )
+        return matchesSearch && matchesTags
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
   }, [recipes, searchQuery, selectedTags])
 
   // Featured = newest recipe with an image, or just newest
@@ -789,7 +798,7 @@ export default function Cookbook() {
       )}
 
       {/* Categories */}
-      {allTags.length > 0 && !searchQuery && (
+      {!searchQuery && (
         <section className="space-y-4">
           <div className="flex justify-between items-end px-1">
             <h3 className="font-heading text-xl font-bold">Categories</h3>
@@ -800,7 +809,7 @@ export default function Cookbook() {
             )}
           </div>
           <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar -mx-6 px-6">
-            {allTags.map((tag, i) => {
+            {COOKBOOK_CATEGORIES.map((tag, i) => {
               const isActive = selectedTags.includes(tag)
               return (
                 <button
@@ -815,7 +824,7 @@ export default function Cookbook() {
                   }`}
                 >
                   <span className={`material-symbols-outlined text-3xl ${
-                    isActive ? 'text-white' : i === 0 && selectedTags.length === 0 ? 'text-section-cookbook' : 'text-section-cookbook'
+                    isActive ? 'text-white' : 'text-section-cookbook'
                   }`}>
                     {getTagIcon(tag)}
                   </span>

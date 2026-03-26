@@ -46,6 +46,63 @@ Return ONLY a valid JSON array. No markdown, no explanation.`,
   receipt: `You are reading a grocery receipt. Extract every food/beverage line item. Exclude taxes, fees, non-food items (paper towels, cleaning supplies, etc).
 For each item return a JSON object with these keys: "name" (generic product name), "qty" (integer, number purchased, minimum 1), "unit" (count unless weight is shown).
 Return ONLY a valid JSON array. No markdown, no explanation.`,
+
+  receipt_inventory: `You are reading a grocery receipt. Extract every food/beverage line item. Exclude taxes, fees, non-food items (paper towels, cleaning supplies, etc).
+
+For each item, decide where it should be stored: "fridge", "freezer", or "pantry". Then assign a category and optional subcategory from the EXACT lists below.
+
+FREEZER categories:
+- "Beef" (subcategory: Ribeye, NY Strip, T-Bone, Flank Steak, Sirloin, Brisket, Chuck Roast, Short Ribs, Other)
+- "Pork" (subcategory: Pork Chops, Pork Tenderloin, Pork Shoulder, Pork Ribs, Pork Loin, Other)
+- "Chicken" (subcategory: Breast, Thighs, Wings, Drumsticks, Whole Chicken, Tenders, Other)
+- "Turkey" (subcategory: Turkey Breast, Whole Turkey, Turkey Cutlets, Other)
+- "Ground Meat" (subcategory: Ground Beef, Ground Turkey, Ground Chicken, Ground Pork, Italian Sausage, Breakfast Sausage, Kielbasa, Bratwurst, Chorizo, Other)
+- "Fish" (subcategory: Salmon, Tilapia, Cod, Halibut, Mahi Mahi, Tuna, Other)
+- "Seafood" (subcategory: Shrimp (Raw), Shrimp (Cooked), Scallops, Crab, Lobster, Other)
+- "Frozen Produce" (no subcategory)
+- "Frozen Meals" (no subcategory)
+- "Other" (no subcategory)
+
+FRIDGE categories:
+- "Deli Meat" (subcategory: Black Forest Ham, Honey Ham, Roasted Turkey, Deli Chicken, Salami, Pepperoni, Prosciutto, Other)
+- "Bacon" (no subcategory)
+- "Dairy" (no subcategory) - milk, cheese, yogurt, butter, eggs, cream, sour cream
+- "Condiments" (no subcategory) - ketchup, mustard, mayo, ranch, salsa, hot sauce, soy sauce
+- "Broth/Stock" (no subcategory)
+- "Bread" (no subcategory) - bread, bagels, buns, rolls, tortillas
+- "Beverages" (no subcategory) - juice, soda, water, beer, wine, kombucha
+- "Fresh Produce" (no subcategory) - ALL fruits and vegetables
+- "Other" (no subcategory)
+
+PANTRY categories:
+- "Pasta" (subcategory: Spaghetti, Penne, Bow Tie (Farfalle), Elbow, Fettuccine, Linguine, Angel Hair, Rigatoni, Rotini, Lasagna, Orzo, Other)
+- "Bread" (no subcategory)
+- "Canned Goods" (no subcategory)
+- "Dry Goods" (no subcategory) - rice, flour, sugar, oats
+- "Sauces & Condiments" (no subcategory)
+- "Spices" (no subcategory)
+- "Snacks" (no subcategory) - chips, crackers, pretzels
+- "Baking" (no subcategory)
+- "Oils" (no subcategory)
+- "Beverages" (no subcategory)
+- "Other" (no subcategory)
+
+UNIT rules: lbs for meats/deli, packages for bacon, cans for canned goods, boxes for pasta/dry goods, bags for snacks/frozen produce/baking, jars for spices, bottles for sauces/condiments/oils/beverages, count for everything else.
+
+STORAGE rules: Raw meats go to freezer. Deli meats, dairy, fresh produce, condiments go to fridge. Canned goods, pasta, dry goods, spices, snacks, oils go to pantry. Bread defaults to pantry unless it clearly needs refrigeration.
+
+For each item return a JSON object with these keys:
+- "name": generic name, no brand
+- "location": "fridge", "freezer", or "pantry"
+- "category": from the category list for that location
+- "subcategory": from the subcategory list if applicable, null otherwise
+- "qty": integer, minimum 1
+- "unit": see unit rules above
+- "confidence": high/medium/low
+- "needs_verification": boolean (true if unsure about location or category)
+- "verification_prompt": string if needs_verification, null otherwise
+
+Return ONLY a valid JSON array. No markdown, no explanation.`,
 }
 
 export async function handler(event) {
