@@ -25,10 +25,10 @@ export default function CategorySection({ category, items, colorClass, accentCol
           {showDragHandle && dragHandleProps && (
             <div
               {...dragHandleProps}
-              className="touch-none flex items-center justify-center w-6 h-6 -ml-1 cursor-grab active:cursor-grabbing p-2 -m-1"
+              className="touch-none flex items-center justify-center cursor-grab active:cursor-grabbing p-1"
               aria-label={`Reorder ${category}`}
             >
-              <span className="material-symbols-outlined text-warmgray-300 text-base">drag_indicator</span>
+              <span className="material-symbols-outlined text-warmgray-400 text-lg">drag_indicator</span>
             </div>
           )}
           <div className={`w-1 h-6 ${accentColor || 'bg-warmgray-400'} rounded-full`} />
