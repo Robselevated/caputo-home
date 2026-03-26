@@ -547,6 +547,105 @@ export default function Cookbook() {
         </div>
       )}
 
+      {/* AI Recipe Suggestions */}
+      {!isSearching && (
+        <section className="space-y-4">
+          <div className="flex justify-between items-end px-1">
+            <div>
+              <h3 className="font-heading text-xl font-bold">What Can I Make?</h3>
+              <p className="text-charcoal-light text-xs mt-1">AI suggestions from your pantry, fridge, and freezer</p>
+            </div>
+          </div>
+
+          {suggestions.length === 0 && !suggestionsLoading && (
+            <button
+              onClick={fetchSuggestions}
+              disabled={suggestionsLoading}
+              className="w-full bg-gradient-to-r from-section-cookbook to-section-cookbook/80 text-white py-4 rounded-full font-bold text-sm tracking-wide active:scale-95 transition-all shadow-dark-md"
+            >
+              Get Recipe Ideas
+            </button>
+          )}
+
+          {suggestionsLoading && (
+            <div className="flex items-center justify-center py-8 gap-3">
+              <div className="w-6 h-6 border-3 border-section-cookbook border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-warmgray-500">Checking your inventory...</span>
+            </div>
+          )}
+
+          {suggestionsError && (
+            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-xl">{suggestionsError}</div>
+          )}
+
+          {suggestions.length > 0 && (
+            <div className="space-y-3">
+              {suggestions.map((suggestion, i) => {
+                const totalIngredients = suggestion.matched_ingredients.length + suggestion.missing_ingredients.length
+                const matchPct = totalIngredients > 0 ? Math.round((suggestion.matched_ingredients.length / totalIngredients) * 100) : 0
+
+                return (
+                  <div key={i} className="bg-dark-surface rounded-2xl p-4 shadow-dark space-y-3 border border-warmgray-100">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h4 className="font-heading font-bold text-charcoal">{suggestion.name}</h4>
+                        <p className="text-xs text-charcoal-light mt-1">{suggestion.description}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 ml-3">
+                        <span className={`text-xs font-bold ${matchPct >= 80 ? 'text-section-grocery' : matchPct >= 50 ? 'text-section-pantry' : 'text-warmgray-400'}`}>
+                          {matchPct}% match
+                        </span>
+                        <span className="text-[10px] text-warmgray-400">{suggestion.time_estimate}m</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-1.5 bg-warmgray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${matchPct >= 80 ? 'bg-section-grocery' : matchPct >= 50 ? 'bg-section-pantry' : 'bg-warmgray-300'}`}
+                          style={{ width: `${matchPct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-warmgray-400">{suggestion.matched_ingredients.length}/{totalIngredients}</span>
+                    </div>
+
+                    {suggestion.tags && suggestion.tags.length > 0 && (
+                      <div className="flex gap-1 flex-wrap">
+                        {suggestion.tags.map(tag => (
+                          <span key={tag} className="px-2 py-0.5 bg-section-cookbook/10 text-section-cookbook text-[10px] rounded-full font-medium">
+                            {tag}
+                          </span>
+                        ))}
+                        <span className="px-2 py-0.5 bg-cream text-warmgray-500 text-[10px] rounded-full font-medium">
+                          {suggestion.difficulty}
+                        </span>
+                      </div>
+                    )}
+
+                    {suggestion.missing_ingredients.length > 0 && (
+                      <div className="pt-2 border-t border-warmgray-100">
+                        <p className="text-[10px] font-medium text-warmgray-500 mb-1">Missing:</p>
+                        <p className="text-xs text-warmgray-400">
+                          {suggestion.missing_ingredients.join(', ')}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              <button
+                onClick={fetchSuggestions}
+                disabled={suggestionsLoading}
+                className="w-full py-3 text-sm font-medium text-section-cookbook border border-section-cookbook/30 rounded-full active:scale-95 transition-all"
+              >
+                Refresh Suggestions
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Featured Recipe: Weekly Signature */}
       {featuredRecipe && !isSearching && (
         <section className="space-y-4">
@@ -811,105 +910,6 @@ export default function Cookbook() {
               )
             })}
           </div>
-        </section>
-      )}
-
-      {/* AI Recipe Suggestions */}
-      {!isSearching && (
-        <section className="space-y-4 pb-8">
-          <div className="flex justify-between items-end px-1">
-            <div>
-              <h3 className="font-heading text-xl font-bold">What Can I Make?</h3>
-              <p className="text-charcoal-light text-xs mt-1">AI suggestions from your pantry, fridge, and freezer</p>
-            </div>
-          </div>
-
-          {suggestions.length === 0 && !suggestionsLoading && (
-            <button
-              onClick={fetchSuggestions}
-              disabled={suggestionsLoading}
-              className="w-full bg-gradient-to-r from-section-cookbook to-section-cookbook/80 text-white py-4 rounded-full font-bold text-sm tracking-wide active:scale-95 transition-all shadow-dark-md"
-            >
-              Get Recipe Ideas
-            </button>
-          )}
-
-          {suggestionsLoading && (
-            <div className="flex items-center justify-center py-8 gap-3">
-              <div className="w-6 h-6 border-3 border-section-cookbook border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-warmgray-500">Checking your inventory...</span>
-            </div>
-          )}
-
-          {suggestionsError && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-xl">{suggestionsError}</div>
-          )}
-
-          {suggestions.length > 0 && (
-            <div className="space-y-3">
-              {suggestions.map((suggestion, i) => {
-                const totalIngredients = suggestion.matched_ingredients.length + suggestion.missing_ingredients.length
-                const matchPct = totalIngredients > 0 ? Math.round((suggestion.matched_ingredients.length / totalIngredients) * 100) : 0
-
-                return (
-                  <div key={i} className="bg-dark-surface rounded-2xl p-4 shadow-dark space-y-3 border border-warmgray-100">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h4 className="font-heading font-bold text-charcoal">{suggestion.name}</h4>
-                        <p className="text-xs text-charcoal-light mt-1">{suggestion.description}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 ml-3">
-                        <span className={`text-xs font-bold ${matchPct >= 80 ? 'text-section-grocery' : matchPct >= 50 ? 'text-section-pantry' : 'text-warmgray-400'}`}>
-                          {matchPct}% match
-                        </span>
-                        <span className="text-[10px] text-warmgray-400">{suggestion.time_estimate}m</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-1.5 bg-warmgray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${matchPct >= 80 ? 'bg-section-grocery' : matchPct >= 50 ? 'bg-section-pantry' : 'bg-warmgray-300'}`}
-                          style={{ width: `${matchPct}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-warmgray-400">{suggestion.matched_ingredients.length}/{totalIngredients}</span>
-                    </div>
-
-                    {suggestion.tags && suggestion.tags.length > 0 && (
-                      <div className="flex gap-1 flex-wrap">
-                        {suggestion.tags.map(tag => (
-                          <span key={tag} className="px-2 py-0.5 bg-section-cookbook/10 text-section-cookbook text-[10px] rounded-full font-medium">
-                            {tag}
-                          </span>
-                        ))}
-                        <span className="px-2 py-0.5 bg-cream text-warmgray-500 text-[10px] rounded-full font-medium">
-                          {suggestion.difficulty}
-                        </span>
-                      </div>
-                    )}
-
-                    {suggestion.missing_ingredients.length > 0 && (
-                      <div className="pt-2 border-t border-warmgray-100">
-                        <p className="text-[10px] font-medium text-warmgray-500 mb-1">Missing:</p>
-                        <p className="text-xs text-warmgray-400">
-                          {suggestion.missing_ingredients.join(', ')}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              <button
-                onClick={fetchSuggestions}
-                disabled={suggestionsLoading}
-                className="w-full py-3 text-sm font-medium text-section-cookbook border border-section-cookbook/30 rounded-full active:scale-95 transition-all"
-              >
-                Refresh Suggestions
-              </button>
-            </div>
-          )}
         </section>
       )}
 
