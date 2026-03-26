@@ -16,13 +16,24 @@ const CATEGORY_KEYWORDS = {
     'Broth/Stock': ['broth', 'stock', 'bouillon', 'bone broth'],
     'Bread': ['bread', 'bagel', 'bun', 'roll', 'tortilla', 'pita', 'english muffin', 'wrap'],
     'Beverages': ['juice', 'soda', 'water', 'beer', 'wine', 'kombucha', 'iced tea', 'lemonade'],
+    'Fresh Produce': ['lettuce', 'romaine', 'spinach', 'kale', 'arugula', 'greens', 'tomato', 'cucumber', 'pepper', 'onion', 'celery', 'carrot', 'broccoli', 'cauliflower', 'mushroom', 'zucchini', 'squash', 'avocado', 'apple', 'orange', 'pear', 'lemon', 'lime', 'grape', 'berry', 'strawberry', 'blueberry', 'raspberry', 'banana', 'melon', 'watermelon', 'mango', 'pineapple', 'peach', 'plum', 'clementine', 'mandarin', 'grapefruit', 'fruit', 'vegetable', 'veggie', 'produce', 'salad', 'herb', 'cilantro', 'basil', 'parsley', 'dill', 'mint', 'radish', 'cabbage', 'corn', 'asparagus', 'green bean', 'scallion', 'shallot', 'garlic', 'ginger'],
   },
 }
 
-// If Claude puts an item in "Other", try to remap via subcategory match then name keywords
+// Remap old fridge produce categories to "Fresh Produce"
+const LEGACY_PRODUCE = ['Lettuce', 'Apples', 'Oranges', 'Pears', 'Produce (Other)']
+
+// If Claude puts an item in "Other" or uses a legacy category, remap it
 function fixCategory(item, location) {
   const taxonomy = TAXONOMY[location]
-  if (!taxonomy || item.category !== 'Other') return item
+  if (!taxonomy) return item
+
+  // Remap legacy produce categories
+  if (location === 'fridge' && LEGACY_PRODUCE.includes(item.category)) {
+    return { ...item, category: 'Fresh Produce', subcategory: null }
+  }
+
+  if (item.category !== 'Other') return item
 
   // Pass 1: subcategory matches a real category name
   if (item.subcategory) {
