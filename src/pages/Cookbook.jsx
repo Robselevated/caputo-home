@@ -74,6 +74,7 @@ export default function Cookbook() {
   const [ingredients, setIngredients] = useState([{ name: '', qty: '', unit: '', notes: '', section: '' }])
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState(null)
+  const [sourceImageUrls, setSourceImageUrls] = useState([])
   const [uploadingDishImage, setUploadingDishImage] = useState(false)
   const [bulkReimporting, setBulkReimporting] = useState(false)
   const [bulkProgress, setBulkProgress] = useState(null) // { current, total }
@@ -144,42 +145,54 @@ export default function Cookbook() {
   }
 
   const handleRecipeScan = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
 
     setScanning(true)
     setScanError(null)
 
     try {
-      // Upload source image to storage
-      const ext = file.name.split('.').pop()
-      const path = `${householdId}/source-${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage
-        .from('recipe-images')
-        .upload(path, file, { upsert: true })
+      // Upload all source images to storage and convert to base64
+      const uploadedUrls = []
+      const imagesPayload = []
 
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
+      for (const file of files) {
+        const ext = file.name.split('.').pop()
+        const path = `${householdId}/source-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`
+        const { error: uploadError } = await supabase.storage
           .from('recipe-images')
-          .getPublicUrl(path)
-        setSourceImageUrl(urlData.publicUrl)
+          .upload(path, file, { upsert: true })
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from('recipe-images')
+            .getPublicUrl(path)
+          uploadedUrls.push(urlData.publicUrl)
+        }
+
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result.split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        imagesPayload.push({ base64, media_type: file.type || 'image/jpeg' })
       }
 
-      // Convert to base64 for OCR
-      const reader = new FileReader()
-      const base64 = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result.split(',')[1])
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
+      if (uploadedUrls.length > 0) {
+        setSourceImageUrls(uploadedUrls)
+        setSourceImageUrl(uploadedUrls[0])
+      }
+
+      // Send single or multi-image request
+      const body = imagesPayload.length === 1
+        ? { image_base64: imagesPayload[0].base64, media_type: imagesPayload[0].media_type }
+        : { images: imagesPayload }
 
       const response = await fetch('/.netlify/functions/parse-recipe-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_base64: base64,
-          media_type: file.type || 'image/jpeg',
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
@@ -252,6 +265,7 @@ export default function Cookbook() {
     const { error } = await createRecipe(recipe, user.id)
     if (!error) {
       setName(''); setDescription(''); setImageUrl(''); setSourceImageUrl('')
+      setSourceImageUrls([])
       setServings(''); setPrepTime(''); setCookTime(''); setTags('')
       setInstructions(''); setScanError(null)
       setIngredients([{ name: '', qty: '', unit: '', notes: '', section: '' }])
@@ -432,17 +446,21 @@ export default function Cookbook() {
             <form onSubmit={handleManualCreate} className="space-y-3">
               {/* Scan Recipe Image */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-warmgray-600">Scan a Recipe Image</label>
-                <p className="text-xs text-warmgray-400">Upload a photo of a recipe card, cookbook page, or screenshot to auto-fill the form.</p>
-                {sourceImageUrl && (
-                  <img src={sourceImageUrl} alt="Recipe source" className="w-full h-32 object-cover rounded-xl" />
+                <label className="text-sm font-medium text-warmgray-600">Scan Recipe Screenshots</label>
+                <p className="text-xs text-warmgray-400">Upload one or more photos/screenshots of a recipe. Select all pages at once for best results.</p>
+                {sourceImageUrls.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    {sourceImageUrls.map((url, i) => (
+                      <img key={i} src={url} alt={`Recipe screenshot ${i + 1}`} className="w-20 h-20 object-cover rounded-lg shrink-0 border border-warmgray-200" />
+                    ))}
+                  </div>
                 )}
                 <label className="block cursor-pointer">
                   <div className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-section-cookbook/30 text-section-cookbook text-sm font-medium ${scanning ? 'opacity-40' : 'hover:border-section-cookbook/60'}`}>
-                    <span className="material-symbols-outlined text-lg">{scanning ? 'progress_activity' : 'document_scanner'}</span>
-                    {scanning ? 'Scanning recipe...' : sourceImageUrl ? 'Rescan Image' : 'Scan Recipe Photo'}
+                    <span className={`material-symbols-outlined text-lg ${scanning ? 'animate-spin' : ''}`}>{scanning ? 'progress_activity' : 'document_scanner'}</span>
+                    {scanning ? `Scanning ${sourceImageUrls.length || ''} image${sourceImageUrls.length !== 1 ? 's' : ''}...` : sourceImageUrls.length > 0 ? `Rescan (${sourceImageUrls.length} uploaded)` : 'Scan Recipe Photos'}
                   </div>
-                  <input type="file" accept="image/*" onChange={handleRecipeScan} disabled={scanning} className="hidden" />
+                  <input type="file" accept="image/*" multiple onChange={handleRecipeScan} disabled={scanning} className="hidden" />
                 </label>
                 {scanError && (
                   <div className="text-sm text-red-600 bg-red-50 p-2 rounded-xl">{scanError}</div>

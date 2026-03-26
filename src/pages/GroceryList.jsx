@@ -50,7 +50,7 @@ function formatDateLabel(dateStr) {
 export default function GroceryList() {
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
-  const { items, loading, addItem, checkItem, deleteItem, updateItem, clearChecked } = useGroceryList(householdId)
+  const { items, loading, addItem, checkItem, deleteItem, updateItem, clearChecked, markChecked, markUnchecked } = useGroceryList(householdId)
   const { items: recentItems, addBackToList } = useRecentlyBought(householdId)
   const { getSuggestions } = useItemHistory(householdId)
   const { scanning, results, error: scanError, uploadAndScan, confirmItems, cancelScan } = useScanSession(householdId)
@@ -61,8 +61,18 @@ export default function GroceryList() {
   const [showRecentHistory, setShowRecentHistory] = useState(false)
   const [storeFilter, setStoreFilter] = useState(null)
   const [openStoreSwitcher, setOpenStoreSwitcher] = useState(null)
+  const [openMenu, setOpenMenu] = useState(null)
+  const [editingItem, setEditingItem] = useState(null)
+  const [editName, setEditName] = useState('')
+  const [editQty, setEditQty] = useState('')
+  const [editUnit, setEditUnit] = useState('')
+  const [editStore, setEditStore] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [expandedItem, setExpandedItem] = useState(null)
   const [expandedDays, setExpandedDays] = useState({})
   const storeSwitcherRef = useRef(null)
+  const menuRef = useRef(null)
+  const pendingChecks = useRef({})
 
   // Add form state
   const [name, setName] = useState('')
@@ -92,6 +102,22 @@ export default function GroceryList() {
       document.removeEventListener('touchstart', handler)
     }
   }, [openStoreSwitcher])
+
+  // Close dropdown menu on outside tap
+  useEffect(() => {
+    if (!openMenu) return
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpenMenu(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
+  }, [openMenu])
 
   // Auto-select store when item name changes
   useEffect(() => {
@@ -204,9 +230,45 @@ export default function GroceryList() {
     await handleQuickAdd()
   }
 
-  const handleCheck = async (item) => {
-    await checkItem(item, user.id)
+  const handleCheck = (item) => {
+    if (item.checked) {
+      // Undo: cancel pending removal and revert UI
+      clearTimeout(pendingChecks.current[item.id])
+      delete pendingChecks.current[item.id]
+      markUnchecked(item.id)
+      return
+    }
+    markChecked(item.id)
     sendPushNotification(householdId, user.id, `${profile?.name || 'Someone'} checked off ${item.name}`)
+    pendingChecks.current[item.id] = setTimeout(() => {
+      delete pendingChecks.current[item.id]
+      checkItem(item, user.id)
+    }, 1500)
+  }
+
+  const startEdit = (item) => {
+    setEditingItem(item.id)
+    setEditName(item.name)
+    setEditQty(item.qty || '')
+    setEditUnit(item.unit || '')
+    setEditStore(item.store || 'Grocery Store')
+    setEditNotes(item.notes || '')
+    setOpenMenu(null)
+  }
+
+  const saveEdit = async (id) => {
+    await updateItem(id, {
+      name: editName.trim(),
+      qty: editQty ? Number(editQty) : null,
+      unit: editUnit || null,
+      store: editStore || null,
+      notes: editNotes || null,
+    }, user.id)
+    setEditingItem(null)
+  }
+
+  const cancelEdit = () => {
+    setEditingItem(null)
   }
 
   const handleAddBack = async (item) => {
@@ -391,97 +453,194 @@ export default function GroceryList() {
                   {/* Item Cards */}
                   <div className="space-y-3">
                     {storeItems.map(item => (
-                      <div
-                        key={item.id}
-                        className={`bg-dark-surface p-5 rounded-lg flex items-center gap-4 active:scale-[0.98] transition-all editorial-shadow ${
-                          item.checked ? 'opacity-40' : ''
-                        }`}
-                      >
-                        {/* Left Accent Bar */}
-                        <div className={`w-1 self-stretch ${accent.bar} rounded-full shrink-0`} />
-
-                        {/* Checkbox */}
-                        <button
-                          onClick={() => handleCheck(item)}
-                          className={`w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
-                            item.checked
-                              ? 'bg-section-grocery border-section-grocery animate-check-off'
-                              : 'border-warmgray-200 hover:border-section-grocery/30'
-                          }`}
-                        >
-                          {item.checked && (
-                            <span className="material-symbols-outlined text-white text-sm">check</span>
-                          )}
-                        </button>
-
-                        {/* Item Info */}
-                        <div className="flex-1 min-w-0">
-                          <p className={`font-semibold ${item.checked ? 'line-through text-warmgray-400' : 'text-charcoal'}`}>
-                            {item.name}
-                          </p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {item.unit && (
-                              <span className="text-xs text-charcoal-light font-medium">{item.unit}</span>
-                            )}
-                            {item.notes && (
-                              <span className="text-xs text-warmgray-400 truncate">{item.notes}</span>
-                            )}
-                            {/* Store Switcher */}
-                            <div className="relative" ref={openStoreSwitcher === item.id ? storeSwitcherRef : null}>
-                              <button
-                                onClick={() => setOpenStoreSwitcher(openStoreSwitcher === item.id ? null : item.id)}
-                                className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${accent.badge}`}
+                      editingItem === item.id ? (
+                        /* Edit Mode */
+                        <div key={item.id} className="bg-dark-surface p-5 rounded-lg editorial-shadow border-2 border-section-grocery/30 animate-slide-down">
+                          <div className="space-y-3">
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              className="input-field focus:ring-section-grocery font-semibold"
+                              placeholder="Item name"
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                value={editQty}
+                                onChange={(e) => setEditQty(e.target.value)}
+                                placeholder="Qty"
+                                className="input-field focus:ring-section-grocery w-20"
+                                inputMode="decimal"
+                              />
+                              <select
+                                value={editUnit}
+                                onChange={(e) => setEditUnit(e.target.value)}
+                                className="input-field focus:ring-section-grocery flex-1"
                               >
-                                {item.store || 'Grocery Store'}
+                                <option value="">Unit</option>
+                                {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                              </select>
+                            </div>
+                            <div className="flex gap-2 flex-wrap">
+                              {STORES.map(s => {
+                                const sAccent = storeAccentColors[s] || defaultAccent
+                                return (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => setEditStore(s)}
+                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                      editStore === s ? `${sAccent.bar} text-white` : 'bg-cream text-warmgray-600'
+                                    }`}
+                                  >
+                                    {s}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            <input
+                              type="text"
+                              value={editNotes}
+                              onChange={(e) => setEditNotes(e.target.value)}
+                              placeholder="Notes"
+                              className="input-field focus:ring-section-grocery"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => saveEdit(item.id)}
+                                disabled={!editName.trim()}
+                                className="btn-primary bg-section-grocery hover:bg-olive-dark flex-1 disabled:opacity-40"
+                              >
+                                Save
                               </button>
-                              {openStoreSwitcher === item.id && (
-                                <div className="absolute left-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[140px]">
-                                  {STORES.map(s => {
-                                    const sAccent = storeAccentColors[s] || defaultAccent
-                                    return (
-                                      <button
-                                        key={s}
-                                        onClick={() => handleStoreChange(item, s)}
-                                        className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
-                                          item.store === s ? 'bg-warmgray-50' : ''
-                                        } active:bg-warmgray-50`}
-                                      >
-                                        <span className={`w-2 h-2 rounded-full ${sAccent.bar}`} />
-                                        <span className="text-charcoal">{s}</span>
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-                              )}
+                              <button
+                                onClick={cancelEdit}
+                                className="flex-1 py-2.5 text-sm font-medium text-warmgray-500 bg-cream rounded-xl"
+                              >
+                                Cancel
+                              </button>
                             </div>
                           </div>
                         </div>
-
-                        {/* Qty Controls */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() => handleAdjustQty(item, -1)}
-                            className="w-8 h-8 rounded-full bg-cream flex items-center justify-center text-charcoal-light hover:bg-warmgray-200 transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-sm">remove</span>
-                          </button>
-                          <span className="w-8 text-center text-sm font-bold text-charcoal">{item.qty || 1}</span>
-                          <button
-                            onClick={() => handleAdjustQty(item, 1)}
-                            className="w-8 h-8 rounded-full bg-section-grocery text-white flex items-center justify-center hover:opacity-90 transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-sm">add</span>
-                          </button>
-                        </div>
-
-                        {/* More / Delete */}
-                        <button
-                          onClick={() => deleteItem(item.id)}
-                          className="text-warmgray-300 hover:text-red-500 shrink-0 transition-colors"
+                      ) : (
+                        /* Normal Mode */
+                        <div
+                          key={item.id}
+                          className={`bg-dark-surface p-5 rounded-lg flex items-center gap-4 transition-all editorial-shadow ${
+                            item.checked ? 'opacity-40' : ''
+                          }`}
                         >
-                          <span className="material-symbols-outlined">more_vert</span>
-                        </button>
-                      </div>
+                          {/* Left Accent Bar */}
+                          <div className={`w-1 self-stretch ${accent.bar} rounded-full shrink-0`} />
+
+                          {/* Checkbox */}
+                          <button
+                            onClick={() => handleCheck(item)}
+                            className={`w-6 h-6 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+                              item.checked
+                                ? 'bg-section-grocery border-section-grocery'
+                                : 'border-warmgray-200 hover:border-section-grocery/30'
+                            }`}
+                          >
+                            {item.checked && (
+                              <span className="material-symbols-outlined text-white text-sm">check</span>
+                            )}
+                          </button>
+
+                          {/* Item Info */}
+                          <div className="flex-1 min-w-0" onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}>
+                            <p className={`font-semibold ${item.checked ? 'line-through text-warmgray-400' : 'text-charcoal'}`}>
+                              {item.name}
+                            </p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              {item.unit && (
+                                <span className="text-xs text-charcoal-light font-medium">{item.unit}</span>
+                              )}
+                              {item.notes && expandedItem !== item.id && (
+                                <span className="text-xs text-warmgray-400 truncate">{item.notes}</span>
+                              )}
+                              {/* Store Switcher */}
+                              <div className="relative" ref={openStoreSwitcher === item.id ? storeSwitcherRef : null}>
+                                <button
+                                  onClick={() => setOpenStoreSwitcher(openStoreSwitcher === item.id ? null : item.id)}
+                                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${accent.badge}`}
+                                >
+                                  {item.store || 'Grocery Store'}
+                                </button>
+                                {openStoreSwitcher === item.id && (
+                                  <div className="absolute left-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[140px]">
+                                    {STORES.map(s => {
+                                      const sAccent = storeAccentColors[s] || defaultAccent
+                                      return (
+                                        <button
+                                          key={s}
+                                          onClick={() => handleStoreChange(item, s)}
+                                          className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
+                                            item.store === s ? 'bg-warmgray-50' : ''
+                                          } active:bg-warmgray-50`}
+                                        >
+                                          <span className={`w-2 h-2 rounded-full ${sAccent.bar}`} />
+                                          <span className="text-charcoal">{s}</span>
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {expandedItem === item.id && item.notes && (
+                              <p className="text-xs text-warmgray-500 mt-1.5 leading-relaxed">{item.notes}</p>
+                            )}
+                          </div>
+
+                          {/* Qty Controls */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => handleAdjustQty(item, -1)}
+                              className="w-8 h-8 rounded-full bg-cream flex items-center justify-center text-charcoal-light hover:bg-warmgray-200 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-sm">remove</span>
+                            </button>
+                            <span className="w-8 text-center text-sm font-bold text-charcoal">{item.qty || 1}</span>
+                            <button
+                              onClick={() => handleAdjustQty(item, 1)}
+                              className="w-8 h-8 rounded-full bg-section-grocery text-white flex items-center justify-center hover:opacity-90 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-sm">add</span>
+                            </button>
+                          </div>
+
+                          {/* More Menu */}
+                          <div className="relative" ref={openMenu === item.id ? menuRef : null}>
+                            <button
+                              onClick={() => setOpenMenu(openMenu === item.id ? null : item.id)}
+                              className="text-warmgray-300 hover:text-charcoal shrink-0 transition-colors"
+                            >
+                              <span className="material-symbols-outlined">more_vert</span>
+                            </button>
+                            {openMenu === item.id && (
+                              <div className="absolute right-0 top-full mt-1 bg-dark-surface border border-warmgray-100 rounded-xl shadow-dark-md z-20 overflow-hidden min-w-[120px]">
+                                <button
+                                  onClick={() => startEdit(item)}
+                                  className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 active:bg-warmgray-50 text-charcoal"
+                                >
+                                  <span className="material-symbols-outlined text-base">edit</span>
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => { deleteItem(item.id); setOpenMenu(null) }}
+                                  className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 active:bg-warmgray-50 text-red-500"
+                                >
+                                  <span className="material-symbols-outlined text-base">delete</span>
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
                     ))}
                   </div>
                 </section>

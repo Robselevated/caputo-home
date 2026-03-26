@@ -92,7 +92,24 @@ export async function handler(event) {
     const text = response.content[0].text
     // Parse JSON from response (handle potential markdown wrapping)
     const jsonMatch = text.match(/\[[\s\S]*\]/)
-    const items = jsonMatch ? JSON.parse(jsonMatch[0]) : []
+    if (!jsonMatch) {
+      console.error('No JSON array found in response:', text.slice(0, 500))
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Could not identify items in this photo. Try a clearer or closer photo.' }),
+      }
+    }
+
+    let items
+    try {
+      items = JSON.parse(jsonMatch[0])
+    } catch (parseErr) {
+      console.error('JSON parse failed:', parseErr.message, text.slice(0, 500))
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Failed to parse scan results. Try again.' }),
+      }
+    }
 
     return {
       statusCode: 200,

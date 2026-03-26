@@ -24,6 +24,7 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
   )
 
   const [expandedIndex, setExpandedIndex] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   const updateItem = (index, field, value) => {
     setEditableItems(prev => {
@@ -63,9 +64,14 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
     })
   }
 
-  const handleConfirm = () => {
-    const confirmed = editableItems.filter(i => i.included)
-    onConfirm(confirmed, location)
+  const handleConfirm = async () => {
+    setSaving(true)
+    try {
+      const confirmed = editableItems.filter(i => i.included)
+      await onConfirm(confirmed, location)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const includedCount = editableItems.filter(i => i.included).length
@@ -81,9 +87,10 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
           <h2 className="text-base font-heading font-bold text-charcoal">Review Items</h2>
           <button
             onClick={handleConfirm}
-            className="text-section-grocery text-sm font-bold"
+            disabled={saving}
+            className="text-section-grocery text-sm font-bold disabled:opacity-40"
           >
-            Add to {label}
+            {saving ? 'Saving...' : `Add to ${label}`}
           </button>
         </div>
 
@@ -94,7 +101,7 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
 
             return (
               <div
-                key={i}
+                key={`${item.name}-${i}`}
                 className={`card ${!item.included ? 'opacity-40' : ''} ${
                   item.needs_verification ? 'border-yellow-300 border-2' : ''
                 }`}
@@ -200,9 +207,17 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
         <div className="px-4 py-3 border-t border-warmgray-100">
           <button
             onClick={handleConfirm}
-            className="w-full py-3 text-sm font-bold text-white bg-section-grocery rounded-2xl active:scale-[0.98] transition-transform shadow-dark"
+            disabled={saving}
+            className="w-full py-3 text-sm font-bold text-white bg-section-grocery rounded-2xl active:scale-[0.98] transition-transform shadow-dark disabled:opacity-60 flex items-center justify-center gap-2"
           >
-            Add {includedCount} Item{includedCount !== 1 ? 's' : ''} to {label}
+            {saving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving {includedCount} Item{includedCount !== 1 ? 's' : ''}...
+              </>
+            ) : (
+              `Add ${includedCount} Item${includedCount !== 1 ? 's' : ''} to ${label}`
+            )}
           </button>
         </div>
       </div>

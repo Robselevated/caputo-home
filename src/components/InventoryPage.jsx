@@ -1,9 +1,14 @@
 import { useState, useMemo } from 'react'
+import { DndContext, DragOverlay, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import { useAuth } from '../hooks/useAuth'
 import { useInventory } from '../hooks/useInventory'
 import { useScanSession } from '../hooks/useScanSession'
+import { useCategoryOrder } from '../hooks/useCategoryOrder'
 import { TAXONOMY, DEFAULT_UNITS } from '../lib/constants'
 import CategorySection from './CategorySection'
+import SortableCategoryWrapper from './SortableCategoryWrapper'
 import PhotoScanner from './PhotoScanner'
 import ScanReview from '../pages/ScanReview'
 
@@ -30,9 +35,20 @@ export default function InventoryPage({
   const [notes, setNotes] = useState('')
 
   const taxonomy = TAXONOMY[location] || {}
-  const categories = Object.keys(taxonomy)
+  const allCategories = Object.keys(taxonomy)
+  const { orderedCategories, reorder } = useCategoryOrder(location)
 
   const subcategories = category && taxonomy[category] ? taxonomy[category] : null
+
+  // Drag-and-drop sensors
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: 8 },
+  })
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: { delay: 200, tolerance: 5 },
+  })
+  const sensors = useSensors(pointerSensor, touchSensor)
+  const [activeId, setActiveId] = useState(null)
 
   // Group items by category, filtered by search + category filter
   const grouped = useMemo(() => {
@@ -136,7 +152,7 @@ export default function InventoryPage({
       </div>
 
       {/* Category Filter Pills */}
-      {categories.length > 0 && (
+      {allCategories.length > 0 && (
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-6 px-6">
           <button
             onClick={() => setCategoryFilter(null)}
@@ -148,7 +164,7 @@ export default function InventoryPage({
           >
             All Items
           </button>
-          {categories.map(cat => (
+          {allCategories.map(cat => (
             <button
               key={cat}
               onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
@@ -197,7 +213,7 @@ export default function InventoryPage({
             className={`input-field ${ringClass}`}
           >
             <option value="">Select category</option>
-            {categories.map(cat => (
+            {allCategories.map(cat => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
@@ -242,27 +258,61 @@ export default function InventoryPage({
           {!search && !categoryFilter && <p className="text-sm mt-1">Tap + to add items</p>}
         </div>
       ) : (
-        <div className="space-y-8">
-          {categories.map(cat => {
-            if (!grouped[cat]) return null
-            return (
-              <CategorySection
-                key={cat}
-                category={cat}
-                items={grouped[cat]}
-                colorClass={lightBg}
-                accentColor={bgClass}
-                textColor={colorClass}
-                onUpdateQty={updateQty}
-                onEditItem={updateItem}
-                onDelete={deleteItem}
-                onAddToGrocery={addToGroceryList}
-                userId={user.id}
-                location={location}
-              />
-            )
-          })}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={(event) => setActiveId(event.active.id)}
+          onDragEnd={(event) => {
+            setActiveId(null)
+            const { active, over } = event
+            if (over && active.id !== over.id) {
+              reorder(active.id, over.id)
+            }
+          }}
+          modifiers={[restrictToVerticalAxis]}
+        >
+          <SortableContext
+            items={orderedCategories.filter(cat => grouped[cat])}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-8">
+              {orderedCategories.map(cat => {
+                if (!grouped[cat]) return null
+                return (
+                  <SortableCategoryWrapper key={cat} id={cat}>
+                    {({ dragHandleProps }) => (
+                      <CategorySection
+                        category={cat}
+                        items={grouped[cat]}
+                        colorClass={lightBg}
+                        accentColor={bgClass}
+                        textColor={colorClass}
+                        onUpdateQty={updateQty}
+                        onEditItem={updateItem}
+                        onDelete={deleteItem}
+                        onAddToGrocery={addToGroceryList}
+                        userId={user.id}
+                        location={location}
+                        dragHandleProps={dragHandleProps}
+                        showDragHandle={!categoryFilter}
+                      />
+                    )}
+                  </SortableCategoryWrapper>
+                )
+              })}
+            </div>
+          </SortableContext>
+          <DragOverlay>
+            {activeId ? (
+              <div className="bg-white rounded-xl p-3 shadow-lg opacity-90">
+                <div className="flex items-center gap-2">
+                  <div className={`w-1 h-6 ${bgClass} rounded-full`} />
+                  <span className="font-heading text-lg font-bold text-charcoal">{activeId}</span>
+                </div>
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
       {/* Scan Error */}

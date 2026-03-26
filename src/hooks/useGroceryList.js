@@ -117,5 +117,13 @@ export function useGroceryList(householdId) {
     }
   }
 
-  return { items, loading, addItem, checkItem, uncheckItem, deleteItem, updateItem, clearChecked }
+  const markChecked = (id) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, checked: true, checked_at: new Date().toISOString() } : i))
+  }
+
+  const markUnchecked = (id) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, checked: false, checked_at: null } : i))
+  }
+
+  return { items, loading, addItem, checkItem, uncheckItem, deleteItem, updateItem, clearChecked, markChecked, markUnchecked }
 }

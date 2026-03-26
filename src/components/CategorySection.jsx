@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { TAXONOMY, DEFAULT_UNITS } from '../lib/constants'
 
-export default function CategorySection({ category, items, colorClass, accentColor, textColor, onUpdateQty, onEditItem, onDelete, onAddToGrocery, userId, location }) {
+export default function CategorySection({ category, items, colorClass, accentColor, textColor, onUpdateQty, onEditItem, onDelete, onAddToGrocery, userId, location, dragHandleProps, showDragHandle = true }) {
+  const [collapsed, setCollapsed] = useState(true)
   const totalItems = items.length
   const zeroQtyCount = items.filter(i => i.qty === 0).length
 
@@ -19,12 +20,32 @@ export default function CategorySection({ category, items, colorClass, accentCol
   return (
     <div className="space-y-4">
       {/* Section Header */}
-      <div className="flex items-center justify-between px-1">
+      <div className="w-full flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
+          {showDragHandle && dragHandleProps && (
+            <div
+              {...dragHandleProps}
+              className="touch-none flex items-center justify-center w-6 h-6 -ml-1 cursor-grab active:cursor-grabbing p-2 -m-1"
+              aria-label={`Reorder ${category}`}
+            >
+              <span className="material-symbols-outlined text-warmgray-300 text-base">drag_indicator</span>
+            </div>
+          )}
           <div className={`w-1 h-6 ${accentColor || 'bg-warmgray-400'} rounded-full`} />
-          <h3 className="font-heading text-xl font-bold text-charcoal">{category}</h3>
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="flex items-center gap-2 active:opacity-70 transition-opacity"
+          >
+            <h3 className="font-heading text-xl font-bold text-charcoal">{category}</h3>
+            <span className={`material-symbols-outlined text-warmgray-400 text-lg transition-transform ${collapsed ? '' : 'rotate-180'}`}>
+              expand_more
+            </span>
+          </button>
         </div>
-        <div className="flex items-center gap-2">
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="flex items-center gap-2 active:opacity-70 transition-opacity"
+        >
           {zeroQtyCount > 0 && (
             <span className="bg-red-50 text-red-500 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">
               {zeroQtyCount} out
@@ -33,50 +54,52 @@ export default function CategorySection({ category, items, colorClass, accentCol
           <span className={`${colorClass} ${textColor || ''} text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider`}>
             {totalItems} item{totalItems !== 1 ? 's' : ''}
           </span>
-        </div>
+        </button>
       </div>
 
       {/* Items */}
-      <div className="space-y-3">
-        {hasSubcategories ? (
-          Object.entries(groups).map(([sub, subItems]) => (
-            <div key={sub} className="space-y-3">
-              <div className="px-1 py-1">
-                <span className="text-[10px] font-bold text-warmgray-500 uppercase tracking-widest">{sub}</span>
+      {!collapsed && (
+        <div className="space-y-3">
+          {hasSubcategories ? (
+            Object.entries(groups).map(([sub, subItems]) => (
+              <div key={sub} className="space-y-3">
+                <div className="px-1 py-1">
+                  <span className="text-[10px] font-bold text-warmgray-500 uppercase tracking-widest">{sub}</span>
+                </div>
+                {subItems.map(item => (
+                  <InventoryItem
+                    key={item.id}
+                    item={item}
+                    accentColor={accentColor}
+                    textColor={textColor}
+                    onUpdateQty={onUpdateQty}
+                    onEditItem={onEditItem}
+                    onDelete={onDelete}
+                    onAddToGrocery={onAddToGrocery}
+                    userId={userId}
+                    location={location}
+                  />
+                ))}
               </div>
-              {subItems.map(item => (
-                <InventoryItem
-                  key={item.id}
-                  item={item}
-                  accentColor={accentColor}
-                  textColor={textColor}
-                  onUpdateQty={onUpdateQty}
-                  onEditItem={onEditItem}
-                  onDelete={onDelete}
-                  onAddToGrocery={onAddToGrocery}
-                  userId={userId}
-                  location={location}
-                />
-              ))}
-            </div>
-          ))
-        ) : (
-          items.map(item => (
-            <InventoryItem
-              key={item.id}
-              item={item}
-              accentColor={accentColor}
-              textColor={textColor}
-              onUpdateQty={onUpdateQty}
-              onEditItem={onEditItem}
-              onDelete={onDelete}
-              onAddToGrocery={onAddToGrocery}
-              userId={userId}
-              location={location}
-            />
-          ))
-        )}
-      </div>
+            ))
+          ) : (
+            items.map(item => (
+              <InventoryItem
+                key={item.id}
+                item={item}
+                accentColor={accentColor}
+                textColor={textColor}
+                onUpdateQty={onUpdateQty}
+                onEditItem={onEditItem}
+                onDelete={onDelete}
+                onAddToGrocery={onAddToGrocery}
+                userId={userId}
+                location={location}
+              />
+            ))
+          )}
+        </div>
+      )}
     </div>
   )
 }

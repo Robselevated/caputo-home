@@ -118,60 +118,67 @@ export function useScanSession(householdId) {
 
   const confirmItems = async (confirmedItems, location, userId) => {
     const errors = []
-    try {
-      for (const rawItem of confirmedItems) {
-        const item = location !== 'receipt' ? fixCategory(rawItem, location) : rawItem
-        if (location === 'receipt') {
-          const { error: insertErr } = await supabase.from('recently_bought').insert({
+
+    const processItem = async (rawItem) => {
+      const item = location !== 'receipt' ? fixCategory(rawItem, location) : rawItem
+      if (location === 'receipt') {
+        const { error: insertErr } = await supabase.from('recently_bought').insert({
+          household_id: householdId,
+          name: item.name,
+          qty: item.qty,
+          unit: item.unit,
+          store: item.store || null,
+          bought_by: userId,
+        })
+        if (insertErr) { errors.push(`${item.name}: ${insertErr.message}`); return }
+        await supabase.from('item_history').upsert(
+          { household_id: householdId, name: item.name },
+          { onConflict: 'household_id,name' }
+        )
+      } else {
+        const { data: matches, error: lookupErr } = await supabase
+          .from('inventory_items')
+          .select('id, qty')
+          .eq('household_id', householdId)
+          .eq('location', location)
+          .ilike('name', item.name)
+
+        if (lookupErr) {
+          errors.push(`${item.name}: ${lookupErr.message}`)
+          return
+        }
+
+        const existing = matches && matches.length > 0 ? matches[0] : null
+
+        if (existing) {
+          const { error: updateErr } = await supabase.from('inventory_items').update({
+            qty: existing.qty + (item.qty || 1),
+            updated_by: userId,
+            updated_at: new Date().toISOString(),
+          }).eq('id', existing.id)
+          if (updateErr) errors.push(`${item.name}: ${updateErr.message}`)
+        } else {
+          const { error: insertErr } = await supabase.from('inventory_items').insert({
             household_id: householdId,
             name: item.name,
-            qty: item.qty,
-            unit: item.unit,
-            store: item.store || null,
-            bought_by: userId,
+            qty: item.qty || 1,
+            unit: item.unit || 'count',
+            location,
+            category: item.category || 'Other',
+            subcategory: item.subcategory || null,
+            notes: item.notes || null,
+            updated_by: userId,
           })
-          if (insertErr) { errors.push(`${item.name}: ${insertErr.message}`); continue }
-          await supabase.from('item_history').upsert(
-            { household_id: householdId, name: item.name },
-            { onConflict: 'household_id,name' }
-          )
-        } else {
-          const { data: matches, error: lookupErr } = await supabase
-            .from('inventory_items')
-            .select('id, qty')
-            .eq('household_id', householdId)
-            .eq('location', location)
-            .ilike('name', item.name)
-
-          if (lookupErr) {
-            errors.push(`${item.name}: ${lookupErr.message}`)
-            continue
-          }
-
-          const existing = matches && matches.length > 0 ? matches[0] : null
-
-          if (existing) {
-            const { error: updateErr } = await supabase.from('inventory_items').update({
-              qty: existing.qty + (item.qty || 1),
-              updated_by: userId,
-              updated_at: new Date().toISOString(),
-            }).eq('id', existing.id)
-            if (updateErr) errors.push(`${item.name}: ${updateErr.message}`)
-          } else {
-            const { error: insertErr } = await supabase.from('inventory_items').insert({
-              household_id: householdId,
-              name: item.name,
-              qty: item.qty || 1,
-              unit: item.unit || 'count',
-              location,
-              category: item.category || 'Other',
-              subcategory: item.subcategory || null,
-              notes: item.notes || null,
-              updated_by: userId,
-            })
-            if (insertErr) errors.push(`${item.name}: ${insertErr.message}`)
-          }
+          if (insertErr) errors.push(`${item.name}: ${insertErr.message}`)
         }
+      }
+    }
+
+    try {
+      // Process in batches of 5 for speed without overwhelming DB
+      for (let i = 0; i < confirmedItems.length; i += 5) {
+        const batch = confirmedItems.slice(i, i + 5)
+        await Promise.allSettled(batch.map(processItem))
       }
 
       if (errors.length > 0) {
