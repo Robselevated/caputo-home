@@ -585,7 +585,7 @@ export default function Cookbook() {
                 const matchPct = totalIngredients > 0 ? Math.round((suggestion.matched_ingredients.length / totalIngredients) * 100) : 0
 
                 return (
-                  <div key={i} className="bg-dark-surface rounded-2xl p-4 shadow-dark space-y-3 border border-warmgray-100">
+                  <div key={i} onClick={() => navigate('/cookbook/suggestion', { state: { suggestion } })} className="bg-dark-surface rounded-2xl p-4 shadow-dark space-y-3 border border-warmgray-100 cursor-pointer active:scale-[0.97] transition-transform">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <h4 className="font-heading font-bold text-charcoal">{suggestion.name}</h4>
