@@ -101,6 +101,54 @@ function extractSectionHints(html) {
   return hints
 }
 
+function parseIngredientLine(line) {
+  // Parse "1 1/2 cups flour, sifted" into { qty, unit, name, notes }
+  const fractionMap = { '¼': 0.25, '½': 0.5, '¾': 0.75, '⅓': 0.333, '⅔': 0.667, '⅛': 0.125 }
+  let text = line.trim()
+  for (const [char, val] of Object.entries(fractionMap)) {
+    text = text.replace(char, val.toString())
+  }
+  // Convert "1/2" style fractions
+  text = text.replace(/(\d+)\/(\d+)/g, (_, n, d) => (parseInt(n) / parseInt(d)).toString())
+
+  const units = ['cups?', 'tbsp', 'tablespoons?', 'tsp', 'teaspoons?', 'oz', 'ounces?', 'lbs?', 'pounds?', 'grams?', 'kg', 'ml', 'liters?', 'quarts?', 'pints?', 'gallons?', 'cans?', 'packages?', 'slices?', 'cloves?', 'heads?', 'bunche?s?', 'stalks?', 'pieces?', 'sprigs?']
+  const unitPattern = new RegExp(`^([\\d.]+(?:\\s+[\\d.]+)?)\\s+(${units.join('|')})\\b\\.?\\s+(.+)`, 'i')
+  const qtyOnlyPattern = /^([\d.]+(?:\s+[\d.]+)?)\s+(.+)/
+
+  let qty = 1, unit = 'count', name = text, notes = null
+
+  // Split notes from name on comma
+  const commaIdx = text.indexOf(',')
+  let mainPart = text
+  if (commaIdx > 0) {
+    mainPart = text.slice(0, commaIdx).trim()
+    notes = text.slice(commaIdx + 1).trim() || null
+  }
+
+  const unitMatch = mainPart.match(unitPattern)
+  if (unitMatch) {
+    qty = parseFloat(unitMatch[1].replace(/\s+/g, '+').split('+').reduce((a, b) => parseFloat(a) + parseFloat(b), 0)) || parseFloat(unitMatch[1])
+    unit = unitMatch[2].toLowerCase().replace(/s$/, '')
+    name = unitMatch[3].trim()
+  } else {
+    const qtyMatch = mainPart.match(qtyOnlyPattern)
+    if (qtyMatch) {
+      qty = parseFloat(qtyMatch[1]) || 1
+      name = qtyMatch[2].trim()
+    } else {
+      name = mainPart
+    }
+  }
+
+  // Normalize unit names
+  if (['tablespoon', 'tablespoons'].includes(unit)) unit = 'tbsp'
+  if (['teaspoon', 'teaspoons'].includes(unit)) unit = 'tsp'
+  if (['ounce'].includes(unit)) unit = 'oz'
+  if (['pound'].includes(unit)) unit = 'lb'
+
+  return { qty, unit, name, notes }
+}
+
 function stripPageChrome(html) {
   let cleaned = html
     .replace(/<header[\s\S]*?<\/header>/gi, '')
@@ -189,8 +237,7 @@ async function fetchContent(url) {
     },
     body: JSON.stringify({
       url,
-      formats: ['html', 'markdown'],
-      onlyMainContent: true,
+      formats: ['rawHtml', 'html', 'markdown'],
     }),
   })
 
@@ -200,8 +247,8 @@ async function fetchContent(url) {
   }
 
   const fcData = await fcResp.json()
-  // Prefer HTML (preserves ingredient group markup) over markdown
-  return fcData.data?.html || fcData.data?.markdown || ''
+  // Prefer rawHtml (preserves JSON-LD scripts + ingredient group markup)
+  return fcData.data?.rawHtml || fcData.data?.html || fcData.data?.markdown || ''
 }
 
 export async function handler(event) {
@@ -276,6 +323,14 @@ export async function handler(event) {
         statusCode: 500,
         body: JSON.stringify({ error: 'Invalid recipe data structure' }),
       }
+    }
+
+    // Fallback: if Claude returned 0 ingredients but JSON-LD has them, parse directly
+    if (recipe.ingredients.length === 0 && jsonLdRecipe?.recipeIngredient?.length > 0) {
+      recipe.ingredients = jsonLdRecipe.recipeIngredient.map(line => {
+        const parsed = parseIngredientLine(String(line))
+        return { section: null, ...parsed }
+      })
     }
 
     // Use og:image as fallback if Claude didn't extract an image

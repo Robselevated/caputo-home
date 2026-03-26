@@ -14,7 +14,7 @@ export default function InventoryPage({
 }) {
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
-  const { items, loading, addItem, updateQty, deleteItem, addToGroceryList } = useInventory(householdId, location)
+  const { items, loading, addItem, updateQty, updateItem, deleteItem, addToGroceryList } = useInventory(householdId, location)
   const { scanning, results, error: scanError, uploadAndScan, confirmItems, cancelScan } = useScanSession(householdId)
 
   const [showAdd, setShowAdd] = useState(false)
@@ -254,9 +254,11 @@ export default function InventoryPage({
                 accentColor={bgClass}
                 textColor={colorClass}
                 onUpdateQty={updateQty}
+                onEditItem={updateItem}
                 onDelete={deleteItem}
                 onAddToGrocery={addToGroceryList}
                 userId={user.id}
+                location={location}
               />
             )
           })}
