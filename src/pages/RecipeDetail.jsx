@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useRecipes } from '../hooks/useRecipes'
 import { useRecipeMatch } from '../hooks/useRecipeMatch'
+import { useMealPicks } from '../hooks/useMealPicks'
+import { getSections } from '../lib/mealSections'
 
 export default function RecipeDetail() {
   const { id } = useParams()
@@ -11,6 +13,7 @@ export default function RecipeDetail() {
   const householdId = profile?.household_id
   const { getRecipe, reimportRecipe, deleteRecipe } = useRecipes(householdId)
   const { matchIngredients, addMissingToGroceryList, useRecipe, addDepletedToGroceryList } = useRecipeMatch(householdId)
+  const { addPick } = useMealPicks(householdId)
 
   const [recipe, setRecipe] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -22,6 +25,8 @@ export default function RecipeDetail() {
   const [refreshing, setRefreshing] = useState(false)
   const [useResult, setUseResult] = useState(null)
   const [using, setUsing] = useState(false)
+  const [showMealPlanPicker, setShowMealPlanPicker] = useState(false)
+  const [addingToPlan, setAddingToPlan] = useState(false)
 
   useEffect(() => {
     loadRecipe()
@@ -83,6 +88,22 @@ export default function RecipeDetail() {
       setTimeout(() => setSuccessMessage(null), 3000)
     }
     setRefreshing(false)
+  }
+
+  const handleAddToMealPlan = async (sectionName) => {
+    setAddingToPlan(true)
+    await addPick({
+      userId: user.id,
+      recipeId: recipe.id,
+      name: recipe.name,
+      notes: recipe.description,
+      imageUrl: recipe.image_url,
+      section: sectionName,
+    })
+    setAddingToPlan(false)
+    setShowMealPlanPicker(false)
+    setSuccessMessage(`Added to ${sectionName}`)
+    setTimeout(() => setSuccessMessage(null), 3000)
   }
 
   const handleDelete = async () => {
@@ -178,13 +199,22 @@ export default function RecipeDetail() {
           </div>
         )}
 
-        <button
-          onClick={handleMakeThis}
-          disabled={matching}
-          className="btn-primary bg-section-cookbook w-full mb-6 disabled:opacity-40"
-        >
-          {matching ? 'Checking ingredients...' : 'Make This'}
-        </button>
+        <div className="flex gap-3 mb-6">
+          <button
+            onClick={handleMakeThis}
+            disabled={matching}
+            className="btn-primary bg-section-cookbook flex-1 disabled:opacity-40"
+          >
+            {matching ? 'Checking...' : 'Make This'}
+          </button>
+          <button
+            onClick={() => setShowMealPlanPicker(true)}
+            className="flex-1 py-3 px-4 border-2 border-section-planning text-section-planning rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
+          >
+            <span className="material-symbols-outlined text-lg">calendar_month</span>
+            Add to Meal Plan
+          </button>
+        </div>
 
         <div className="card mb-4">
           <h2 className="font-heading font-semibold text-charcoal mb-3">Ingredients</h2>
@@ -438,6 +468,34 @@ export default function RecipeDetail() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {showMealPlanPicker && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-surface rounded-2xl p-6 w-full max-w-sm shadow-dark-lg">
+            <h3 className="text-lg font-heading font-semibold text-charcoal mb-1">Add to Meal Plan</h3>
+            <p className="text-warmgray-500 text-sm mb-4">Pick a section for {recipe.name}</p>
+            <div className="space-y-2">
+              {getSections(householdId).map(sec => (
+                <button
+                  key={sec}
+                  onClick={() => handleAddToMealPlan(sec)}
+                  disabled={addingToPlan}
+                  className="w-full flex items-center justify-between p-3 bg-cream rounded-xl text-left active:scale-[0.98] transition-transform disabled:opacity-40"
+                >
+                  <span className="font-medium text-sm text-charcoal">{sec}</span>
+                  <span className="material-symbols-outlined text-section-planning">add_circle</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowMealPlanPicker(false)}
+              className="w-full mt-3 py-2 text-sm font-medium text-warmgray-400"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

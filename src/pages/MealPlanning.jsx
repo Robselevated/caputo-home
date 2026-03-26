@@ -1,22 +1,17 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { useHouseholdMembers } from '../hooks/useHouseholdMembers'
 import { useMealPicks } from '../hooks/useMealPicks'
 import { useRecipes } from '../hooks/useRecipes'
 import { useRecipeMatch } from '../hooks/useRecipeMatch'
+import { DEFAULT_SECTIONS, getSections, addCustomSection } from '../lib/mealSections'
 
 function getInitial(name) {
   if (!name) return '?'
   return name.charAt(0).toUpperCase()
 }
 
-function getFirstName(name) {
-  if (!name) return 'Unknown'
-  return name.split(' ')[0]
-}
-
-const MEMBER_COLORS = [
+const SECTION_COLORS = [
   { bg: 'bg-section-fridge/20', text: 'text-section-fridge', accent: 'text-section-fridge' },
   { bg: 'bg-section-cookbook/20', text: 'text-section-cookbook', accent: 'text-section-cookbook' },
   { bg: 'bg-section-pantry/20', text: 'text-section-pantry', accent: 'text-section-pantry' },
@@ -28,8 +23,7 @@ export default function MealPlanning() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
-  const { members } = useHouseholdMembers(householdId)
-  const { picks, loading, addPick, removePick, clearMyPicks } = useMealPicks(householdId)
+  const { picks, loading, addPick, removePick, clearSection } = useMealPicks(householdId)
   const { recipes } = useRecipes(householdId)
   const { matchIngredients, addMissingToGroceryList } = useRecipeMatch(householdId)
 
@@ -41,22 +35,36 @@ export default function MealPlanning() {
   const [adding, setAdding] = useState(false)
   const [groceryLoading, setGroceryLoading] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
+  const [selectedSection, setSelectedSection] = useState(DEFAULT_SECTIONS[0])
+  const [showNewSection, setShowNewSection] = useState(false)
+  const [newSectionName, setNewSectionName] = useState('')
+  const [sections, setSections] = useState(() => getSections(householdId))
 
   const filteredRecipes = useMemo(() => {
-    if (!recipeSearch) return recipes.slice(0, 20)
+    if (!recipeSearch) return recipes
     const q = recipeSearch.toLowerCase()
-    return recipes.filter(r => r.name.toLowerCase().includes(q)).slice(0, 20)
+    return recipes.filter(r => r.name.toLowerCase().includes(q))
   }, [recipes, recipeSearch])
 
-  const picksByUser = useMemo(() => {
+  const picksBySection = useMemo(() => {
     const grouped = {}
     for (const pick of picks) {
-      const uid = pick.user_id || 'unknown'
-      if (!grouped[uid]) grouped[uid] = []
-      grouped[uid].push(pick)
+      const sec = pick.section || DEFAULT_SECTIONS[0]
+      if (!grouped[sec]) grouped[sec] = []
+      grouped[sec].push(pick)
     }
     return grouped
   }, [picks])
+
+  // Merge default sections, localStorage sections, and any sections found in picks
+  const allSections = useMemo(() => {
+    const fromPicks = Object.keys(picksBySection)
+    const merged = [...sections]
+    for (const s of fromPicks) {
+      if (!merged.includes(s)) merged.push(s)
+    }
+    return merged
+  }, [sections, picksBySection])
 
   const handleAddFromCookbook = async (recipe) => {
     setAdding(true)
@@ -66,6 +74,7 @@ export default function MealPlanning() {
       name: recipe.name,
       notes: recipe.description,
       imageUrl: recipe.image_url,
+      section: selectedSection,
     })
     setAdding(false)
     setShowAdd(false)
@@ -82,6 +91,7 @@ export default function MealPlanning() {
       name: quickName.trim(),
       notes: quickNotes.trim() || null,
       imageUrl: null,
+      section: selectedSection,
     })
     setAdding(false)
     setShowAdd(false)
@@ -104,8 +114,13 @@ export default function MealPlanning() {
     setGroceryLoading(null)
   }
 
-  const handleClearMyPicks = async () => {
-    await clearMyPicks(user.id)
+  const handleAddSection = () => {
+    const name = newSectionName.trim()
+    if (!name) return
+    const updated = addCustomSection(householdId, name)
+    setSections(updated)
+    setNewSectionName('')
+    setShowNewSection(false)
   }
 
   if (loading) {
@@ -133,45 +148,33 @@ export default function MealPlanning() {
         </div>
       )}
 
-      {/* Member Sections */}
-      {members.length === 0 && picks.length === 0 && (
-        <div className="text-center py-16 text-warmgray-400">
-          <span className="material-symbols-outlined text-6xl mb-3 opacity-50 block animate-float">calendar_month</span>
-          <p className="font-medium text-charcoal-light">No meal picks yet</p>
-          <p className="text-sm mt-1">Tap + to add your first idea</p>
-        </div>
-      )}
-
-      {members.map((member, mi) => {
-        const memberPicks = picksByUser[member.id] || []
-        const colors = MEMBER_COLORS[mi % MEMBER_COLORS.length]
-        const firstName = getFirstName(member.name)
-        const isMe = member.id === user.id
+      {/* Section-based layout */}
+      {allSections.map((sectionName, si) => {
+        const sectionPicks = picksBySection[sectionName] || []
+        const colors = SECTION_COLORS[si % SECTION_COLORS.length]
 
         return (
-          <section key={member.id} className="space-y-4">
+          <section key={sectionName} className="space-y-4">
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
                 <div className={`w-8 h-8 rounded-full ${colors.bg} flex items-center justify-center`}>
-                  <span className={`font-heading font-bold text-sm ${colors.text}`}>{getInitial(member.name)}</span>
+                  <span className={`font-heading font-bold text-sm ${colors.text}`}>{getInitial(sectionName)}</span>
                 </div>
-                <h3 className="font-heading font-bold text-xl text-charcoal">{firstName}'s Picks</h3>
+                <h3 className="font-heading font-bold text-xl text-charcoal">{sectionName}</h3>
               </div>
               <span className={`text-xs font-semibold uppercase tracking-widest ${colors.accent}`}>
-                {memberPicks.length} {memberPicks.length === 1 ? 'Idea' : 'Ideas'}
+                {sectionPicks.length} {sectionPicks.length === 1 ? 'Idea' : 'Ideas'}
               </span>
             </div>
 
-            {memberPicks.length === 0 && (
+            {sectionPicks.length === 0 && (
               <div className="bg-dark-surface rounded-2xl p-6 shadow-dark text-center">
-                <p className="text-warmgray-400 text-sm">
-                  {isMe ? 'No picks yet. Tap + to add one!' : `${firstName} hasn't added any picks yet.`}
-                </p>
+                <p className="text-warmgray-400 text-sm">No picks yet. Tap + to add one!</p>
               </div>
             )}
 
             <div className="space-y-4">
-              {memberPicks.map(pick => (
+              {sectionPicks.map(pick => (
                 <article
                   key={pick.id}
                   className="bg-dark-surface rounded-2xl shadow-dark overflow-hidden border-l-4 border-section-planning active:scale-[0.98] transition-transform"
@@ -190,14 +193,12 @@ export default function MealPlanning() {
                       <div>
                         <div className="flex justify-between items-start">
                           <h4 className="font-heading font-bold text-base leading-tight text-charcoal">{pick.name}</h4>
-                          {isMe && (
-                            <button
-                              onClick={() => removePick(pick.id)}
-                              className="text-warmgray-300 hover:text-red-400 -mt-1 -mr-1 p-1"
-                            >
-                              <span className="material-symbols-outlined text-lg">close</span>
-                            </button>
-                          )}
+                          <button
+                            onClick={() => removePick(pick.id)}
+                            className="text-warmgray-300 hover:text-red-400 -mt-1 -mr-1 p-1"
+                          >
+                            <span className="material-symbols-outlined text-lg">close</span>
+                          </button>
                         </div>
                         {pick.notes && (
                           <p className="text-xs text-warmgray-500 mt-1 line-clamp-2">{pick.notes}</p>
@@ -233,40 +234,53 @@ export default function MealPlanning() {
               ))}
             </div>
 
-            {isMe && memberPicks.length > 0 && (
+            {sectionPicks.length > 0 && (
               <button
-                onClick={handleClearMyPicks}
+                onClick={() => clearSection(sectionName)}
                 className="w-full py-2 text-sm font-medium text-warmgray-400 border border-warmgray-200 rounded-xl"
               >
-                Clear My Picks
+                Clear {sectionName}
               </button>
             )}
           </section>
         )
       })}
 
-      {/* Show picks from users not in members list (edge case) */}
-      {Object.keys(picksByUser).filter(uid => uid !== 'unknown' && !members.find(m => m.id === uid)).map(uid => {
-        const orphanPicks = picksByUser[uid]
-        return (
-          <section key={uid} className="space-y-4">
-            <div className="flex items-center gap-3 px-1">
-              <div className="w-8 h-8 rounded-full bg-warmgray-200 flex items-center justify-center">
-                <span className="font-heading font-bold text-sm text-warmgray-500">?</span>
-              </div>
-              <h3 className="font-heading font-bold text-xl text-charcoal">Picks</h3>
-            </div>
-            <div className="space-y-4">
-              {orphanPicks.map(pick => (
-                <article key={pick.id} className="bg-dark-surface rounded-2xl shadow-dark overflow-hidden border-l-4 border-warmgray-300 p-4">
-                  <h4 className="font-heading font-bold text-charcoal">{pick.name}</h4>
-                  {pick.notes && <p className="text-xs text-warmgray-500 mt-1">{pick.notes}</p>}
-                </article>
-              ))}
-            </div>
-          </section>
-        )
-      })}
+      {/* Add Section */}
+      {showNewSection ? (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newSectionName}
+            onChange={(e) => setNewSectionName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddSection()}
+            placeholder="Section name..."
+            className="input-field focus:ring-section-planning flex-1"
+            autoFocus
+          />
+          <button
+            onClick={handleAddSection}
+            disabled={!newSectionName.trim()}
+            className="btn-primary bg-section-planning px-4 disabled:opacity-40"
+          >
+            Add
+          </button>
+          <button
+            onClick={() => { setShowNewSection(false); setNewSectionName('') }}
+            className="px-3 py-2 text-warmgray-400"
+          >
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowNewSection(true)}
+          className="w-full py-3 text-sm font-medium text-section-planning border border-dashed border-section-planning/30 rounded-xl flex items-center justify-center gap-2"
+        >
+          <span className="material-symbols-outlined text-lg">add</span>
+          Add Section
+        </button>
+      )}
 
       {/* FAB */}
       <button
@@ -290,6 +304,26 @@ export default function MealPlanning() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
+            </div>
+
+            {/* Section Picker */}
+            <div className="px-6 pt-4">
+              <p className="text-xs font-semibold text-warmgray-400 uppercase tracking-wider mb-2">Add to section</p>
+              <div className="flex gap-2 flex-wrap">
+                {allSections.map(sec => (
+                  <button
+                    key={sec}
+                    onClick={() => setSelectedSection(sec)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                      selectedSection === sec
+                        ? 'bg-section-planning text-white'
+                        : 'bg-section-planning/10 text-section-planning'
+                    }`}
+                  >
+                    {sec}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Tabs */}

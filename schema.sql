@@ -303,6 +303,7 @@ create table meal_picks (
   name text not null,
   notes text,
   image_url text,
+  section text default 'Rob''s Picks',  -- named section grouping
   created_at timestamptz default now()
 );
 

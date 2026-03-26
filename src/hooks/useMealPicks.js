@@ -35,7 +35,7 @@ export function useMealPicks(householdId) {
     return () => { supabase.removeChannel(channel) }
   }, [householdId, fetchPicks])
 
-  const addPick = async ({ userId, recipeId, name, notes, imageUrl }) => {
+  const addPick = async ({ userId, recipeId, name, notes, imageUrl, section }) => {
     const { error } = await supabase.from('meal_picks').insert({
       household_id: householdId,
       user_id: userId,
@@ -43,6 +43,7 @@ export function useMealPicks(householdId) {
       name: name.trim(),
       notes: notes?.trim() || null,
       image_url: imageUrl || null,
+      section: section || null,
     })
     return { error }
   }
@@ -54,16 +55,16 @@ export function useMealPicks(householdId) {
     return { error }
   }
 
-  const clearMyPicks = async (userId) => {
-    setPicks(prev => prev.filter(p => p.user_id !== userId))
+  const clearSection = async (sectionName) => {
+    setPicks(prev => prev.filter(p => p.section !== sectionName))
     const { error } = await supabase
       .from('meal_picks')
       .delete()
       .eq('household_id', householdId)
-      .eq('user_id', userId)
+      .eq('section', sectionName)
     if (error) fetchPicks()
     return { error }
   }
 
-  return { picks, loading, addPick, removePick, clearMyPicks }
+  return { picks, loading, addPick, removePick, clearSection }
 }
