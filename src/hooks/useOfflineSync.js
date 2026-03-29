@@ -68,17 +68,44 @@ export function useOfflineSync(householdId) {
         try {
           switch (write.type) {
             case 'insert': {
-              const { id: _, timestamp: __, type: ___, ...itemData } = write
-              await supabase.from('grocery_items').insert(itemData)
+              await supabase.from('grocery_items').insert(write.data)
               break
             }
             case 'update': {
-              const { itemId, changes } = write
-              await supabase.from('grocery_items').update(changes).eq('id', itemId)
+              await supabase.from('grocery_items').update(write.changes).eq('id', write.itemId)
               break
             }
             case 'delete': {
               await supabase.from('grocery_items').delete().eq('id', write.itemId)
+              break
+            }
+            case 'check': {
+              const { item, householdId, userId } = write
+              await supabase.from('recently_bought').insert({
+                household_id: householdId,
+                name: item.name,
+                qty: item.qty,
+                unit: item.unit,
+                store: item.store,
+                notes: item.notes,
+                bought_by: userId,
+              })
+              await supabase.from('item_history').upsert(
+                { household_id: householdId, name: item.name },
+                { onConflict: 'household_id,name' }
+              )
+              await supabase.from('grocery_items').delete().eq('id', item.id)
+              break
+            }
+            case 'reorder': {
+              const { orderedIds, userId } = write
+              await Promise.all(orderedIds.map((id, index) =>
+                supabase.from('grocery_items').update({
+                  sort_order: index,
+                  updated_by: userId,
+                  updated_at: new Date().toISOString(),
+                }).eq('id', id)
+              ))
               break
             }
           }
