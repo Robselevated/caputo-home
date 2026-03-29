@@ -37,7 +37,7 @@ export function useOfflineSync(householdId) {
     if (isOnline && pendingCount > 0) {
       syncNow()
     }
-  }, [isOnline])
+  }, [isOnline, pendingCount])
 
   // Cache items from Supabase to IndexedDB
   const cacheFromSupabase = useCallback(async (items) => {

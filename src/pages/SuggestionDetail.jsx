@@ -24,7 +24,7 @@ export default function SuggestionDetail() {
   useEffect(() => {
     if (!suggestion) return
     expandSuggestion()
-  }, [])
+  }, [suggestion])
 
   const expandSuggestion = async () => {
     setExpanding(true)

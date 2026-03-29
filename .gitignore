@@ -1,8 +1,11 @@
 node_modules
 dist
-.env
+
+# .env contains public VITE_ keys only - safe to commit
+# .env.local contains SECRET keys - never commit
 .env.local
 .env.*.local
+
 *.log
 .DS_Store
 

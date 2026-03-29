@@ -78,6 +78,13 @@ export default function GroceryList() {
   const menuRef = useRef(null)
   const pendingChecks = useRef({})
 
+  // Clear pending check timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(pendingChecks.current).forEach(clearTimeout)
+    }
+  }, [])
+
   // Add form state
   const [name, setName] = useState('')
   const [qty, setQty] = useState('')
@@ -246,7 +253,7 @@ export default function GroceryList() {
   const handleQuickAdd = async () => {
     if (!name.trim()) return
     await addItem({ name, qty: qty ? Number(qty) : 1, unit, store: store || 'Grocery Store', notes, userId: user.id })
-    sendPushNotification(householdId, user.id, `${profile?.name || 'Someone'} added ${name} to the grocery list`)
+    sendPushNotification(householdId, user.id, `${profile?.name || 'Someone'} added ${name} to the grocery list`).catch(() => {})
     setName('')
     setQty('')
     setUnit('')
@@ -270,7 +277,7 @@ export default function GroceryList() {
       return
     }
     markChecked(item.id)
-    sendPushNotification(householdId, user.id, `${profile?.name || 'Someone'} checked off ${item.name}`)
+    sendPushNotification(householdId, user.id, `${profile?.name || 'Someone'} checked off ${item.name}`).catch(() => {})
     pendingChecks.current[item.id] = setTimeout(() => {
       delete pendingChecks.current[item.id]
       checkItem(item, user.id)
@@ -335,26 +342,45 @@ export default function GroceryList() {
         {/* Search / Add Quick Action */}
         <div className="mb-10">
           <div className="bg-cream rounded-xl p-1 flex items-center gap-2">
-            <div className="flex-1 flex items-center px-4 py-3 gap-3">
-              <span className="material-symbols-outlined text-warmgray-400">search</span>
-              <ItemAutocomplete
-                value={name}
-                onChange={(val) => {
-                  setName(val)
-                  setUserOverrodeStore(false)
-                }}
-                suggestions={getSuggestions}
-                placeholder="Add milk, eggs, bread..."
-                className="bg-transparent border-none focus:ring-0 w-full placeholder:text-warmgray-400 p-0 text-charcoal"
-              />
-            </div>
+            {showAddForm ? (
+              <div className="flex-1 flex items-center px-4 py-3 gap-3">
+                <span className="material-symbols-outlined text-section-grocery">edit</span>
+                <ItemAutocomplete
+                  value={name}
+                  onChange={(val) => {
+                    setName(val)
+                    setUserOverrodeStore(false)
+                  }}
+                  suggestions={getSuggestions}
+                  placeholder="Item name..."
+                  className="bg-transparent border-none focus:ring-0 w-full placeholder:text-warmgray-400 p-0 text-charcoal font-medium"
+                  autoFocus
+                />
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center px-4 py-3 gap-3">
+                <span className="material-symbols-outlined text-warmgray-400">search</span>
+                <ItemAutocomplete
+                  value={name}
+                  onChange={(val) => {
+                    setName(val)
+                    setUserOverrodeStore(false)
+                  }}
+                  suggestions={getSuggestions}
+                  placeholder="Add milk, eggs, bread..."
+                  className="bg-transparent border-none focus:ring-0 w-full placeholder:text-warmgray-400 p-0 text-charcoal"
+                />
+              </div>
+            )}
             <div className="flex items-center gap-1.5">
-              <PhotoScanner
-                onCapture={(file) => uploadAndScan(file, 'receipt_inventory', user.id)}
-                scanning={scanning}
-                colorClass="bg-section-grocery"
-                icon="receipt_long"
-              />
+              {!showAddForm && (
+                <PhotoScanner
+                  onCapture={(file) => uploadAndScan(file, 'receipt_inventory', user.id)}
+                  scanning={scanning}
+                  colorClass="bg-section-grocery"
+                  icon="receipt_long"
+                />
+              )}
               <button
                 onClick={() => {
                   if (name.trim() && !showAddForm) {
@@ -381,6 +407,7 @@ export default function GroceryList() {
                   placeholder="Qty"
                   className="input-field focus:ring-section-grocery w-20"
                   inputMode="decimal"
+                  min="0"
                 />
                 <select
                   value={unit}
@@ -515,6 +542,7 @@ export default function GroceryList() {
                                     placeholder="Qty"
                                     className="input-field focus:ring-section-grocery w-20"
                                     inputMode="decimal"
+                                    min="0"
                                   />
                                   <select
                                     value={editUnit}

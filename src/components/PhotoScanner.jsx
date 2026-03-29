@@ -1,11 +1,20 @@
 import { useRef } from 'react'
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
 export default function PhotoScanner({ onCapture, scanning, colorClass, icon = 'photo_camera' }) {
   const fileRef = useRef(null)
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0]
-    if (file) onCapture(file)
+    if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        alert('Image is too large. Please use an image under 10MB.')
+        e.target.value = ''
+        return
+      }
+      onCapture(file)
+    }
     e.target.value = ''
   }
 

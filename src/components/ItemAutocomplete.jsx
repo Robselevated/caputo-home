@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 
-export default function ItemAutocomplete({ value, onChange, suggestions, placeholder, className }) {
+export default function ItemAutocomplete({ value, onChange, suggestions, placeholder, className, autoFocus }) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [filtered, setFiltered] = useState([])
   const wrapperRef = useRef(null)
@@ -36,6 +36,7 @@ export default function ItemAutocomplete({ value, onChange, suggestions, placeho
         }}
         placeholder={placeholder}
         className={className || "input-field focus:ring-section-grocery"}
+        autoFocus={autoFocus}
       />
       {showSuggestions && (
         <ul className="absolute z-20 left-0 right-0 mt-1 bg-dark-surface border border-warmgray-100 rounded-2xl shadow-dark-md max-h-40 overflow-y-auto">

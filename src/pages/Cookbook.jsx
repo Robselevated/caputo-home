@@ -129,6 +129,7 @@ export default function Cookbook() {
       .order('position', { ascending: true })
       .limit(3)
       .then(({ data }) => { if (data) setLatestIngredients(data) })
+      .catch(() => setLatestIngredients([]))
   }, [latestRecipe?.id])
 
   const handleImport = async (e) => {
@@ -468,8 +469,8 @@ export default function Cookbook() {
                 <p className="text-xs text-warmgray-400">Upload one or more photos/screenshots of a recipe. Select all pages at once for best results.</p>
                 {sourceImageUrls.length > 0 && (
                   <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                    {sourceImageUrls.map((url, i) => (
-                      <img key={i} src={url} alt={`Recipe screenshot ${i + 1}`} className="w-20 h-20 object-cover rounded-lg shrink-0 border border-warmgray-200" />
+                    {sourceImageUrls.map((url) => (
+                      <img key={url} src={url} alt="Recipe screenshot" className="w-20 h-20 object-cover rounded-lg shrink-0 border border-warmgray-200" onError={(e) => { e.target.style.display = 'none' }} />
                     ))}
                   </div>
                 )}
@@ -513,9 +514,9 @@ export default function Cookbook() {
               </div>
 
               <div className="flex gap-2">
-                <input type="number" value={servings} onChange={(e) => setServings(e.target.value)} placeholder="Servings" className="input-field focus:ring-section-cookbook flex-1" inputMode="numeric" />
-                <input type="number" value={prepTime} onChange={(e) => setPrepTime(e.target.value)} placeholder="Prep (min)" className="input-field focus:ring-section-cookbook flex-1" inputMode="numeric" />
-                <input type="number" value={cookTime} onChange={(e) => setCookTime(e.target.value)} placeholder="Cook (min)" className="input-field focus:ring-section-cookbook flex-1" inputMode="numeric" />
+                <input type="number" value={servings} onChange={(e) => setServings(e.target.value)} placeholder="Servings" className="input-field focus:ring-section-cookbook flex-1" inputMode="numeric" min="0" />
+                <input type="number" value={prepTime} onChange={(e) => setPrepTime(e.target.value)} placeholder="Prep (min)" className="input-field focus:ring-section-cookbook flex-1" inputMode="numeric" min="0" />
+                <input type="number" value={cookTime} onChange={(e) => setCookTime(e.target.value)} placeholder="Cook (min)" className="input-field focus:ring-section-cookbook flex-1" inputMode="numeric" min="0" />
               </div>
               <input type="text" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Tags (comma separated)" className="input-field focus:ring-section-cookbook" />
               <div className="space-y-2">
@@ -616,12 +617,12 @@ export default function Cookbook() {
 
           {suggestions.length > 0 && (
             <div className="space-y-3">
-              {suggestions.map((suggestion, i) => {
+              {suggestions.map((suggestion) => {
                 const totalIngredients = suggestion.matched_ingredients.length + suggestion.missing_ingredients.length
                 const matchPct = totalIngredients > 0 ? Math.round((suggestion.matched_ingredients.length / totalIngredients) * 100) : 0
 
                 return (
-                  <div key={i} onClick={() => navigate('/cookbook/suggestion', { state: { suggestion } })} className="bg-dark-surface rounded-2xl p-4 shadow-dark space-y-3 border border-warmgray-100 cursor-pointer active:scale-[0.97] transition-transform">
+                  <div key={suggestion.name} onClick={() => navigate('/cookbook/suggestion', { state: { suggestion } })} className="bg-dark-surface rounded-2xl p-4 shadow-dark space-y-3 border border-warmgray-100 cursor-pointer active:scale-[0.97] transition-transform">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <h4 className="font-heading font-bold text-charcoal">{suggestion.name}</h4>
@@ -701,7 +702,7 @@ export default function Cookbook() {
                 >
                   <div className="h-28 overflow-hidden">
                     {recipe.image_url ? (
-                      <img src={recipe.image_url} alt={recipe.name} className="w-full h-full object-cover" />
+                      <img src={recipe.image_url} alt={recipe.name} className="w-full h-full object-cover" onError={(e) => { e.target.parentElement.innerHTML = '<div class="w-full h-full bg-section-cookbook/10 flex items-center justify-center"><span class="material-symbols-outlined text-4xl text-section-cookbook/30">menu_book</span></div>' }} />
                     ) : (
                       <div className="w-full h-full bg-section-cookbook/10 flex items-center justify-center">
                         <span className="material-symbols-outlined text-4xl text-section-cookbook/30">menu_book</span>
@@ -869,8 +870,8 @@ export default function Cookbook() {
               </div>
               {latestIngredients.length > 0 && (
                 <ul className="space-y-2">
-                  {latestIngredients.map((ing, i) => (
-                    <li key={i} className="flex items-center gap-3 text-sm text-charcoal">
+                  {latestIngredients.map((ing) => (
+                    <li key={ing.name} className="flex items-center gap-3 text-sm text-charcoal">
                       <div className="w-1.5 h-1.5 rounded-full bg-section-cookbook" />
                       <span>{ing.name}</span>
                     </li>
@@ -929,7 +930,7 @@ export default function Cookbook() {
                 >
                   <div className="relative">
                     {recipe.image_url ? (
-                      <img src={recipe.image_url} alt={recipe.name} className="w-full h-32 object-cover" />
+                      <img src={recipe.image_url} alt={recipe.name} className="w-full h-32 object-cover" onError={(e) => { e.target.parentElement.innerHTML = '<div class="w-full h-32 bg-section-cookbook/10 flex items-center justify-center"><span class="material-symbols-outlined text-5xl text-section-cookbook/30">menu_book</span></div>' }} />
                     ) : (
                       <div className="w-full h-32 bg-section-cookbook/10 flex items-center justify-center">
                         <span className="material-symbols-outlined text-5xl text-section-cookbook/30">menu_book</span>

@@ -76,7 +76,7 @@ export function useGroceryList(householdId) {
 
   const checkItem = async (item, userId) => {
     // Move to recently_bought
-    await supabase.from('recently_bought').insert({
+    const { error: insertError } = await supabase.from('recently_bought').insert({
       household_id: householdId,
       name: item.name,
       qty: item.qty,
@@ -86,6 +86,12 @@ export function useGroceryList(householdId) {
       bought_by: userId,
     })
 
+    if (insertError) {
+      console.error('Failed to add to recently_bought:', insertError)
+      fetchItems()
+      return
+    }
+
     // Add to item_history
     await supabase.from('item_history').upsert(
       { household_id: householdId, name: item.name },
@@ -93,7 +99,11 @@ export function useGroceryList(householdId) {
     )
 
     // Delete from grocery list
-    await supabase.from('grocery_items').delete().eq('id', item.id)
+    const { error: deleteError } = await supabase.from('grocery_items').delete().eq('id', item.id)
+    if (deleteError) {
+      console.error('Failed to delete grocery item:', deleteError)
+      fetchItems()
+    }
   }
 
   const uncheckItem = async (item, userId) => {
@@ -154,7 +164,12 @@ export function useGroceryList(householdId) {
         updated_at: new Date().toISOString(),
       }).eq('id', id)
     )
-    await Promise.all(updates)
+    const results = await Promise.allSettled(updates)
+    const failed = results.filter(r => r.status === 'rejected')
+    if (failed.length > 0) {
+      console.error(`Reorder: ${failed.length} of ${results.length} updates failed`)
+      fetchItems()
+    }
   }
 
   return { items, loading, addItem, checkItem, uncheckItem, deleteItem, updateItem, clearChecked, markChecked, markUnchecked, reorderItems }

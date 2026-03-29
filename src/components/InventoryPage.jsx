@@ -205,6 +205,7 @@ export default function InventoryPage({
               placeholder="Qty"
               className={`input-field ${ringClass} w-20`}
               inputMode="decimal"
+              min="0"
             />
             <input
               type="text"
