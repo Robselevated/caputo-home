@@ -1,4 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { verifyAuth } from './lib/auth.js'
+import { checkRateLimit } from './lib/rate-limit.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY })
 
@@ -109,6 +111,12 @@ export async function handler(event) {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method not allowed' }
   }
+
+  const user = await verifyAuth(event)
+  if (!user) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) }
+
+  const { allowed, remaining } = await checkRateLimit(user.id, 'claude-scan', 20)
+  if (!allowed) return { statusCode: 429, body: JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }) }
 
   try {
     const { image_url, image_base64, media_type, scan_type } = JSON.parse(event.body)

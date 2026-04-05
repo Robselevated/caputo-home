@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { authFetch } from '../lib/authFetch'
 
 export function useRecipes(householdId) {
   const [recipes, setRecipes] = useState([])
@@ -57,7 +58,7 @@ export function useRecipes(householdId) {
 
   const importRecipe = async (url, userId) => {
     try {
-      const response = await fetch('/.netlify/functions/parse-recipe', {
+      const response = await authFetch('/.netlify/functions/parse-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -159,7 +160,7 @@ export function useRecipes(householdId) {
 
   const reimportRecipe = async (id, sourceUrl) => {
     try {
-      const response = await fetch('/.netlify/functions/parse-recipe', {
+      const response = await authFetch('/.netlify/functions/parse-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: sourceUrl }),

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useRecipes } from '../hooks/useRecipes'
 import { useGroceryList } from '../hooks/useGroceryList'
+import { authFetch } from '../lib/authFetch'
 
 export default function SuggestionDetail() {
   const location = useLocation()
@@ -31,7 +32,7 @@ export default function SuggestionDetail() {
     setExpandError(null)
 
     try {
-      const response = await fetch('/.netlify/functions/expand-suggestion', {
+      const response = await authFetch('/.netlify/functions/expand-suggestion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

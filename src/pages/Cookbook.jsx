@@ -5,6 +5,8 @@ import { useRecipes } from '../hooks/useRecipes'
 import { useIngredientCoverage } from '../hooks/useIngredientCoverage'
 import { useRecipeSuggestions } from '../hooks/useRecipeSuggestions'
 import { supabase } from '../lib/supabase'
+import { authFetch } from '../lib/authFetch'
+import { validateImageFile } from '../lib/uploadValidation'
 
 const COOKBOOK_CATEGORIES = [
   'Italian',
@@ -162,6 +164,16 @@ export default function Cookbook() {
     setScanError(null)
 
     try {
+      // Validate all files before uploading
+      for (const file of files) {
+        const validationError = validateImageFile(file)
+        if (validationError) {
+          setScanError(validationError)
+          setScanning(false)
+          return
+        }
+      }
+
       // Upload all source images to storage and convert to base64
       const uploadedUrls = []
       const imagesPayload = []
@@ -199,7 +211,7 @@ export default function Cookbook() {
         ? { image_base64: imagesPayload[0].base64, media_type: imagesPayload[0].media_type }
         : { images: imagesPayload }
 
-      const response = await fetch('/.netlify/functions/parse-recipe-image', {
+      const response = await authFetch('/.netlify/functions/parse-recipe-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -240,6 +252,12 @@ export default function Cookbook() {
   const handleDishImageUpload = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
+
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      setScanError(validationError)
+      return
+    }
 
     setUploadingDishImage(true)
     const ext = file.name.split('.').pop()

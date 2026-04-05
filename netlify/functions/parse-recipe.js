@@ -1,4 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { verifyAuth } from './lib/auth.js'
+import { checkRateLimit } from './lib/rate-limit.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY })
 
@@ -256,11 +258,31 @@ export async function handler(event) {
     return { statusCode: 405, body: 'Method not allowed' }
   }
 
+  const user = await verifyAuth(event)
+  if (!user) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) }
+
+  const { allowed } = await checkRateLimit(user.id, 'parse-recipe', 20)
+  if (!allowed) return { statusCode: 429, body: JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }) }
+
   try {
     const { url } = JSON.parse(event.body)
 
     if (!url) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Missing url parameter' }) }
+    }
+
+    // SSRF protection: only allow public HTTP(S) URLs
+    try {
+      const parsed = new URL(url)
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Invalid URL protocol' }) }
+      }
+      const hostname = parsed.hostname
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('169.254.') || hostname.startsWith('10.') || hostname.startsWith('192.168.') || /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Invalid URL' }) }
+      }
+    } catch {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Invalid URL format' }) }
     }
 
     const content = await fetchContent(url)

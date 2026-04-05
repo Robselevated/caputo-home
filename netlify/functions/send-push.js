@@ -1,5 +1,6 @@
 import webpush from 'web-push'
 import { createClient } from '@supabase/supabase-js'
+import { verifyAuth } from './lib/auth.js'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -17,11 +18,25 @@ export async function handler(event) {
     return { statusCode: 405, body: 'Method not allowed' }
   }
 
+  const authedUser = await verifyAuth(event)
+  if (!authedUser) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) }
+
   try {
     const { household_id, changed_by_user_id, message } = JSON.parse(event.body)
 
     if (!household_id || !changed_by_user_id) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
+    }
+
+    // Verify the caller belongs to this household
+    const { data: callerProfile } = await supabase
+      .from('users')
+      .select('household_id')
+      .eq('id', authedUser.id)
+      .single()
+
+    if (callerProfile?.household_id !== household_id) {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
     }
 
     // Get all users in household except the one who made the change

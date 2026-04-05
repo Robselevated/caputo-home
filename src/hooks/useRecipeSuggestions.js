@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { authFetch } from '../lib/authFetch'
 
 export function useRecipeSuggestions(householdId) {
   const [suggestions, setSuggestions] = useState([])
@@ -33,7 +34,7 @@ export function useRecipeSuggestions(householdId) {
         return
       }
 
-      const response = await fetch('/.netlify/functions/suggest-recipes', {
+      const response = await authFetch('/.netlify/functions/suggest-recipes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ingredients: items }),

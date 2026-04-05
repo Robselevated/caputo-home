@@ -319,6 +319,32 @@ create policy "meal_picks_all" on meal_picks
 alter publication supabase_realtime add table meal_picks;
 
 -- ============================================================
+-- API USAGE (rate limiting for Netlify Functions)
+-- Tracks per-user API calls per action per hour
+-- ============================================================
+create table api_usage (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id) on delete cascade,
+  action text not null,
+  created_at timestamptz default now()
+);
+
+create index idx_api_usage_user_action on api_usage(user_id, action, created_at);
+
+alter table api_usage enable row level security;
+-- No RLS policies needed — this table is only accessed via service role key from Netlify functions
+
+-- Auto-delete old rate limit records (older than 24 hours) to keep table small
+select cron.schedule(
+  'delete-old-api-usage',
+  '0 4 * * *',  -- runs daily at 4am UTC
+  $$
+    delete from api_usage
+    where created_at < now() - interval '24 hours';
+  $$
+);
+
+-- ============================================================
 -- SUPABASE STORAGE BUCKET
 -- Create manually in dashboard or via this:
 -- ============================================================

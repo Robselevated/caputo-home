@@ -2,8 +2,11 @@ import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
+import ProtectedRoute from './components/ProtectedRoute'
 
 // Lazy-load pages so only the active route downloads on first load
+const Login = lazy(() => import('./pages/Login'))
+const AuthCallback = lazy(() => import('./pages/AuthCallback'))
 const GroceryList = lazy(() => import('./pages/GroceryList'))
 const Freezer = lazy(() => import('./pages/Freezer'))
 const Fridge = lazy(() => import('./pages/Fridge'))
@@ -25,29 +28,35 @@ function PageLoader() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <Routes>
-        <Route
-          path="/*"
-          element={
-            <Layout>
-              <Suspense fallback={<PageLoader />}>
-                <Routes>
-                  <Route path="/grocery" element={<GroceryList />} />
-                  <Route path="/freezer" element={<Freezer />} />
-                  <Route path="/fridge" element={<Fridge />} />
-                  <Route path="/pantry" element={<Pantry />} />
-                  <Route path="/planning" element={<MealPlanning />} />
-                  <Route path="/cookbook" element={<Cookbook />} />
-                  <Route path="/cookbook/suggestion" element={<SuggestionDetail />} />
-                  <Route path="/cookbook/:id/edit" element={<RecipeEdit />} />
-                  <Route path="/cookbook/:id" element={<RecipeDetail />} />
-                  <Route path="*" element={<Navigate to="/grocery" replace />} />
-                </Routes>
-              </Suspense>
-            </Layout>
-          }
-        />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                      <Route path="/grocery" element={<GroceryList />} />
+                      <Route path="/freezer" element={<Freezer />} />
+                      <Route path="/fridge" element={<Fridge />} />
+                      <Route path="/pantry" element={<Pantry />} />
+                      <Route path="/planning" element={<MealPlanning />} />
+                      <Route path="/cookbook" element={<Cookbook />} />
+                      <Route path="/cookbook/suggestion" element={<SuggestionDetail />} />
+                      <Route path="/cookbook/:id/edit" element={<RecipeEdit />} />
+                      <Route path="/cookbook/:id" element={<RecipeDetail />} />
+                      <Route path="*" element={<Navigate to="/grocery" replace />} />
+                    </Routes>
+                  </Suspense>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Suspense>
     </ErrorBoundary>
   )
 }

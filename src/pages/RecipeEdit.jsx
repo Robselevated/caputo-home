@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { useRecipes } from '../hooks/useRecipes'
 import { supabase } from '../lib/supabase'
+import { authFetch } from '../lib/authFetch'
+import { validateImageFile } from '../lib/uploadValidation'
 
 export default function RecipeEdit() {
   const { id } = useParams()
@@ -70,6 +72,12 @@ export default function RecipeEdit() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+
     setUploading(true)
     const ext = file.name.split('.').pop()
     const path = `${householdId}/${id}-${Date.now()}.${ext}`
@@ -105,13 +113,22 @@ export default function RecipeEdit() {
 
   const handleScreenshotScan = async () => {
     if (screenshotFiles.length === 0) return
+
+    for (const file of screenshotFiles) {
+      const validationError = validateImageFile(file)
+      if (validationError) {
+        setScanError(validationError)
+        return
+      }
+    }
+
     setScanningScreenshots(true)
     setScanError(null)
 
     try {
       const images = await Promise.all(screenshotFiles.map(f => fileToBase64(f)))
 
-      const response = await fetch('/.netlify/functions/parse-recipe-image', {
+      const response = await authFetch('/.netlify/functions/parse-recipe-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ images }),

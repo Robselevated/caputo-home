@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { authFetch } from '../lib/authFetch'
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
 
@@ -85,7 +86,7 @@ export function usePushNotifications(userId) {
 
   const sendPushNotification = async (householdId, changedByUserId, message) => {
     try {
-      await fetch('/.netlify/functions/send-push', {
+      await authFetch('/.netlify/functions/send-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

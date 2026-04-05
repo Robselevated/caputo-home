@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { authFetch } from '../lib/authFetch'
 import { TAXONOMY } from '../lib/constants'
 
 // Keywords to catch items Claude miscategorizes as "Other"
@@ -92,7 +93,7 @@ export function useScanSession(householdId) {
       const { base64, media_type } = await fileToBase64(file)
 
       // Call Netlify function with base64 image
-      const response = await fetch('/.netlify/functions/claude-scan', {
+      const response = await authFetch('/.netlify/functions/claude-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
