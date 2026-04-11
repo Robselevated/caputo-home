@@ -292,6 +292,13 @@ export default function RecipeDetail() {
           </div>
         )}
 
+        {recipe.notes && (
+          <div className="card mt-4">
+            <h2 className="font-heading font-semibold text-charcoal mb-3">Notes</h2>
+            <p className="text-sm text-warmgray-600 whitespace-pre-wrap">{recipe.notes}</p>
+          </div>
+        )}
+
         {recipe.source_image_url && (
           <div className="card mt-4">
             <h2 className="font-heading font-semibold text-charcoal mb-3">Recipe Source</h2>

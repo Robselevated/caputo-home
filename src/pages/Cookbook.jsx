@@ -86,6 +86,7 @@ export default function Cookbook() {
   const [cookTime, setCookTime] = useState('')
   const [tags, setTags] = useState('')
   const [instructions, setInstructions] = useState('')
+  const [recipeNotes, setRecipeNotes] = useState('')
   const [ingredients, setIngredients] = useState([{ name: '', qty: '', unit: '', notes: '', section: '' }])
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState(null)
@@ -218,7 +219,8 @@ export default function Cookbook() {
       })
 
       if (!response.ok) {
-        setScanError('Failed to scan recipe image')
+        const errBody = await response.json().catch(() => ({}))
+        setScanError(errBody.error || 'Failed to scan recipe image')
         setScanning(false)
         return
       }
@@ -288,6 +290,7 @@ export default function Cookbook() {
       cook_time: cookTime ? Number(cookTime) : null,
       tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       instructions: instructions.trim() || null,
+      notes: recipeNotes.trim() || null,
       ingredients: ingredients.filter(ing => ing.name.trim()),
     }
     const { error } = await createRecipe(recipe, user.id)
@@ -295,7 +298,7 @@ export default function Cookbook() {
       setName(''); setDescription(''); setImageUrl(''); setSourceImageUrl('')
       setSourceImageUrls([])
       setServings(''); setPrepTime(''); setCookTime(''); setTags('')
-      setInstructions(''); setScanError(null)
+      setInstructions(''); setRecipeNotes(''); setScanError(null)
       setIngredients([{ name: '', qty: '', unit: '', notes: '', section: '' }])
       setShowAdd(false)
     }
@@ -594,6 +597,7 @@ export default function Cookbook() {
                 </button>
               </div>
               <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Instructions" className="input-field focus:ring-section-cookbook min-h-[100px]" rows={4} />
+              <textarea value={recipeNotes} onChange={(e) => setRecipeNotes(e.target.value)} placeholder="Notes, tweaks, modifications..." className="input-field focus:ring-section-cookbook min-h-[60px]" rows={2} />
               <button type="submit" disabled={!name.trim()} className="btn-primary bg-section-cookbook w-full disabled:opacity-40">
                 Create Recipe
               </button>

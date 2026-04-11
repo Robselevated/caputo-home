@@ -30,6 +30,7 @@ export default function RecipeEdit() {
   const [cookTime, setCookTime] = useState('')
   const [tags, setTags] = useState('')
   const [instructions, setInstructions] = useState('')
+  const [notes, setNotes] = useState('')
   const [ingredients, setIngredients] = useState([{ name: '', qty: '', unit: '', notes: '', section: '' }])
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export default function RecipeEdit() {
     setCookTime(data.cook_time ? String(data.cook_time) : '')
     setTags(data.tags ? data.tags.join(', ') : '')
     setInstructions(data.instructions || '')
+    setNotes(data.notes || '')
 
     if (data.ingredients && data.ingredients.length > 0) {
       setIngredients(data.ingredients.map(ing => ({
@@ -183,6 +185,7 @@ export default function RecipeEdit() {
       cook_time: cookTime ? Number(cookTime) : null,
       tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       instructions: instructions.trim() || null,
+      notes: notes.trim() || null,
     }
 
     const filteredIngredients = ingredients.filter(ing => ing.name.trim())
@@ -549,6 +552,17 @@ export default function RecipeEdit() {
             className="input-field focus:ring-section-cookbook min-h-[120px]"
             rows={5}
           />
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-warmgray-600">Notes</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Your notes, tweaks, and modifications..."
+              className="input-field focus:ring-section-cookbook min-h-[80px]"
+              rows={3}
+            />
+          </div>
 
           <div className="flex gap-3 pt-2">
             <button

@@ -129,6 +129,7 @@ export function useRecipes(householdId) {
         cook_time: recipe.cook_time || null,
         instructions: recipe.instructions || null,
         tags: recipe.tags || [],
+        notes: recipe.notes || null,
         source_url: null,
         created_by: userId,
       })
@@ -226,6 +227,7 @@ export function useRecipes(householdId) {
       cook_time: updates.cook_time || null,
       instructions: updates.instructions || null,
       tags: updates.tags || [],
+      notes: updates.notes || null,
     }
     if ('source_image_url' in updates) {
       updateData.source_image_url = updates.source_image_url || null

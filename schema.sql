@@ -167,6 +167,7 @@ create table recipes (
   image_url text,                  -- finished dish display image
   source_image_url text,           -- uploaded recipe source image (cookbook page, card, screenshot)
   source_url text,                 -- original URL if imported
+  notes text,                      -- user notes / modifications / tips
   created_by uuid references users(id) on delete set null,
   created_at timestamptz default now()
 );

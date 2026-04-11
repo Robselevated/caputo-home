@@ -59,6 +59,7 @@ export function useInventory(householdId, location) {
   }
 
   const updateQty = async (id, newQty, userId) => {
+    if (!householdId) return
     await supabase.from('inventory_items').update({
       qty: Math.max(0, newQty),
       updated_by: userId,
@@ -67,6 +68,7 @@ export function useInventory(householdId, location) {
   }
 
   const updateItem = async (id, changes, userId) => {
+    if (!householdId) return
     await supabase.from('inventory_items').update({
       ...changes,
       updated_by: userId,
@@ -75,10 +77,20 @@ export function useInventory(householdId, location) {
   }
 
   const deleteItem = async (id) => {
-    await supabase.from('inventory_items').delete().eq('id', id)
+    if (!householdId) return { error: 'No household' }
+    // Optimistic removal
+    setItems(prev => prev.filter(item => item.id !== id))
+    const { error } = await supabase.from('inventory_items').delete().eq('id', id)
+    if (error) {
+      // Revert on failure
+      fetchItems()
+      return { error }
+    }
+    return { error: null }
   }
 
   const addToGroceryList = async (item, userId) => {
+    if (!householdId) return
     await supabase.from('grocery_items').insert({
       household_id: householdId,
       name: item.name,
