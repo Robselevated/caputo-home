@@ -28,8 +28,17 @@ export function useRecipes(householdId) {
         schema: 'public',
         table: 'recipes',
         filter: `household_id=eq.${householdId}`,
-      }, () => {
-        fetchRecipes()
+      }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          setRecipes(prev => prev.filter(r => r.id !== payload.old.id))
+        } else if (payload.eventType === 'UPDATE') {
+          setRecipes(prev => prev.map(r =>
+            r.id === payload.new.id ? { ...r, ...payload.new } : r
+          ))
+        } else {
+          // INSERT: refetch to get proper ordering
+          fetchRecipes()
+        }
       })
       .subscribe()
 
@@ -37,23 +46,20 @@ export function useRecipes(householdId) {
   }, [householdId, fetchRecipes])
 
   const getRecipe = async (id) => {
-    const { data: recipe, error: recipeError } = await supabase
+    const { data, error } = await supabase
       .from('recipes')
-      .select('*')
+      .select('*, ingredients:recipe_ingredients(*)')
       .eq('id', id)
       .single()
 
-    if (recipeError) return { error: recipeError }
+    if (error) return { error }
 
-    const { data: ingredients, error: ingredientsError } = await supabase
-      .from('recipe_ingredients')
-      .select('*')
-      .eq('recipe_id', id)
-      .order('position', { ascending: true })
+    // Sort ingredients by position client-side (Supabase nested selects don't support order)
+    if (data.ingredients) {
+      data.ingredients.sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    }
 
-    if (ingredientsError) return { error: ingredientsError }
-
-    return { data: { ...recipe, ingredients } }
+    return { data }
   }
 
   const importRecipe = async (url, userId) => {

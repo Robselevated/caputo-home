@@ -32,8 +32,17 @@ export function useInventory(householdId, location) {
         table: 'inventory_items',
         filter: `household_id=eq.${householdId}`,
       }, (payload) => {
-        // Only refetch if the change is for our location
-        if (payload.new?.location === location || payload.old?.location === location) {
+        const isOurLocation = payload.new?.location === location || payload.old?.location === location
+        if (!isOurLocation) return
+
+        if (payload.eventType === 'DELETE') {
+          setItems(prev => prev.filter(item => item.id !== payload.old.id))
+        } else if (payload.eventType === 'UPDATE' && payload.new?.location === location) {
+          setItems(prev => prev.map(item =>
+            item.id === payload.new.id ? { ...item, ...payload.new } : item
+          ))
+        } else {
+          // INSERT or location changed, refetch to get proper ordering and joins
           fetchItems()
         }
       })
@@ -43,6 +52,7 @@ export function useInventory(householdId, location) {
   }, [householdId, location, fetchItems])
 
   const addItem = async ({ name, qty, unit, category, subcategory, notes, userId }) => {
+    if (!householdId) return { error: 'No household' }
     const defaultUnit = DEFAULT_UNITS[location]?.[category] || 'count'
     const { error } = await supabase.from('inventory_items').insert({
       household_id: householdId,
@@ -60,8 +70,13 @@ export function useInventory(householdId, location) {
 
   const updateQty = async (id, newQty, userId) => {
     if (!householdId) return
+    const clamped = Math.max(0, newQty)
+    // Optimistic update
+    setItems(prev => prev.map(item =>
+      item.id === id ? { ...item, qty: clamped } : item
+    ))
     await supabase.from('inventory_items').update({
-      qty: Math.max(0, newQty),
+      qty: clamped,
       updated_by: userId,
       updated_at: new Date().toISOString(),
     }).eq('id', id)
@@ -78,11 +93,9 @@ export function useInventory(householdId, location) {
 
   const deleteItem = async (id) => {
     if (!householdId) return { error: 'No household' }
-    // Optimistic removal
     setItems(prev => prev.filter(item => item.id !== id))
     const { error } = await supabase.from('inventory_items').delete().eq('id', id)
     if (error) {
-      // Revert on failure
       fetchItems()
       return { error }
     }

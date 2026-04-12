@@ -7,10 +7,12 @@ export function useRecentlyBought(householdId) {
 
   const fetchItems = useCallback(async () => {
     if (!householdId) return
+    const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data, error } = await supabase
       .from('recently_bought')
       .select('*, bought_by_user:users!recently_bought_bought_by_fkey(name)')
       .eq('household_id', householdId)
+      .gte('bought_at', cutoff)
       .order('bought_at', { ascending: false })
 
     if (!error && data) setItems(data)

@@ -173,6 +173,8 @@ export default function RecipeDetail() {
           <img
             src={recipe.image_url}
             alt={recipe.name}
+            width="400"
+            height="192"
             className="w-full h-48 md:h-64 lg:h-80 object-cover rounded-2xl mb-4"
             onError={(e) => { e.target.style.display = 'none' }}
           />
@@ -302,7 +304,7 @@ export default function RecipeDetail() {
         {recipe.source_image_url && (
           <div className="card mt-4">
             <h2 className="font-heading font-semibold text-charcoal mb-3">Recipe Source</h2>
-            <img src={recipe.source_image_url} alt="Recipe source" className="w-full rounded-xl" onError={(e) => { e.target.style.display = 'none' }} />
+            <img src={recipe.source_image_url} alt="Recipe source" loading="lazy" className="w-full rounded-xl" onError={(e) => { e.target.style.display = 'none' }} />
           </div>
         )}
 

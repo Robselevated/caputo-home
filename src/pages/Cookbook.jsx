@@ -724,7 +724,7 @@ export default function Cookbook() {
                 >
                   <div className="h-28 overflow-hidden">
                     {recipe.image_url ? (
-                      <img src={recipe.image_url} alt={recipe.name} className="w-full h-full object-cover" onError={(e) => { e.target.parentElement.innerHTML = '<div class="w-full h-full bg-section-cookbook/10 flex items-center justify-center"><span class="material-symbols-outlined text-4xl text-section-cookbook/30">menu_book</span></div>' }} />
+                      <img src={recipe.image_url} alt={recipe.name} loading="lazy" width="176" height="112" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none' }} />
                     ) : (
                       <div className="w-full h-full bg-section-cookbook/10 flex items-center justify-center">
                         <span className="material-symbols-outlined text-4xl text-section-cookbook/30">menu_book</span>
@@ -952,7 +952,7 @@ export default function Cookbook() {
                 >
                   <div className="relative">
                     {recipe.image_url ? (
-                      <img src={recipe.image_url} alt={recipe.name} className="w-full h-32 object-cover" onError={(e) => { e.target.parentElement.innerHTML = '<div class="w-full h-32 bg-section-cookbook/10 flex items-center justify-center"><span class="material-symbols-outlined text-5xl text-section-cookbook/30">menu_book</span></div>' }} />
+                      <img src={recipe.image_url} alt={recipe.name} loading="lazy" width="400" height="128" className="w-full h-32 object-cover" onError={(e) => { e.target.style.display = 'none' }} />
                     ) : (
                       <div className="w-full h-32 bg-section-cookbook/10 flex items-center justify-center">
                         <span className="material-symbols-outlined text-5xl text-section-cookbook/30">menu_book</span>

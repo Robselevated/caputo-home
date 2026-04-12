@@ -73,6 +73,7 @@ export function useRecipeMatch(householdId) {
     const decremented = []
     const nowOut = []
     const skipped = []
+    const updates = []
 
     for (const item of matchResult.inInventory) {
       const inv = item.inventoryItem
@@ -80,17 +81,21 @@ export function useRecipeMatch(householdId) {
 
       if (unitsMatch) {
         const newQty = Math.max(0, inv.qty - (item.qty || 1))
-        await supabase.from('inventory_items').update({
-          qty: newQty,
-          updated_by: userId,
-          updated_at: new Date().toISOString(),
-        }).eq('id', inv.id)
+        updates.push(
+          supabase.from('inventory_items').update({
+            qty: newQty,
+            updated_by: userId,
+            updated_at: new Date().toISOString(),
+          }).eq('id', inv.id)
+        )
         decremented.push({ ...item, oldQty: inv.qty, newQty })
         if (newQty === 0) nowOut.push(item)
       } else {
         skipped.push({ ...item, reason: `${item.unit} vs ${inv.unit}` })
       }
     }
+
+    await Promise.all(updates)
 
     return { decremented, nowOut, skipped }
   }

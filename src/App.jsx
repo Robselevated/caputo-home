@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
+import { AuthProvider } from './hooks/useAuth'
 
 // Lazy-load pages so only the active route downloads on first load
 const Login = lazy(() => import('./pages/Login'))
@@ -28,6 +29,7 @@ function PageLoader() {
 export default function App() {
   return (
     <ErrorBoundary>
+      <AuthProvider>
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -57,6 +59,7 @@ export default function App() {
           />
         </Routes>
       </Suspense>
+      </AuthProvider>
     </ErrorBoundary>
   )
 }
