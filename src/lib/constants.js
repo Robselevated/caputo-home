@@ -27,6 +27,63 @@ export function getDefaultStore(itemName) {
   return isMatch ? "Pilgrim's" : 'Grocery Store'
 }
 
+// Item-to-location mapping for auto-adding checked grocery items to inventory
+const LOCATION_RULES = [
+  // Fridge: produce (reuse existing PRODUCE_KEYWORDS)
+  { keywords: PRODUCE_KEYWORDS, location: 'fridge', category: 'Fresh Produce' },
+  // Fridge: dairy
+  { keywords: ['milk', 'cream cheese', 'sour cream', 'half and half', 'heavy cream', 'whipping cream', 'cream', 'cheese', 'yogurt', 'butter', 'egg', 'eggs', 'cottage', 'mozzarella', 'parmesan', 'cheddar', 'provolone', 'swiss', 'gouda', 'brie', 'ricotta'], location: 'fridge', category: 'Dairy' },
+  // Fridge: deli
+  { keywords: ['deli', 'ham', 'turkey breast', 'salami', 'pepperoni', 'prosciutto', 'lunch meat', 'roast beef'], location: 'fridge', category: 'Deli Meat' },
+  // Fridge: bacon
+  { keywords: ['bacon'], location: 'fridge', category: 'Bacon' },
+  // Fridge: beverages
+  { keywords: ['juice', 'kombucha', 'creamer', 'almond milk', 'oat milk'], location: 'fridge', category: 'Beverages' },
+  // Fridge: condiments
+  { keywords: ['ranch', 'ketchup', 'mustard', 'mayo', 'mayonnaise', 'hot sauce', 'soy sauce', 'sriracha', 'salsa', 'hummus', 'guacamole', 'pesto', 'relish', 'horseradish', 'tartar sauce'], location: 'fridge', category: 'Condiments' },
+  // Fridge: broth
+  { keywords: ['broth', 'stock'], location: 'fridge', category: 'Broth/Stock' },
+  // Fridge: bread (fresh)
+  { keywords: ['bread', 'tortilla', 'pita', 'naan', 'bagel', 'english muffin', 'bun', 'roll', 'croissant'], location: 'fridge', category: 'Bread' },
+  // Freezer: meats (check before generic frozen)
+  { keywords: ['chicken breast', 'chicken thigh', 'chicken wing', 'chicken tender', 'chicken drum', 'whole chicken'], location: 'freezer', category: 'Chicken' },
+  { keywords: ['ground beef', 'ground turkey', 'ground chicken', 'ground pork', 'italian sausage', 'breakfast sausage', 'kielbasa', 'bratwurst', 'chorizo', 'sausage'], location: 'freezer', category: 'Ground Meat' },
+  { keywords: ['steak', 'ribeye', 'ny strip', 'sirloin', 'flank', 'brisket', 'chuck roast', 'short rib', 't-bone'], location: 'freezer', category: 'Beef' },
+  { keywords: ['pork chop', 'pork tenderloin', 'pork shoulder', 'pork rib', 'pork loin', 'pork butt'], location: 'freezer', category: 'Pork' },
+  { keywords: ['turkey breast', 'whole turkey', 'turkey cutlet'], location: 'freezer', category: 'Turkey' },
+  { keywords: ['salmon', 'tilapia', 'cod', 'halibut', 'mahi', 'tuna steak', 'swordfish', 'trout'], location: 'freezer', category: 'Fish' },
+  { keywords: ['shrimp', 'scallop', 'crab', 'lobster', 'clam', 'mussel', 'calamari'], location: 'freezer', category: 'Seafood' },
+  { keywords: ['frozen', 'ice cream', 'popsicle', 'frozen pizza', 'frozen waffle', 'frozen fries', 'tater tot', 'hot pocket', 'tv dinner'], location: 'freezer', category: 'Frozen Meals' },
+  // Pantry
+  { keywords: ['pasta', 'spaghetti', 'penne', 'fettuccine', 'linguine', 'rigatoni', 'macaroni', 'rotini', 'farfalle', 'orzo', 'lasagna', 'angel hair', 'elbow'], location: 'pantry', category: 'Pasta' },
+  { keywords: ['canned', 'can of', 'cans of', 'beans', 'chickpea', 'lentil', 'diced tomato', 'crushed tomato', 'tomato paste', 'tomato sauce', 'coconut milk'], location: 'pantry', category: 'Canned Goods' },
+  { keywords: ['rice', 'flour', 'sugar', 'oats', 'oatmeal', 'quinoa', 'cereal', 'granola', 'cornmeal', 'panko', 'breadcrumb'], location: 'pantry', category: 'Dry Goods' },
+  { keywords: ['chips', 'crackers', 'pretzels', 'popcorn', 'granola bar', 'snack', 'trail mix', 'nuts', 'almonds', 'cashews', 'peanuts', 'pistachios'], location: 'pantry', category: 'Snacks' },
+  { keywords: ['olive oil', 'vegetable oil', 'canola oil', 'coconut oil', 'avocado oil', 'sesame oil', 'cooking spray', 'vinegar'], location: 'pantry', category: 'Oils' },
+  { keywords: ['cumin', 'paprika', 'garlic powder', 'onion powder', 'cinnamon', 'pepper flake', 'chili powder', 'cayenne', 'turmeric', 'nutmeg', 'italian seasoning', 'taco seasoning', 'everything bagel', 'seasoning', 'spice'], location: 'pantry', category: 'Spices' },
+  { keywords: ['baking soda', 'baking powder', 'vanilla extract', 'cocoa', 'chocolate chip', 'yeast', 'cornstarch', 'powdered sugar', 'brown sugar', 'confectioner'], location: 'pantry', category: 'Baking' },
+  { keywords: ['marinara', 'pasta sauce', 'bbq sauce', 'teriyaki', 'worcestershire', 'enchilada sauce', 'alfredo', 'hoisin', 'fish sauce', 'oyster sauce'], location: 'pantry', category: 'Sauces & Condiments' },
+  { keywords: ['coffee', 'tea bag', 'hot chocolate', 'water bottle', 'soda', 'sparkling water', 'gatorade', 'energy drink'], location: 'pantry', category: 'Beverages' },
+  // Home goods
+  { keywords: ['paper towel', 'toilet paper', 'napkin', 'tissue', 'paper plate', 'paper cup'], location: 'home_goods', category: 'Paper Products' },
+  { keywords: ['dish soap', 'hand soap', 'cleaner', 'sponge', 'bleach', 'wipe', 'disinfectant', 'lysol', 'clorox'], location: 'home_goods', category: 'Cleaning' },
+  { keywords: ['trash bag', 'garbage bag', 'ziploc', 'zip lock', 'aluminum foil', 'plastic wrap', 'parchment', 'sandwich bag', 'freezer bag'], location: 'home_goods', category: 'Trash & Storage' },
+  { keywords: ['shampoo', 'conditioner', 'toothpaste', 'toothbrush', 'deodorant', 'lotion', 'razor', 'body wash', 'sunscreen', 'floss'], location: 'home_goods', category: 'Personal Care' },
+  { keywords: ['advil', 'tylenol', 'ibuprofen', 'vitamin', 'medicine', 'bandaid', 'band-aid', 'pepto', 'tums', 'allergy'], location: 'home_goods', category: 'Medicine' },
+  { keywords: ['detergent', 'laundry', 'dryer sheet', 'fabric softener', 'stain remover', 'tide', 'downy'], location: 'home_goods', category: 'Laundry' },
+]
+
+export function getDefaultLocation(itemName) {
+  if (!itemName) return { location: 'pantry', category: 'Other' }
+  const lower = itemName.toLowerCase()
+  for (const rule of LOCATION_RULES) {
+    if (rule.keywords.some(kw => lower.includes(kw))) {
+      return { location: rule.location, category: rule.category }
+    }
+  }
+  return { location: 'pantry', category: 'Other' }
+}
+
 // Common units
 export const UNITS = ['count', 'slices', 'lbs', 'oz', 'bags', 'boxes', 'cans', 'jars', 'bottles', 'packages']
 

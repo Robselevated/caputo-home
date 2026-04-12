@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { cacheGroceryItems, getCachedGroceryItems, queueWrite } from '../lib/db'
+import { getDefaultLocation, DEFAULT_UNITS } from '../lib/constants'
 
 export function useGroceryList(householdId) {
   const [items, setItems] = useState([])
@@ -152,6 +153,20 @@ export function useGroceryList(householdId) {
         householdId,
         userId,
       })
+      // Queue inventory add for when back online
+      const { location, category } = getDefaultLocation(item.name)
+      await queueWrite({
+        type: 'inventory_add',
+        data: {
+          household_id: householdId,
+          name: item.name,
+          qty: item.qty || 1,
+          unit: item.unit || DEFAULT_UNITS[location]?.[category] || 'count',
+          location,
+          category,
+          updated_by: userId,
+        },
+      })
       return
     }
 
@@ -176,6 +191,18 @@ export function useGroceryList(householdId) {
       { household_id: householdId, name: item.name },
       { onConflict: 'household_id,name' }
     )
+
+    // Auto-add to inventory
+    const { location, category } = getDefaultLocation(item.name)
+    await supabase.from('inventory_items').insert({
+      household_id: householdId,
+      name: item.name,
+      qty: item.qty || 1,
+      unit: item.unit || DEFAULT_UNITS[location]?.[category] || 'count',
+      location,
+      category,
+      updated_by: userId,
+    })
 
     const { error: deleteError } = await supabase.from('grocery_items').delete().eq('id', item.id)
     if (deleteError) {

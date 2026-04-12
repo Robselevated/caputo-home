@@ -108,6 +108,10 @@ export function useOfflineSync(householdId) {
               ))
               break
             }
+            case 'inventory_add': {
+              await supabase.from('inventory_items').insert(write.data)
+              break
+            }
           }
           await clearWrite(write.id)
         } catch (err) {
