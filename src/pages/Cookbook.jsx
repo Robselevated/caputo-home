@@ -51,6 +51,24 @@ function getTagIcon(tag) {
   return 'restaurant'
 }
 
+function compressImage(file, maxWidth = 1500, quality = 0.8) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = Math.min(1, maxWidth / img.width)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality)
+    }
+    img.src = url
+  })
+}
+
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
@@ -175,11 +193,12 @@ export default function Cookbook() {
         }
       }
 
-      // Upload all source images to storage and convert to base64
+      // Upload originals to storage, compress for API payload
       const uploadedUrls = []
       const imagesPayload = []
 
       for (const file of files) {
+        // Upload original to Supabase storage
         const ext = file.name.split('.').pop()
         const path = `${householdId}/source-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`
         const { error: uploadError } = await supabase.storage
@@ -193,13 +212,15 @@ export default function Cookbook() {
           uploadedUrls.push(urlData.publicUrl)
         }
 
+        // Compress for API payload (max 1500px wide, JPEG 80%)
+        const compressed = await compressImage(file)
         const base64 = await new Promise((resolve, reject) => {
           const reader = new FileReader()
           reader.onload = () => resolve(reader.result.split(',')[1])
           reader.onerror = reject
-          reader.readAsDataURL(file)
+          reader.readAsDataURL(compressed)
         })
-        imagesPayload.push({ base64, media_type: file.type || 'image/jpeg' })
+        imagesPayload.push({ base64, media_type: 'image/jpeg' })
       }
 
       if (uploadedUrls.length > 0) {
@@ -471,7 +492,7 @@ export default function Cookbook() {
               />
               {importError && (
                 <div className="text-sm text-red-600 bg-red-50 p-2 rounded-xl">
-                  {importError}
+                  {typeof importError === 'string' ? importError : importError.message || 'Import failed'}
                 </div>
               )}
               <button

@@ -71,8 +71,8 @@ export function useRecipes(householdId) {
       })
 
       if (!response.ok) {
-        const error = await response.text()
-        return { error: error || 'Failed to parse recipe' }
+        const errBody = await response.json().catch(() => null)
+        return { error: errBody?.error || 'Failed to parse recipe' }
       }
 
       const parsed = await response.json()
@@ -174,8 +174,8 @@ export function useRecipes(householdId) {
       })
 
       if (!response.ok) {
-        const error = await response.text()
-        return { error: error || 'Failed to parse recipe' }
+        const errBody = await response.json().catch(() => null)
+        return { error: errBody?.error || 'Failed to parse recipe' }
       }
 
       const parsed = await response.json()
