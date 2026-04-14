@@ -4,12 +4,9 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 
-// Auto-reload when service worker updates to new version
+// VitePWA registerType: 'autoUpdate' handles SW lifecycle automatically.
+// Just check for updates on load — no manual reload needed.
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.location.reload()
-  })
-  // Force update check on every page load
   navigator.serviceWorker.ready.then(reg => reg.update())
 }
 

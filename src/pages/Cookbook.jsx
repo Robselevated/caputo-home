@@ -52,7 +52,8 @@ function getTagIcon(tag) {
 }
 
 function compressImage(file, maxWidth = 1500, quality = 0.8) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Image compression timed out')), 15000)
     const img = new Image()
     const url = URL.createObjectURL(file)
     img.onload = () => {
@@ -63,7 +64,16 @@ function compressImage(file, maxWidth = 1500, quality = 0.8) {
       canvas.height = Math.round(img.height * scale)
       const ctx = canvas.getContext('2d')
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality)
+      canvas.toBlob((blob) => {
+        clearTimeout(timeout)
+        if (!blob) return reject(new Error('Image compression failed'))
+        resolve(blob)
+      }, 'image/jpeg', quality)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      clearTimeout(timeout)
+      reject(new Error('Failed to load image'))
     }
     img.src = url
   })
