@@ -208,9 +208,12 @@ function stripScriptsAndStyles(html) {
 }
 
 async function fetchContent(url) {
-  // Try direct fetch first
+  // Try direct fetch first (5s timeout)
   try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 5000)
     const resp = await fetch(url, {
+      signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -218,6 +221,7 @@ async function fetchContent(url) {
       },
       redirect: 'follow',
     })
+    clearTimeout(timer)
     if (resp.ok) {
       return await resp.text()
     }
@@ -309,10 +313,11 @@ export async function handler(event) {
       contextParts.push(`\n--- DETECTED INGREDIENT SECTIONS ---\nThe recipe HTML has these ingredient group headers: ${sectionHints.map(s => `"${s}"`).join(', ')}. You MUST assign each ingredient to the correct section.\n---`)
     }
 
-    // Call Claude API to parse the recipe
+    // Call Claude API to parse the recipe (22s timeout to fit in Netlify's 26s limit)
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4096,
+      timeout: 22000,
       messages: [
         {
           role: 'user',

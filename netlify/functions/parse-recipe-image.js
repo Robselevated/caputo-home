@@ -98,6 +98,7 @@ export async function handler(event) {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: isMulti ? 8192 : 4096,
+      timeout: 22000,
       messages: [
         {
           role: 'user',

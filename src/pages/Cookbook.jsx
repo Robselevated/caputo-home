@@ -203,24 +203,25 @@ export default function Cookbook() {
         }
       }
 
-      // Upload originals to storage, compress for API payload
-      const uploadedUrls = []
+      // Compress images for API payload (don't block on storage upload)
       const imagesPayload = []
+      const storageUploads = []
 
       for (const file of files) {
-        // Upload original to Supabase storage
+        // Kick off storage upload in background (non-blocking)
         const ext = file.name.split('.').pop()
         const path = `${householdId}/source-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`
-        const { error: uploadError } = await supabase.storage
-          .from('recipe-images')
-          .upload(path, file, { upsert: true })
-
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage
-            .from('recipe-images')
-            .getPublicUrl(path)
-          uploadedUrls.push(urlData.publicUrl)
-        }
+        storageUploads.push(
+          supabase.storage.from('recipe-images').upload(path, file, { upsert: true })
+            .then(({ error }) => {
+              if (!error) {
+                const { data: urlData } = supabase.storage.from('recipe-images').getPublicUrl(path)
+                return urlData.publicUrl
+              }
+              return null
+            })
+            .catch(() => null)
+        )
 
         // Compress for API payload (max 1500px wide, JPEG 80%)
         const compressed = await compressImage(file)
@@ -233,10 +234,14 @@ export default function Cookbook() {
         imagesPayload.push({ base64, media_type: 'image/jpeg' })
       }
 
-      if (uploadedUrls.length > 0) {
-        setSourceImageUrls(uploadedUrls)
-        setSourceImageUrl(uploadedUrls[0])
-      }
+      // Collect storage URLs in background (don't block the API call)
+      Promise.all(storageUploads).then(urls => {
+        const uploaded = urls.filter(Boolean)
+        if (uploaded.length > 0) {
+          setSourceImageUrls(uploaded)
+          setSourceImageUrl(uploaded[0])
+        }
+      })
 
       // Send single or multi-image request
       const body = imagesPayload.length === 1
