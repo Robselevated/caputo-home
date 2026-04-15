@@ -9,13 +9,21 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Safety timeout: if auth hasn't resolved in 5s, stop blocking the UI
+    const timeout = setTimeout(() => setLoading(false), 5000)
+
     supabase.auth.getSession()
-      .then(({ data: { session } }) => {
+      .then(async ({ data: { session } }) => {
         setUser(session?.user ?? null)
-        if (session?.user) fetchProfile(session.user.id)
-        else setLoading(false)
+        if (session?.user) {
+          await fetchProfile(session.user.id)
+        } else {
+          setLoading(false)
+        }
+        clearTimeout(timeout)
       })
       .catch(() => {
+        clearTimeout(timeout)
         setLoading(false)
       })
 
@@ -30,7 +38,10 @@ export function AuthProvider({ children }) {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function fetchProfile(userId) {
