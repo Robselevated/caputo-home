@@ -59,13 +59,8 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const signIn = async () => {
-    return supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
+  const signIn = async (email, password) => {
+    return supabase.auth.signInWithPassword({ email, password })
   }
 
   const signOut = async () => {
