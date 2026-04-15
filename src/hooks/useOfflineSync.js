@@ -109,7 +109,21 @@ export function useOfflineSync(householdId) {
               break
             }
             case 'inventory_add': {
-              await supabase.from('inventory_items').insert(write.data)
+              const { data: inv } = await supabase
+                .from('inventory_items')
+                .select('id, qty')
+                .eq('household_id', write.data.household_id)
+                .ilike('name', write.data.name)
+                .limit(1)
+                .single()
+              if (inv) {
+                await supabase.from('inventory_items').update({
+                  qty: (inv.qty || 0) + (write.data.qty || 1),
+                  updated_by: write.data.updated_by,
+                }).eq('id', inv.id)
+              } else {
+                await supabase.from('inventory_items').insert(write.data)
+              }
               break
             }
           }

@@ -192,17 +192,33 @@ export function useGroceryList(householdId) {
       { onConflict: 'household_id,name' }
     )
 
-    // Auto-add to inventory
+    // Auto-add to inventory (increment qty if already exists)
     const { location, category } = getDefaultLocation(item.name)
-    await supabase.from('inventory_items').insert({
-      household_id: householdId,
-      name: item.name,
-      qty: item.qty || 1,
-      unit: item.unit || DEFAULT_UNITS[location]?.[category] || 'count',
-      location,
-      category,
-      updated_by: userId,
-    })
+    const addQty = item.qty || 1
+    const { data: existing } = await supabase
+      .from('inventory_items')
+      .select('id, qty')
+      .eq('household_id', householdId)
+      .ilike('name', item.name)
+      .limit(1)
+      .single()
+
+    if (existing) {
+      await supabase.from('inventory_items').update({
+        qty: (existing.qty || 0) + addQty,
+        updated_by: userId,
+      }).eq('id', existing.id)
+    } else {
+      await supabase.from('inventory_items').insert({
+        household_id: householdId,
+        name: item.name,
+        qty: addQty,
+        unit: item.unit || DEFAULT_UNITS[location]?.[category] || 'count',
+        location,
+        category,
+        updated_by: userId,
+      })
+    }
 
     const { error: deleteError } = await supabase.from('grocery_items').delete().eq('id', item.id)
     if (deleteError) {
