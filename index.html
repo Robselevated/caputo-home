@@ -18,10 +18,35 @@
     <div id="root">
       <div id="splash" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh">
         <img src="/caputoappicon.png" alt="" width="64" height="64" style="border-radius:16px;margin-bottom:16px">
-        <div style="width:28px;height:28px;border:3px solid #d1ccc7;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite"></div>
+        <div id="splash-spinner" style="width:28px;height:28px;border:3px solid #d1ccc7;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite"></div>
       </div>
       <style>@keyframes sp{to{transform:rotate(360deg)}}</style>
     </div>
+    <script>
+      // Self-recovery: if the app hasn't loaded in 8 seconds, clear stale
+      // service worker cache and reload once to get fresh code.
+      setTimeout(function() {
+        if (!document.getElementById('splash')) return; // app loaded fine
+        if (sessionStorage.getItem('sw-reset')) return; // already tried once
+        sessionStorage.setItem('sw-reset', '1');
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(r) { r.unregister(); });
+            caches.keys().then(function(keys) {
+              Promise.all(keys.map(function(k) { return caches.delete(k); })).then(function() {
+                window.location.reload();
+              });
+            });
+          });
+        } else {
+          window.location.reload();
+        }
+      }, 8000);
+      // Clear the flag on successful load so recovery works again next time
+      window.addEventListener('load', function() {
+        setTimeout(function() { sessionStorage.removeItem('sw-reset'); }, 3000);
+      });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
