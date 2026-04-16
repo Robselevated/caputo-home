@@ -102,10 +102,24 @@ export default function GroceryList() {
   })
   const sensors = useSensors(pointerSensor, touchSensor)
 
-  // Request push notification permission on first load
+  const [showNotifBanner, setShowNotifBanner] = useState(false)
+
+  // Show notification banner if permission hasn't been granted or denied
   useEffect(() => {
-    if (permission === 'default') requestPermission()
+    if (permission === 'default' && !localStorage.getItem('notif-dismissed')) {
+      setShowNotifBanner(true)
+    }
   }, [permission])
+
+  const handleEnableNotifications = async () => {
+    await requestPermission()
+    setShowNotifBanner(false)
+  }
+
+  const handleDismissNotifications = () => {
+    setShowNotifBanner(false)
+    localStorage.setItem('notif-dismissed', '1')
+  }
 
   // Close store switcher on outside tap
   useEffect(() => {
@@ -253,7 +267,7 @@ export default function GroceryList() {
   const handleQuickAdd = async () => {
     if (!name.trim()) return
     await addItem({ name, qty: qty ? Number(qty) : 1, unit, store: store || 'Grocery Store', notes, userId: user.id })
-    sendPushNotification(householdId, user.id, `${profile?.name || 'Someone'} added ${name} to the grocery list`).catch(() => {})
+    sendPushNotification(householdId, user.id, 'added', name).catch(() => {})
     setName('')
     setQty('')
     setUnit('')
@@ -277,7 +291,7 @@ export default function GroceryList() {
       return
     }
     markChecked(item.id)
-    sendPushNotification(householdId, user.id, `${profile?.name || 'Someone'} checked off ${item.name}`).catch(() => {})
+    sendPushNotification(householdId, user.id, 'checked_off', item.name).catch(() => {})
     pendingChecks.current[item.id] = setTimeout(() => {
       delete pendingChecks.current[item.id]
       checkItem(item, user.id)
@@ -328,6 +342,15 @@ export default function GroceryList() {
   return (
     <div>
       <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} onSync={syncNow} />
+
+      {showNotifBanner && (
+        <div className="mx-6 mt-2 mb-0 bg-white border border-warmgray-200 rounded-xl p-3 flex items-center gap-3 shadow-dark-sm">
+          <span className="material-symbols-outlined text-section-grocery text-xl">notifications</span>
+          <p className="flex-1 text-xs text-charcoal">Get notified when the grocery list changes?</p>
+          <button onClick={handleEnableNotifications} className="text-xs font-semibold text-section-grocery">Enable</button>
+          <button onClick={handleDismissNotifications} className="text-xs text-warmgray-400">Dismiss</button>
+        </div>
+      )}
 
       <div className="px-6">
         {/* Hero Section */}

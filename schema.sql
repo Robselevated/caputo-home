@@ -152,6 +152,18 @@ create table scan_sessions (
 );
 
 -- ============================================================
+-- GROCERY NOTIFICATION QUEUE (batched push notifications)
+-- ============================================================
+create table grocery_notifications (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid references households(id) on delete cascade,
+  changed_by uuid references users(id) on delete set null,
+  action text not null,              -- 'added', 'checked_off', 'removed'
+  item_name text not null,
+  created_at timestamptz default now()
+);
+
+-- ============================================================
 -- RECIPES
 -- ============================================================
 create table recipes (

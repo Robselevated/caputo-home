@@ -84,7 +84,7 @@ export function usePushNotifications(userId) {
     }
   }
 
-  const sendPushNotification = async (householdId, changedByUserId, message) => {
+  const sendPushNotification = async (householdId, changedByUserId, action, itemName) => {
     try {
       await authFetch('/.netlify/functions/send-push', {
         method: 'POST',
@@ -92,7 +92,8 @@ export function usePushNotifications(userId) {
         body: JSON.stringify({
           household_id: householdId,
           changed_by_user_id: changedByUserId,
-          message,
+          action,
+          item_name: itemName,
         }),
       })
     } catch {
