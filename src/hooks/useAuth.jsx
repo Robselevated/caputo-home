@@ -9,23 +9,30 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Safety timeout: if auth hasn't resolved in 5s, stop blocking the UI
-    const timeout = setTimeout(() => setLoading(false), 5000)
+    // Safety timeout: if auth hasn't resolved in 3s, stop blocking the UI
+    const timeout = setTimeout(() => setLoading(false), 3000)
 
-    supabase.auth.getSession()
-      .then(async ({ data: { session } }) => {
+    async function initAuth() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
         setUser(session?.user ?? null)
         if (session?.user) {
           await fetchProfile(session.user.id)
         } else {
           setLoading(false)
         }
-        clearTimeout(timeout)
-      })
-      .catch(() => {
-        clearTimeout(timeout)
+      } catch {
         setLoading(false)
-      })
+      }
+    }
+
+    initAuth()
+
+    // Re-check auth when app returns from background (iOS PWA suspension)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') initAuth()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
@@ -40,6 +47,7 @@ export function AuthProvider({ children }) {
 
     return () => {
       clearTimeout(timeout)
+      document.removeEventListener('visibilitychange', handleVisibility)
       subscription.unsubscribe()
     }
   }, [])
