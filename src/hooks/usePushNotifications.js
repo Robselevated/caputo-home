@@ -65,22 +65,32 @@ export function usePushNotifications(userId) {
   }
 
   const subscribe = async () => {
+    let sub
     try {
       const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.subscribe({
+      sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       })
 
-      // Save subscription to user record
-      await supabase
+      const { error } = await supabase
         .from('users')
         .update({ push_subscription: sub.toJSON() })
         .eq('id', userId)
 
+      if (error) {
+        console.error('Failed to save push subscription:', error.message)
+        // Roll back the browser-side subscription so we don't leak an
+        // endpoint the server will never push to.
+        try { await sub.unsubscribe() } catch {}
+        return
+      }
       setSubscribed(true)
     } catch (err) {
       console.error('Push subscription failed:', err)
+      if (sub) {
+        try { await sub.unsubscribe() } catch {}
+      }
     }
   }
 

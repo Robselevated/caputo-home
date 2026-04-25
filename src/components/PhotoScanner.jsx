@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { validateImageFile } from '../lib/uploadValidation'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
@@ -8,6 +9,12 @@ export default function PhotoScanner({ onCapture, scanning, colorClass, icon = '
   const handleFileChange = (e) => {
     const file = e.target.files?.[0]
     if (file) {
+      const validationError = validateImageFile(file)
+      if (validationError) {
+        alert(validationError)
+        e.target.value = ''
+        return
+      }
       if (file.size > MAX_FILE_SIZE) {
         alert('Image is too large. Please use an image under 10MB.')
         e.target.value = ''

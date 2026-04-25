@@ -30,12 +30,15 @@ const defaultAccent = { bar: 'bg-warmgray-400', badge: 'bg-warmgray-100 text-war
 function formatRelativeTime(dateStr) {
   const date = new Date(dateStr)
   const now = new Date()
-  const diffMs = now - date
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  // Compare local calendar days, not elapsed milliseconds — otherwise
+  // an item from "yesterday evening" can show as "Today" right after midnight.
+  const dateLocal = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diffDays = Math.round((todayLocal - dateLocal) / (1000 * 60 * 60 * 24))
 
   if (diffDays === 0) return 'Today'
   if (diffDays === 1) return 'Yesterday'
-  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays > 1 && diffDays < 7) return `${diffDays} days ago`
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
@@ -78,12 +81,24 @@ export default function GroceryList() {
   const menuRef = useRef(null)
   const pendingChecks = useRef({})
 
-  // Clear pending check timeouts on unmount
+  // Flush pending check-offs on navigation/unmount so a user who taps
+  // and leaves within the 1.5s undo window doesn't lose their checkmark.
   useEffect(() => {
-    return () => {
-      Object.values(pendingChecks.current).forEach(clearTimeout)
+    const flush = () => {
+      const pending = pendingChecks.current
+      pendingChecks.current = {}
+      for (const id in pending) {
+        const entry = pending[id]
+        clearTimeout(entry.timeoutId)
+        try { checkItem(entry.item, entry.userId) } catch {}
+      }
     }
-  }, [])
+    window.addEventListener('pagehide', flush)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      flush()
+    }
+  }, [checkItem])
 
   // Add form state
   const [name, setName] = useState('')
@@ -285,17 +300,19 @@ export default function GroceryList() {
   const handleCheck = (item) => {
     if (item.checked) {
       // Undo: cancel pending removal and revert UI
-      clearTimeout(pendingChecks.current[item.id])
+      const entry = pendingChecks.current[item.id]
+      if (entry) clearTimeout(entry.timeoutId)
       delete pendingChecks.current[item.id]
       markUnchecked(item.id)
       return
     }
     markChecked(item.id)
     sendPushNotification(householdId, user.id, 'checked_off', item.name).catch(() => {})
-    pendingChecks.current[item.id] = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       delete pendingChecks.current[item.id]
       checkItem(item, user.id)
     }, 1500)
+    pendingChecks.current[item.id] = { timeoutId, item, userId: user.id }
   }
 
   const startEdit = (item) => {
