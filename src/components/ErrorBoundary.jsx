@@ -1,9 +1,11 @@
 import { Component } from 'react'
+import { recoverFromChunkError, looksLikeChunkError } from '../lib/recovery'
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
     this.state = { hasError: false, error: null }
+    this.autoRecoverTimer = null
   }
 
   static getDerivedStateFromError(error) {
@@ -12,6 +14,19 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('App crash:', error, info.componentStack)
+    if (looksLikeChunkError(error?.message)) {
+      this.autoRecoverTimer = setTimeout(() => {
+        recoverFromChunkError()
+      }, 800)
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.autoRecoverTimer) clearTimeout(this.autoRecoverTimer)
+  }
+
+  handleReload = () => {
+    recoverFromChunkError()
   }
 
   render() {
@@ -29,7 +44,7 @@ export default class ErrorBoundary extends Component {
               {this.state.error?.message || 'An unexpected error occurred'}
             </p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={this.handleReload}
               className="px-6 py-3 bg-olive text-white rounded-2xl font-medium active:scale-95 transition-transform shadow-dark"
             >
               Reload App

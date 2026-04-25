@@ -5,6 +5,14 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Asset rule must come first so missing /assets/* files return a real 404
+# instead of being caught by the SPA fallback (which would serve index.html
+# as text/html for a missing JS chunk and trigger a MIME-type crash).
+[[redirects]]
+  from = "/assets/*"
+  to = "/assets/:splat"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

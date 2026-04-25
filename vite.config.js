@@ -17,7 +17,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' instead of 'autoUpdate' so the new SW does NOT skipWaiting.
+      // We never wire up an updateSW() prompt, which means the new SW just
+      // stays in waiting state until all PWA windows close. Next launch
+      // activates it cleanly with matching HTML + chunk hashes.
+      registerType: 'prompt',
+      injectRegister: 'auto',
       includeAssets: ['icon-192.png', 'icon-512.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Caputo Home',
@@ -48,8 +53,15 @@ export default defineConfig({
         ]
       },
       workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
+        // Explicitly false (not just omitted): autoUpdate registerType
+        // otherwise enables these by default, which causes a new SW to
+        // hijack a running page that still references old chunk hashes.
+        // The result was "text/html is not a valid JavaScript MIME type"
+        // crashes when the user tapped a tab post-deploy. With these
+        // off, the new SW waits for all PWA windows to close, then new
+        // HTML + new chunks activate together on next launch.
+        skipWaiting: false,
+        clientsClaim: false,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
