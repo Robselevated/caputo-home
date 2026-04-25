@@ -79,6 +79,43 @@ function compressImage(file, maxWidth = 1500, quality = 0.8) {
   })
 }
 
+function mergeScannedRecipes(results) {
+  const valid = results.filter(r => r && !r._partial)
+  if (valid.length === 0) return results[0] || {}
+  if (valid.length === 1) return valid[0]
+
+  const pickFirst = (key) => valid.find(r => r[key] != null && r[key] !== '')?.[key] ?? null
+  const pickLongest = (key) => {
+    const vals = valid.map(r => r[key]).filter(v => typeof v === 'string' && v.length > 0)
+    return vals.sort((a, b) => b.length - a.length)[0] ?? null
+  }
+
+  const tags = [...new Set(valid.flatMap(r => r.tags || []))]
+
+  const seen = new Set()
+  const ingredients = []
+  for (const r of valid) {
+    for (const ing of (r.ingredients || [])) {
+      const key = `${(ing.section || '').toLowerCase().trim()}|${(ing.name || '').toLowerCase().trim()}|${ing.qty ?? ''}|${ing.unit || ''}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        ingredients.push(ing)
+      }
+    }
+  }
+
+  return {
+    name: pickLongest('name'),
+    description: pickFirst('description'),
+    servings: pickFirst('servings'),
+    prep_time: pickFirst('prep_time'),
+    cook_time: pickFirst('cook_time'),
+    tags,
+    instructions: pickLongest('instructions'),
+    ingredients,
+  }
+}
+
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime()
   const days = Math.floor(diff / (1000 * 60 * 60 * 24))
@@ -231,28 +268,40 @@ export default function Cookbook() {
       setSourceImageUrls(imageUrls)
       setSourceImageUrl(imageUrls[0])
 
-      // Send URLs (single or multi)
-      const body = imageUrls.length === 1
-        ? { image_url: imageUrls[0] }
-        : { image_urls: imageUrls }
+      // Fan out: one function call per image in parallel. Bundling all images
+      // into a single vision call exceeds Netlify's 10s sync function timeout
+      // for 4+ images. Per-image calls each finish in 3-5s, so Promise.all
+      // resolves in ~max(call_time), not the sum.
+      const scanOne = async (url, idx) => {
+        const response = await authFetch('/.netlify/functions/parse-recipe-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_url: url }),
+        })
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}))
+          const base = errBody.error || 'Failed to scan'
+          const detail = errBody.details ? ` — ${errBody.details}` : ''
+          throw new Error(`Image ${idx + 1}: ${base}${detail} (HTTP ${response.status})`)
+        }
+        return response.json()
+      }
 
-      const response = await authFetch('/.netlify/functions/parse-recipe-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
+      const settled = await Promise.allSettled(imageUrls.map((url, idx) => scanOne(url, idx)))
+      const succeeded = settled.filter(r => r.status === 'fulfilled').map(r => r.value)
+      const failed = settled.filter(r => r.status === 'rejected').map(r => r.reason?.message || 'unknown error')
 
-      if (!response.ok) {
-        const errBody = await response.json().catch(() => ({}))
-        const base = errBody.error || 'Failed to scan recipe image'
-        const detail = errBody.details ? ` — ${errBody.details}` : ''
-        const status = ` (HTTP ${response.status})`
-        setScanError(base + detail + status)
+      if (succeeded.length === 0) {
+        setScanError(failed[0] || 'All images failed to scan')
         setScanning(false)
         return
       }
 
-      const parsed = await response.json()
+      const parsed = mergeScannedRecipes(succeeded)
+
+      if (failed.length > 0) {
+        setScanError(`Scanned ${succeeded.length}/${imageUrls.length} images. ${failed[0]}`)
+      }
 
       // Pre-fill form with extracted data
       if (parsed.name) setName(parsed.name)

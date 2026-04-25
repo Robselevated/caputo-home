@@ -68,7 +68,9 @@ export async function handler(event) {
   const user = await verifyAuth(event)
   if (!user) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) }
 
-  const { allowed } = await checkRateLimit(user.id, 'parse-recipe-image', 15)
+  // Bumped from 15 → 60 because the client now fans out one call per image
+  // (typical scan: 3-7 images = 3-7 invocations). 60/hr = ~10 multi-image scans.
+  const { allowed } = await checkRateLimit(user.id, 'parse-recipe-image', 60)
   if (!allowed) return { statusCode: 429, body: JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }) }
 
   try {

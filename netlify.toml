@@ -5,17 +5,6 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Bump recipe-import functions from the 10s default to the 26s sync-function
-# platform max. Multi-image vision on 7 screenshots can run 15-25s through
-# Anthropic; the default kills the function before the API returns and the
-# gateway sends back a non-JSON 504 (which the frontend surfaces as a generic
-# "Failed to scan recipe image" because there's no error body to parse).
-[functions."parse-recipe-image"]
-  timeout = 26
-
-[functions."parse-recipe"]
-  timeout = 26
-
 # Asset rule must come first so missing /assets/* files return a real 404
 # instead of being caught by the SPA fallback (which would serve index.html
 # as text/html for a missing JS chunk and trigger a MIME-type crash).
