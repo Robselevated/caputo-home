@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useMealPicks } from '../hooks/useMealPicks'
 import { useRecipes } from '../hooks/useRecipes'
 import { useRecipeMatch } from '../hooks/useRecipeMatch'
-import { DEFAULT_SECTIONS, getSections, addCustomSection } from '../lib/mealSections'
+import { DEFAULT_SECTIONS, resolveSection } from '../lib/mealSections'
 
 function getInitial(name) {
   if (!name) return '?'
@@ -36,9 +36,6 @@ export default function MealPlanning() {
   const [groceryLoading, setGroceryLoading] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
   const [selectedSection, setSelectedSection] = useState(DEFAULT_SECTIONS[0])
-  const [showNewSection, setShowNewSection] = useState(false)
-  const [newSectionName, setNewSectionName] = useState('')
-  const [sections, setSections] = useState(() => getSections(householdId))
 
   const filteredRecipes = useMemo(() => {
     if (!recipeSearch) return recipes
@@ -49,22 +46,14 @@ export default function MealPlanning() {
   const picksBySection = useMemo(() => {
     const grouped = {}
     for (const pick of picks) {
-      const sec = pick.section || DEFAULT_SECTIONS[0]
+      const sec = resolveSection(pick.section)
       if (!grouped[sec]) grouped[sec] = []
       grouped[sec].push(pick)
     }
     return grouped
   }, [picks])
 
-  // Merge default sections, localStorage sections, and any sections found in picks
-  const allSections = useMemo(() => {
-    const fromPicks = Object.keys(picksBySection)
-    const merged = [...sections]
-    for (const s of fromPicks) {
-      if (!merged.includes(s)) merged.push(s)
-    }
-    return merged
-  }, [sections, picksBySection])
+  const allSections = DEFAULT_SECTIONS
 
   const handleAddFromCookbook = async (recipe) => {
     setAdding(true)
@@ -112,15 +101,6 @@ export default function MealPlanning() {
     }
     setTimeout(() => setSuccessMessage(null), 3000)
     setGroceryLoading(null)
-  }
-
-  const handleAddSection = () => {
-    const name = newSectionName.trim()
-    if (!name) return
-    const updated = addCustomSection(householdId, name)
-    setSections(updated)
-    setNewSectionName('')
-    setShowNewSection(false)
   }
 
   if (loading) {
@@ -245,42 +225,6 @@ export default function MealPlanning() {
           </section>
         )
       })}
-
-      {/* Add Section */}
-      {showNewSection ? (
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newSectionName}
-            onChange={(e) => setNewSectionName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAddSection()}
-            placeholder="Section name..."
-            className="input-field focus:ring-section-planning flex-1"
-            autoFocus
-          />
-          <button
-            onClick={handleAddSection}
-            disabled={!newSectionName.trim()}
-            className="btn-primary bg-section-planning px-4 disabled:opacity-40"
-          >
-            Add
-          </button>
-          <button
-            onClick={() => { setShowNewSection(false); setNewSectionName('') }}
-            className="px-3 py-2 text-warmgray-400"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowNewSection(true)}
-          className="w-full py-3 text-sm font-medium text-section-planning border border-dashed border-section-planning/30 rounded-xl flex items-center justify-center gap-2"
-        >
-          <span className="material-symbols-outlined text-lg">add</span>
-          Add Section
-        </button>
-      )}
 
       {/* FAB */}
       <button

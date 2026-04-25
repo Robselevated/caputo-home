@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useRecipes } from '../hooks/useRecipes'
 import { useRecipeMatch } from '../hooks/useRecipeMatch'
 import { useMealPicks } from '../hooks/useMealPicks'
-import { getSections } from '../lib/mealSections'
+import { DEFAULT_SECTIONS } from '../lib/mealSections'
 
 export default function RecipeDetail() {
   const { id } = useParams()
@@ -492,7 +492,7 @@ export default function RecipeDetail() {
             <h3 className="text-lg font-heading font-semibold text-charcoal mb-1">Add to Meal Plan</h3>
             <p className="text-warmgray-500 text-sm mb-4">Pick a section for {recipe.name}</p>
             <div className="space-y-2">
-              {getSections(householdId).map(sec => (
+              {DEFAULT_SECTIONS.map(sec => (
                 <button
                   key={sec}
                   onClick={() => handleAddToMealPlan(sec)}
