@@ -109,17 +109,19 @@ export async function handler(event) {
     }
 
     const imageCount = isMultiUrl ? image_urls.length : isMultiB64 ? images.length : 1
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: imageCount > 1 ? 8192 : 4096,
-      timeout: 22000,
-      messages: [
-        {
-          role: 'user',
-          content: contentBlocks,
-        },
-      ],
-    })
+    const response = await anthropic.messages.create(
+      {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: imageCount > 1 ? 8192 : 4096,
+        messages: [
+          {
+            role: 'user',
+            content: contentBlocks,
+          },
+        ],
+      },
+      { timeout: 22000 }
+    )
 
     const text = response.content[0].text
     // Parse JSON from response (handle potential markdown wrapping)

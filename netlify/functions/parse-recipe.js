@@ -321,22 +321,24 @@ export async function handler(event) {
     }
 
     // Call Claude API to parse the recipe (22s timeout to fit in Netlify's 26s limit)
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      timeout: 22000,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: contextParts.join('\n'),
-            },
-          ],
-        },
-      ],
-    })
+    const response = await anthropic.messages.create(
+      {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4096,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: contextParts.join('\n'),
+              },
+            ],
+          },
+        ],
+      },
+      { timeout: 22000 }
+    )
 
     const text = response.content[0].text
     // Parse JSON from response (handle potential markdown wrapping)
