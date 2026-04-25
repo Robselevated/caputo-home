@@ -20,9 +20,15 @@ const PRODUCE_KEYWORDS = [
   'produce', 'fruit', 'vegetable', 'veggie', 'salad',
 ]
 
+// Normalize for keyword matching: lowercase + collapse hyphens/underscores/
+// slashes/dots to spaces so "Half-and-Half" matches "half and half" etc.
+function normalizeForMatch(s) {
+  return s.toLowerCase().replace(/[-_/.]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 export function getDefaultStore(itemName) {
   if (!itemName) return 'Grocery Store'
-  const lower = itemName.toLowerCase()
+  const lower = normalizeForMatch(itemName)
   const isMatch = PRODUCE_KEYWORDS.some(kw => lower.includes(kw))
   return isMatch ? "Pilgrim's" : 'Grocery Store'
 }
@@ -75,7 +81,7 @@ const LOCATION_RULES = [
 
 export function getDefaultLocation(itemName) {
   if (!itemName) return { location: 'pantry', category: 'Other' }
-  const lower = itemName.toLowerCase()
+  const lower = normalizeForMatch(itemName)
   for (const rule of LOCATION_RULES) {
     if (rule.keywords.some(kw => lower.includes(kw))) {
       return { location: rule.location, category: rule.category }

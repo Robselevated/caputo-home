@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { getDefaultLocation } from './constants'
 
-const FLAG_KEY_PREFIX = 'inv-cleanup-v1-'
+const FLAG_KEY_PREFIX = 'inv-cleanup-v2-'
 
 // One-time pass per household: merges case-insensitive name duplicates and
 // recategorizes items currently sitting in 'Other' to their correct
