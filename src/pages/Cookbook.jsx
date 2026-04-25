@@ -193,7 +193,7 @@ export default function Cookbook() {
     setScanError(null)
 
     try {
-      // Validate all files before uploading
+      // Validate all files first
       for (const file of files) {
         const validationError = validateImageFile(file)
         if (validationError) {
@@ -203,50 +203,38 @@ export default function Cookbook() {
         }
       }
 
-      // Compress images for API payload (don't block on storage upload)
-      const imagesPayload = []
-      const storageUploads = []
-
-      for (const file of files) {
-        // Kick off storage upload in background (non-blocking)
-        const ext = file.name.split('.').pop()
-        const path = `${householdId}/source-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`
-        storageUploads.push(
-          supabase.storage.from('recipe-images').upload(path, file, { upsert: true })
-            .then(({ error }) => {
-              if (!error) {
-                const { data: urlData } = supabase.storage.from('recipe-images').getPublicUrl(path)
-                return urlData.publicUrl
-              }
-              return null
-            })
-            .catch(() => null)
-        )
-
-        // Compress for API payload (max 1500px wide, JPEG 80%)
+      // Compress + upload to Supabase Storage in parallel. We pass public URLs
+      // to the function so the JSON request body stays tiny — base64-encoding
+      // multiple screenshots in JSON would blow past Netlify's 6MB sync limit.
+      const uploadPromises = files.map(async (file) => {
         const compressed = await compressImage(file)
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(reader.result.split(',')[1])
-          reader.onerror = reject
-          reader.readAsDataURL(compressed)
-        })
-        imagesPayload.push({ base64, media_type: 'image/jpeg' })
-      }
-
-      // Collect storage URLs in background (don't block the API call)
-      Promise.all(storageUploads).then(urls => {
-        const uploaded = urls.filter(Boolean)
-        if (uploaded.length > 0) {
-          setSourceImageUrls(uploaded)
-          setSourceImageUrl(uploaded[0])
-        }
+        const path = `${householdId}/source-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
+        const { error: upErr } = await supabase.storage
+          .from('recipe-images')
+          .upload(path, compressed, { upsert: true, contentType: 'image/jpeg' })
+        if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`)
+        const { data } = supabase.storage.from('recipe-images').getPublicUrl(path)
+        if (!data?.publicUrl) throw new Error('Storage upload returned no public URL')
+        return data.publicUrl
       })
 
-      // Send single or multi-image request
-      const body = imagesPayload.length === 1
-        ? { image_base64: imagesPayload[0].base64, media_type: imagesPayload[0].media_type }
-        : { images: imagesPayload }
+      let imageUrls
+      try {
+        imageUrls = await Promise.all(uploadPromises)
+      } catch (uploadErr) {
+        setScanError(`Could not upload images: ${uploadErr.message}`)
+        setScanning(false)
+        return
+      }
+
+      // Track source URLs for the recipe save flow
+      setSourceImageUrls(imageUrls)
+      setSourceImageUrl(imageUrls[0])
+
+      // Send URLs (single or multi)
+      const body = imageUrls.length === 1
+        ? { image_url: imageUrls[0] }
+        : { image_urls: imageUrls }
 
       const response = await authFetch('/.netlify/functions/parse-recipe-image', {
         method: 'POST',
@@ -256,7 +244,9 @@ export default function Cookbook() {
 
       if (!response.ok) {
         const errBody = await response.json().catch(() => ({}))
-        setScanError(errBody.error || 'Failed to scan recipe image')
+        const base = errBody.error || 'Failed to scan recipe image'
+        const detail = errBody.details ? ` — ${errBody.details}` : ''
+        setScanError(base + detail)
         setScanning(false)
         return
       }

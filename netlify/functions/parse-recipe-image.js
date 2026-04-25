@@ -58,6 +58,13 @@ export async function handler(event) {
     return { statusCode: 405, body: 'Method not allowed' }
   }
 
+  if (!process.env.CLAUDE_API_KEY) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Server configuration error', details: 'CLAUDE_API_KEY env var is not set in Netlify' }),
+    }
+  }
+
   const user = await verifyAuth(event)
   if (!user) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) }
 
@@ -65,24 +72,30 @@ export async function handler(event) {
   if (!allowed) return { statusCode: 429, body: JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }) }
 
   try {
-    const { image_base64, media_type, image_url, images } = JSON.parse(event.body)
+    const { image_base64, media_type, image_url, images, image_urls } = JSON.parse(event.body)
 
-    const isMulti = Array.isArray(images) && images.length > 0
+    const isMultiUrl = Array.isArray(image_urls) && image_urls.length > 0
+    const isMultiB64 = Array.isArray(images) && images.length > 0
+    const isMulti = isMultiUrl || isMultiB64
     if (!isMulti && !image_base64 && !image_url) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing image_base64, image_url, or images array' }) }
+      return { statusCode: 400, body: JSON.stringify({ error: 'Missing image_base64, image_url, image_urls, or images' }) }
     }
 
     let contentBlocks
 
-    if (isMulti) {
-      // Multiple screenshots of the same recipe
-      contentBlocks = []
-      for (const img of images) {
-        contentBlocks.push({
-          type: 'image',
-          source: { type: 'base64', media_type: img.media_type || 'image/jpeg', data: img.base64 },
-        })
-      }
+    if (isMultiUrl) {
+      // Multi-image via public URLs (preferred — keeps request body tiny)
+      contentBlocks = image_urls.map((url) => ({
+        type: 'image',
+        source: { type: 'url', url },
+      }))
+      contentBlocks.push({ type: 'text', text: MULTI_IMAGE_PROMPT })
+    } else if (isMultiB64) {
+      // Multi-image via base64 (legacy path; still supported)
+      contentBlocks = images.map((img) => ({
+        type: 'image',
+        source: { type: 'base64', media_type: img.media_type || 'image/jpeg', data: img.base64 },
+      }))
       contentBlocks.push({ type: 'text', text: MULTI_IMAGE_PROMPT })
     } else {
       // Single image (backward compatible)
@@ -95,9 +108,10 @@ export async function handler(event) {
       ]
     }
 
+    const imageCount = isMultiUrl ? image_urls.length : isMultiB64 ? images.length : 1
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: isMulti ? 8192 : 4096,
+      max_tokens: imageCount > 1 ? 8192 : 4096,
       timeout: 22000,
       messages: [
         {
@@ -139,7 +153,10 @@ export async function handler(event) {
     console.error('Recipe OCR error:', err)
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Recipe image parsing failed' }),
+      body: JSON.stringify({
+        error: 'Recipe image parsing failed',
+        details: err?.message || String(err),
+      }),
     }
   }
 }

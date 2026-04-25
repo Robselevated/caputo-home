@@ -262,6 +262,13 @@ export async function handler(event) {
     return { statusCode: 405, body: 'Method not allowed' }
   }
 
+  if (!process.env.CLAUDE_API_KEY) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Server configuration error', details: 'CLAUDE_API_KEY env var is not set in Netlify' }),
+    }
+  }
+
   const user = await verifyAuth(event)
   if (!user) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) }
 
