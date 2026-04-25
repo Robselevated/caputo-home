@@ -201,7 +201,7 @@ export function useGroceryList(householdId) {
       .eq('household_id', householdId)
       .ilike('name', item.name)
       .limit(1)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       await supabase.from('inventory_items').update({

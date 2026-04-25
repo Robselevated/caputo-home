@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, createContext, useMemo, useCallback } from 'react'
+import { useState, useEffect, useContext, createContext, useMemo, useCallback, useRef } from 'react'
 import { supabase, readPersistedUser } from '../lib/supabase'
 
 const AuthContext = createContext(null)
@@ -16,8 +16,11 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => readPersistedUser())
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(false)
+  const fetchedForUserRef = useRef(null)
 
   const fetchProfile = useCallback(async (userId) => {
+    if (fetchedForUserRef.current === userId) return
+    fetchedForUserRef.current = userId
     try {
       const result = await raceTimeout(
         supabase
@@ -27,10 +30,19 @@ export function AuthProvider({ children }) {
           .single(),
         PROFILE_TIMEOUT_MS
       )
-      if (result?.__timeout) return
+      if (result?.__timeout) {
+        fetchedForUserRef.current = null
+        return
+      }
+      if (result?.error) {
+        console.warn('fetchProfile error:', result.error.message)
+        fetchedForUserRef.current = null
+        return
+      }
       setProfile(result?.data ?? null)
-    } catch {
-      // Non-fatal: next auth event will retry.
+    } catch (err) {
+      console.warn('fetchProfile threw:', err?.message ?? err)
+      fetchedForUserRef.current = null
     }
   }, [])
 
@@ -44,8 +56,12 @@ export function AuthProvider({ children }) {
         if (!mounted) return
         const nextUser = session?.user ?? null
         setUser(nextUser)
-        if (nextUser) fetchProfile(nextUser.id)
-        else setProfile(null)
+        if (nextUser) {
+          fetchProfile(nextUser.id)
+        } else {
+          setProfile(null)
+          fetchedForUserRef.current = null
+        }
       }
     )
 
@@ -63,6 +79,7 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
+    fetchedForUserRef.current = null
   }
 
   const value = useMemo(

@@ -79,6 +79,21 @@ export async function getPendingWrites() {
   }
 }
 
+export async function incrementWriteAttempts(id) {
+  const db = await getDB()
+  if (!db) return 0
+  try {
+    const write = await db.get('write_queue', id)
+    if (!write) return 0
+    const next = (write.attempts || 0) + 1
+    await db.put('write_queue', { ...write, attempts: next })
+    return next
+  } catch (err) {
+    console.warn('Increment attempts failed:', err.message)
+    return 0
+  }
+}
+
 export async function clearWrite(id) {
   const db = await getDB()
   if (!db) return

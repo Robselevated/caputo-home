@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { cacheGroceryItems, getCachedGroceryItems, queueWrite, getPendingWrites, clearWrite, getPendingCount } from '../lib/db'
+import { cacheGroceryItems, getCachedGroceryItems, queueWrite, getPendingWrites, clearWrite, getPendingCount, incrementWriteAttempts } from '../lib/db'
+
+const MAX_SYNC_ATTEMPTS = 5
 
 export function useOfflineSync(householdId) {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
@@ -115,7 +117,7 @@ export function useOfflineSync(householdId) {
                 .eq('household_id', write.data.household_id)
                 .ilike('name', write.data.name)
                 .limit(1)
-                .single()
+                .maybeSingle()
               if (inv) {
                 await supabase.from('inventory_items').update({
                   qty: (inv.qty || 0) + (write.data.qty || 1),
@@ -130,7 +132,11 @@ export function useOfflineSync(householdId) {
           await clearWrite(write.id)
         } catch (err) {
           console.error('Sync error for write:', write.id, err)
-          // Continue with other writes
+          const attempts = await incrementWriteAttempts(write.id)
+          if (attempts >= MAX_SYNC_ATTEMPTS) {
+            console.error(`Dropping write after ${MAX_SYNC_ATTEMPTS} failed attempts:`, write)
+            await clearWrite(write.id)
+          }
         }
       }
 
