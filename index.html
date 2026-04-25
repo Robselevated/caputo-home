@@ -23,12 +23,28 @@
       <style>@keyframes sp{to{transform:rotate(360deg)}}</style>
     </div>
     <script>
-      // Self-recovery: if the app hasn't loaded in 8 seconds, clear stale
-      // service worker cache and reload once to get fresh code.
+      // Self-recovery: if the splash hasn't been replaced in 8s, clear the SW +
+      // caches and reload. Counter-based (localStorage so it survives PWA
+      // force-close) with a 24h window and a 3-attempt cap so we never loop
+      // forever. Clears legacy sessionStorage flag from earlier versions.
+      try { sessionStorage.removeItem('sw-reset'); } catch (e) {}
+      var RESET_COUNT_KEY = 'sw-reset-count';
+      var RESET_TS_KEY = 'sw-reset-ts';
+      var MAX_RESETS = 3;
+      var WINDOW_MS = 24 * 60 * 60 * 1000;
+
       setTimeout(function() {
-        if (!document.getElementById('splash')) return; // app loaded fine
-        if (sessionStorage.getItem('sw-reset')) return; // already tried once
-        sessionStorage.setItem('sw-reset', '1');
+        if (!document.getElementById('splash')) return;
+        var now = Date.now();
+        var firstTs = parseInt(localStorage.getItem(RESET_TS_KEY) || '0', 10);
+        var count = parseInt(localStorage.getItem(RESET_COUNT_KEY) || '0', 10);
+        if (!firstTs || now - firstTs > WINDOW_MS) {
+          firstTs = now;
+          count = 0;
+          localStorage.setItem(RESET_TS_KEY, String(firstTs));
+        }
+        if (count >= MAX_RESETS) return;
+        localStorage.setItem(RESET_COUNT_KEY, String(count + 1));
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then(function(regs) {
             regs.forEach(function(r) { r.unregister(); });
@@ -42,9 +58,21 @@
           window.location.reload();
         }
       }, 8000);
-      // Clear the flag on successful load so recovery works again next time
+
+      // Once React mounts and removes the splash, reset the counter so future
+      // hangs get the full 3-attempt budget again.
       window.addEventListener('load', function() {
-        setTimeout(function() { sessionStorage.removeItem('sw-reset'); }, 3000);
+        var attempts = 0;
+        var iv = setInterval(function() {
+          attempts++;
+          if (!document.getElementById('splash')) {
+            localStorage.removeItem(RESET_COUNT_KEY);
+            localStorage.removeItem(RESET_TS_KEY);
+            clearInterval(iv);
+          } else if (attempts > 30) {
+            clearInterval(iv);
+          }
+        }, 500);
       });
     </script>
     <script type="module" src="/src/main.jsx"></script>

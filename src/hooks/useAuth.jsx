@@ -1,71 +1,59 @@
-import { useState, useEffect, useContext, createContext, useMemo } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState, useEffect, useContext, createContext, useMemo, useCallback } from 'react'
+import { supabase, readPersistedUser } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+const PROFILE_TIMEOUT_MS = 2000
+
+function raceTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve({ __timeout: true }), ms)),
+  ])
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState(() => readPersistedUser())
   const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+
+  const fetchProfile = useCallback(async (userId) => {
+    try {
+      const result = await raceTimeout(
+        supabase
+          .from('users')
+          .select('id, household_id, name, email')
+          .eq('id', userId)
+          .single(),
+        PROFILE_TIMEOUT_MS
+      )
+      if (result?.__timeout) return
+      setProfile(result?.data ?? null)
+    } catch {
+      // Non-fatal: next auth event will retry.
+    }
+  }, [])
 
   useEffect(() => {
-    // Safety timeout: if auth hasn't resolved in 3s, stop blocking the UI
-    const timeout = setTimeout(() => setLoading(false), 3000)
+    let mounted = true
 
-    async function initAuth() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        setUser(session?.user ?? null)
-        if (session?.user) {
-          await fetchProfile(session.user.id)
-        } else {
-          setLoading(false)
-        }
-      } catch {
-        setLoading(false)
-      }
-    }
-
-    initAuth()
-
-    // Re-check auth when app returns from background (iOS PWA suspension)
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') initAuth()
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
+    if (user?.id) fetchProfile(user.id)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setUser(session?.user ?? null)
-        if (session?.user) await fetchProfile(session.user.id)
-        else {
-          setProfile(null)
-          setLoading(false)
-        }
+      (_event, session) => {
+        if (!mounted) return
+        const nextUser = session?.user ?? null
+        setUser(nextUser)
+        if (nextUser) fetchProfile(nextUser.id)
+        else setProfile(null)
       }
     )
 
     return () => {
-      clearTimeout(timeout)
-      document.removeEventListener('visibilitychange', handleVisibility)
+      mounted = false
       subscription.unsubscribe()
     }
-  }, [])
-
-  async function fetchProfile(userId) {
-    try {
-      const { data } = await supabase
-        .from('users')
-        .select('id, household_id, name, email')
-        .eq('id', userId)
-        .single()
-      setProfile(data)
-    } catch {
-      setProfile(null)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const signIn = async (email, password) => {
     return supabase.auth.signInWithPassword({ email, password })

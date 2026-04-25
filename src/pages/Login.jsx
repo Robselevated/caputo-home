@@ -3,17 +3,12 @@ import { useAuth } from '../hooks/useAuth'
 import { Navigate } from 'react-router-dom'
 
 export default function Login() {
-  const { user, loading, signIn } = useAuth()
+  const { user, signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-screen bg-ivory">
-      <div className="w-8 h-8 border-4 border-warmgray-300 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
   if (user) return <Navigate to="/" replace />
 
   const handleSubmit = async (e) => {

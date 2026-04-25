@@ -1,11 +1,28 @@
 import { supabase } from './supabase'
 
+const SESSION_TIMEOUT_MS = 2000
+const FETCH_TIMEOUT_MS = 55000
+
+async function getTokenWithTimeout() {
+  try {
+    const result = await Promise.race([
+      supabase.auth.getSession(),
+      new Promise((resolve) =>
+        setTimeout(() => resolve({ __timeout: true }), SESSION_TIMEOUT_MS)
+      ),
+    ])
+    if (result?.__timeout) return null
+    return result?.data?.session?.access_token ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function authFetch(url, options = {}) {
-  const { data: { session } } = await supabase.auth.getSession()
-  const token = session?.access_token
+  const token = await getTokenWithTimeout()
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 55000)
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
   try {
     return await fetch(url, {
