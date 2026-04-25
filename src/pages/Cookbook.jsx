@@ -246,7 +246,8 @@ export default function Cookbook() {
         const errBody = await response.json().catch(() => ({}))
         const base = errBody.error || 'Failed to scan recipe image'
         const detail = errBody.details ? ` — ${errBody.details}` : ''
-        setScanError(base + detail)
+        const status = ` (HTTP ${response.status})`
+        setScanError(base + detail + status)
         setScanning(false)
         return
       }
