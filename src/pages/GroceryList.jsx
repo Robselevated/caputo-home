@@ -15,6 +15,7 @@ import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-ki
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import SortableGroceryItem from '../components/SortableGroceryItem'
 import { STORES, UNITS, getDefaultStore } from '../lib/constants'
+import { runOneTimeInventoryCleanup } from '../lib/inventoryCleanup'
 
 // Store accent colors for left bar + badges
 const storeAccentColors = {
@@ -125,6 +126,14 @@ export default function GroceryList() {
       setShowNotifBanner(true)
     }
   }, [permission])
+
+  // One-time inventory cleanup when the household is first known.
+  // Internally gated by a localStorage flag so it never runs twice.
+  useEffect(() => {
+    if (householdId && user?.id) {
+      runOneTimeInventoryCleanup(householdId, user.id)
+    }
+  }, [householdId, user?.id])
 
   const handleEnableNotifications = async () => {
     await requestPermission()

@@ -7,7 +7,7 @@ const PRODUCE_KEYWORDS = [
   'broccoli', 'cabbage', 'cantaloupe', 'carrot', 'cauliflower', 'celery',
   'cherry', 'clementine', 'corn', 'cucumber', 'date', 'eggplant', 'fig',
   'garlic', 'ginger', 'grape', 'grapefruit', 'greens', 'honeydew', 'jalapeno',
-  'kale', 'kiwi', 'leek', 'lemon', 'lettuce', 'lime', 'mango', 'melon',
+  'kale', 'kiwi', 'leek', 'lemon', 'lettuce', 'lime', 'mandarin', 'mango', 'melon',
   'mushroom', 'nectarine', 'onion', 'orange', 'papaya', 'parsnip', 'peach',
   'pear', 'pepper', 'pineapple', 'plum', 'pomegranate', 'potato', 'radish',
   'raspberry', 'romaine', 'scallion', 'shallot', 'spinach', 'sprout', 'squash',
@@ -32,7 +32,7 @@ const LOCATION_RULES = [
   // Fridge: produce (reuse existing PRODUCE_KEYWORDS)
   { keywords: PRODUCE_KEYWORDS, location: 'fridge', category: 'Fresh Produce' },
   // Fridge: dairy
-  { keywords: ['milk', 'cream cheese', 'sour cream', 'half and half', 'heavy cream', 'whipping cream', 'cream', 'cheese', 'yogurt', 'butter', 'egg', 'eggs', 'cottage', 'mozzarella', 'parmesan', 'cheddar', 'provolone', 'swiss', 'gouda', 'brie', 'ricotta'], location: 'fridge', category: 'Dairy' },
+  { keywords: ['milk', 'cream cheese', 'sour cream', 'half and half', 'half & half', 'half&half', 'h&h', 'heavy cream', 'whipping cream', 'cream', 'cheese', 'yogurt', 'butter', 'egg', 'eggs', 'cottage', 'mozzarella', 'parmesan', 'cheddar', 'provolone', 'swiss', 'gouda', 'brie', 'ricotta'], location: 'fridge', category: 'Dairy' },
   // Fridge: deli
   { keywords: ['deli', 'ham', 'turkey breast', 'salami', 'pepperoni', 'prosciutto', 'lunch meat', 'roast beef'], location: 'fridge', category: 'Deli Meat' },
   // Fridge: bacon
