@@ -4,11 +4,11 @@ import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './hooks/useAuth'
+import GroceryList from './pages/GroceryList'
 
-// Lazy-load pages so only the active route downloads on first load
+// Lazy-load secondary routes; GroceryList is eager since it's the landing page.
 const Login = lazy(() => import('./pages/Login'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback'))
-const GroceryList = lazy(() => import('./pages/GroceryList'))
 const Freezer = lazy(() => import('./pages/Freezer'))
 const Fridge = lazy(() => import('./pages/Fridge'))
 const Pantry = lazy(() => import('./pages/Pantry'))

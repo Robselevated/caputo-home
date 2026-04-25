@@ -10,30 +10,32 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@300;400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@300;400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"></noscript>
     <title>Caputo Home</title>
   </head>
   <body class="bg-ivory text-charcoal antialiased font-body">
     <div id="root">
-      <div id="splash" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh">
+      <div id="splash" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:0 24px">
         <img src="/caputoappicon.png" alt="" width="64" height="64" style="border-radius:16px;margin-bottom:16px">
         <div id="splash-spinner" style="width:28px;height:28px;border:3px solid #d1ccc7;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite"></div>
+        <button id="splash-retry" type="button" style="display:none;margin-top:28px;padding:10px 20px;background:#fff;border:1px solid #d1ccc7;border-radius:10px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;font-weight:500;color:#444;cursor:pointer;-webkit-tap-highlight-color:transparent">Tap to reload</button>
       </div>
       <style>@keyframes sp{to{transform:rotate(360deg)}}</style>
     </div>
     <script>
-      // Self-recovery: if the splash hasn't been replaced in 8s, clear the SW +
+      // Self-recovery: if the splash hasn't been replaced in 12s, clear the SW +
       // caches and reload. Counter-based (localStorage so it survives PWA
       // force-close) with a 24h window and a 3-attempt cap so we never loop
-      // forever. Clears legacy sessionStorage flag from earlier versions.
+      // forever. A manual "Tap to reload" button appears at 5s for instant
+      // recovery without the wait.
       try { sessionStorage.removeItem('sw-reset'); } catch (e) {}
       var RESET_COUNT_KEY = 'sw-reset-count';
       var RESET_TS_KEY = 'sw-reset-ts';
       var MAX_RESETS = 3;
       var WINDOW_MS = 24 * 60 * 60 * 1000;
 
-      setTimeout(function() {
+      function recoverNow() {
         if (!document.getElementById('splash')) return;
         var now = Date.now();
         var firstTs = parseInt(localStorage.getItem(RESET_TS_KEY) || '0', 10);
@@ -57,7 +59,19 @@
         } else {
           window.location.reload();
         }
-      }, 8000);
+      }
+
+      // Show the manual retry button at 5s so the user can recover without waiting.
+      setTimeout(function() {
+        var btn = document.getElementById('splash-retry');
+        if (btn && document.getElementById('splash')) {
+          btn.style.display = 'inline-block';
+          btn.addEventListener('click', recoverNow);
+        }
+      }, 5000);
+
+      // Auto-recovery at 12s if still stuck.
+      setTimeout(recoverNow, 12000);
 
       // Once React mounts and removes the splash, reset the counter so future
       // hangs get the full 3-attempt budget again.
