@@ -1098,7 +1098,7 @@ export default function Cookbook() {
 
       {/* Bulk Re-import Confirmation */}
       {showBulkConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm editorial-shadow">
             <h3 className="text-lg font-heading font-semibold text-charcoal mb-2">Refresh All Recipes?</h3>
             <p className="text-warmgray-600 text-sm mb-6">

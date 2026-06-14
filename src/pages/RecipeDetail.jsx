@@ -327,7 +327,7 @@ export default function RecipeDetail() {
       </div>
 
       {showMakeThis && matchResult && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-[60] p-4">
           <div className="bg-dark-surface rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[80vh] overflow-y-auto">
             <div className="sticky top-0 bg-dark-surface px-6 py-4 border-b border-warmgray-100 flex items-center justify-between">
               <h3 className="text-lg font-heading font-semibold text-charcoal">Ingredient Check</h3>
@@ -491,7 +491,7 @@ export default function RecipeDetail() {
       )}
 
       {showMealPlanPicker && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
           <div className="bg-dark-surface rounded-2xl p-6 w-full max-w-sm shadow-dark-lg">
             <h3 className="text-lg font-heading font-semibold text-charcoal mb-1">Add to Meal Plan</h3>
             <p className="text-warmgray-500 text-sm mb-4">Pick a section for {recipe.name}</p>
@@ -519,7 +519,7 @@ export default function RecipeDetail() {
       )}
 
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
           <div className="bg-dark-surface rounded-2xl p-6 w-full max-w-sm shadow-dark-lg">
             <h3 className="text-lg font-heading font-semibold text-charcoal mb-2">Delete Recipe?</h3>
             <p className="text-warmgray-600 text-sm mb-6">

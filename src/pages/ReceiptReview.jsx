@@ -141,8 +141,8 @@ export default function ReceiptReview({ items, onConfirm, onCancel, householdId 
   const includedCount = editableItems.filter(i => i.included).length
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
-      <div className="bg-dark-surface w-full max-w-lg max-h-[85vh] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center">
+      <div className="bg-dark-surface w-full max-w-lg max-h-[85vh] rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col pb-safe">
         <div className="px-4 py-3 border-b border-warmgray-100 flex items-center justify-between">
           <button onClick={() => onCancel()} className="text-warmgray-400 text-sm font-medium">
             Cancel
