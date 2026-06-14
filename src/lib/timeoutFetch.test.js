@@ -30,4 +30,23 @@ describe('makeTimeoutFetch', () => {
     tf('/x', { signal: ctrl.signal })
     expect(fetchImpl).toHaveBeenCalledWith('/x', { signal: ctrl.signal })
   })
+
+  it('does NOT bound storage object transfers (no injected signal)', () => {
+    const fetchImpl = vi.fn(() => Promise.resolve('ok'))
+    const tf = makeTimeoutFetch(20, fetchImpl)
+    tf('https://x.supabase.co/storage/v1/object/photos/a.jpg', { method: 'POST' })
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://x.supabase.co/storage/v1/object/photos/a.jpg',
+      { method: 'POST' }
+    )
+    // no AbortController signal was injected
+    expect(fetchImpl.mock.calls[0][1].signal).toBeUndefined()
+  })
+
+  it('still bounds auth + rest requests (injects a signal)', () => {
+    const fetchImpl = vi.fn(() => Promise.resolve('ok'))
+    const tf = makeTimeoutFetch(20, fetchImpl)
+    tf('https://x.supabase.co/auth/v1/token', { method: 'POST' })
+    expect(fetchImpl.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal)
+  })
 })

@@ -17,7 +17,7 @@ function BootLoader() {
 }
 
 export default function ProtectedRoute({ children }) {
-  const { user, loading, profile, profileError, retryProfile } = useAuth()
+  const { user, loading, profile, profileError, retryProfile, signOut } = useAuth()
 
   // Hold a loader until the boot session gate resolves (bounded to ~3s by
   // resolveInitialSession's timeout).
@@ -44,6 +44,9 @@ export default function ProtectedRoute({ children }) {
               Reload
             </button>
           </div>
+          <button onClick={signOut} className="mt-4 text-warmgray-400 text-sm underline">
+            Sign out
+          </button>
           <VersionStamp />
         </div>
       )

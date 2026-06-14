@@ -15,10 +15,25 @@
 
 export const SUPABASE_FETCH_TIMEOUT_MS = 8000
 
+function requestUrl(input) {
+  if (typeof input === 'string') return input
+  if (input && typeof input.url === 'string') return input.url // Request object
+  try {
+    return String(input) // URL object
+  } catch {
+    return ''
+  }
+}
+
 export function makeTimeoutFetch(timeoutMs = SUPABASE_FETCH_TIMEOUT_MS, fetchImpl = fetch) {
   return function timeoutFetch(input, init = {}) {
     // If a caller already controls aborting, don't override it.
     if (init.signal) return fetchImpl(input, init)
+    // Storage object transfers (photo upload/download) can legitimately take far
+    // longer than 8s on a weak cellular link — never abort those. The timeout
+    // exists for the cold-start culprit (the /auth/v1/token refresh) and for
+    // small/fast PostgREST queries, not for binary blobs.
+    if (requestUrl(input).includes('/storage/v1/object')) return fetchImpl(input, init)
     const controller = new AbortController()
     const id = setTimeout(() => controller.abort(), timeoutMs)
     return fetchImpl(input, { ...init, signal: controller.signal }).finally(() =>

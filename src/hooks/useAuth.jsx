@@ -17,8 +17,10 @@ const PROFILE_TIMEOUT_MS = 6000
 const PROFILE_MAX_RETRIES = 4
 // Hard backstop: if we're online and the profile still hasn't loaded after this
 // long, stop spinning and surface a retry. Guarantees the household resolution
-// can never present as an infinite spinner again, whatever the cause.
-const PROFILE_HARD_TIMEOUT_MS = 15000
+// can never present as an infinite spinner again, whatever the cause. Set above
+// the realistic cold-radio recovery window (bounded auth refresh ~8s + a warm
+// retry) so it backstops a true wedge rather than pre-empting a slow-but-working load.
+const PROFILE_HARD_TIMEOUT_MS = 20000
 
 function seedProfile() {
   const u = readPersistedUser()
@@ -69,6 +71,15 @@ export function AuthProvider({ children }) {
           .single(),
         PROFILE_TIMEOUT_MS
       )
+      if (result?.error?.code === 'PGRST116') {
+        // No users row for this account (e.g. the signup trigger never ran).
+        // Retrying can't conjure a row — surface a terminal error so the user
+        // gets a Sign out escape hatch instead of looping forever.
+        console.warn('fetchProfile: no profile row for user', userId)
+        fetchedForUserRef.current = null
+        setProfileError(true)
+        return
+      }
       if (result?.__timeout || result?.error) {
         if (result?.error) console.warn('fetchProfile error:', result.error.message)
         retry()
