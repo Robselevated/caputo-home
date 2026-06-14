@@ -221,10 +221,10 @@ function stripScriptsAndStyles(html) {
 }
 
 async function fetchContent(url) {
-  // Try direct fetch first (5s timeout)
+  // Try direct fetch first (bounded so a slow site can't eat the whole budget)
   try {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 5000)
+    const timer = setTimeout(() => controller.abort(), 3000)
     const resp = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -248,17 +248,25 @@ async function fetchContent(url) {
     throw new Error('Site blocked direct access and Firecrawl API key is not configured')
   }
 
-  const fcResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${firecrawlKey}`,
-    },
-    body: JSON.stringify({
-      url,
-      formats: ['rawHtml', 'html', 'markdown'],
-    }),
-  })
+  const fcController = new AbortController()
+  const fcTimer = setTimeout(() => fcController.abort(), 4000)
+  let fcResp
+  try {
+    fcResp = await fetch('https://api.firecrawl.dev/v1/scrape', {
+      method: 'POST',
+      signal: fcController.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${firecrawlKey}`,
+      },
+      body: JSON.stringify({
+        url,
+        formats: ['rawHtml', 'html', 'markdown'],
+      }),
+    })
+  } finally {
+    clearTimeout(fcTimer)
+  }
 
   if (!fcResp.ok) {
     const errText = await fcResp.text()
@@ -333,25 +341,28 @@ export async function handler(event) {
       contextParts.push(`\n--- DETECTED INGREDIENT SECTIONS ---\nThe recipe HTML has these ingredient group headers: ${sectionHints.map(s => `"${s}"`).join(', ')}. You MUST assign each ingredient to the correct section.\n---`)
     }
 
-    // Call Claude API to parse the recipe (22s timeout to fit in Netlify's 26s limit)
-    const response = await anthropic.messages.create(
-      {
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: contextParts.join('\n'),
-              },
-            ],
-          },
-        ],
-      },
-      { timeout: 22000 }
-    )
+    // Reformatting pre-supplied JSON-LD into our shape needs no deep reasoning,
+    // so run it fast: thinking off + low effort keeps it well inside Netlify's
+    // function budget (Sonnet 4.6 otherwise defaults to high effort = slower).
+    // effort/output_config are only typed on the beta path in this SDK version,
+    // so try beta first and fall back to the stable call if anything's off.
+    const baseParams = {
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4096,
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: contextParts.join('\n') }] },
+      ],
+    }
+    let response
+    try {
+      response = await anthropic.beta.messages.create(
+        { ...baseParams, thinking: { type: 'disabled' }, output_config: { effort: 'low' } },
+        { timeout: 8000 }
+      )
+    } catch (modelErr) {
+      console.warn('parse-recipe: beta call failed, falling back to stable:', modelErr?.message)
+      response = await anthropic.messages.create(baseParams, { timeout: 9000 })
+    }
 
     const text = response.content[0].text
     const recipe = extractRecipeJson(text)

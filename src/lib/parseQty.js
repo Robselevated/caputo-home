@@ -53,6 +53,58 @@ export function parseQty(raw) {
   return { qty: null, leftover: s }
 }
 
+const UNIT_WORDS = new Set([
+  'cups', 'cup', 'tbsp', 'tablespoons', 'tablespoon', 'tsp', 'teaspoons', 'teaspoon',
+  'oz', 'ounces', 'ounce', 'lbs', 'lb', 'pounds', 'pound', 'grams', 'gram', 'g', 'kg',
+  'ml', 'liters', 'liter', 'l', 'quarts', 'quart', 'pints', 'pint', 'gallons', 'gallon',
+  'cans', 'can', 'packages', 'package', 'pkg', 'slices', 'slice', 'cloves', 'clove',
+  'heads', 'head', 'bunches', 'bunch', 'stalks', 'stalk', 'pieces', 'piece', 'sprigs',
+  'sprig', 'sticks', 'stick', 'pinch', 'dash', 'handful', 'count',
+])
+
+// Forgivingly parse one pasted line ("2 cups flour, sifted") into an ingredient
+// row. Anything it can't split confidently just lands in `name`, so nothing is lost.
+export function parseIngredientLine(line) {
+  let text = String(line || '').trim()
+  text = text.replace(/^\s*[-•*]\s*/, '').replace(/^\s*\d+[.)]\s+/, '') // strip bullets / "1. "
+  if (!text) return null
+
+  let notes = ''
+  const comma = text.indexOf(',')
+  let main = text
+  if (comma > 0) {
+    main = text.slice(0, comma).trim()
+    notes = text.slice(comma + 1).trim()
+  }
+
+  let qty = ''
+  let rest = main
+  const qtyMatch = main.match(/^((?:\d+\s+\d+\/\d+)|(?:\d+\s*\/\s*\d+)|(?:\d+(?:\.\d+)?)|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])\s*/)
+  if (qtyMatch) {
+    qty = qtyMatch[1].trim()
+    rest = main.slice(qtyMatch[0].length).trim()
+  }
+
+  let unit = ''
+  const firstWord = rest.split(/\s+/)[0] || ''
+  if (UNIT_WORDS.has(firstWord.toLowerCase().replace(/\.$/, ''))) {
+    unit = firstWord.replace(/\.$/, '')
+    rest = rest.slice(firstWord.length).trim()
+  }
+
+  return { name: rest || main, qty, unit, notes, section: '' }
+}
+
+// Parse a pasted block (one ingredient per line) into ingredient rows.
+export function parseIngredientBlock(block) {
+  return String(block || '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map(parseIngredientLine)
+    .filter(Boolean)
+}
+
 // Coerce an ingredient's free-text qty into a numeric qty, stashing any
 // non-numeric remainder into notes so nothing the user typed is lost.
 export function normalizeIngredientQty(ing) {

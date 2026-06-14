@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseQty, normalizeIngredientQty } from './parseQty'
+import { parseQty, normalizeIngredientQty, parseIngredientLine, parseIngredientBlock } from './parseQty'
 
 describe('parseQty', () => {
   it('parses plain numbers', () => {
@@ -34,6 +34,33 @@ describe('parseQty', () => {
     expect(parseQty('')).toEqual({ qty: null, leftover: null })
     expect(parseQty(null)).toEqual({ qty: null, leftover: null })
     expect(parseQty('   ')).toEqual({ qty: null, leftover: null })
+  })
+})
+
+describe('parseIngredientLine', () => {
+  it('splits qty, unit, name', () => {
+    expect(parseIngredientLine('2 cups flour')).toEqual({ name: 'flour', qty: '2', unit: 'cups', notes: '', section: '' })
+  })
+  it('handles fractions and notes', () => {
+    expect(parseIngredientLine('1/2 tsp salt, fine')).toEqual({ name: 'salt', qty: '1/2', unit: 'tsp', notes: 'fine', section: '' })
+  })
+  it('handles no-unit items', () => {
+    expect(parseIngredientLine('3 eggs')).toEqual({ name: 'eggs', qty: '3', unit: '', notes: '', section: '' })
+  })
+  it('strips bullets / list numbers', () => {
+    expect(parseIngredientLine('- 1 onion, diced')).toEqual({ name: 'onion', qty: '1', unit: '', notes: 'diced', section: '' })
+  })
+  it('puts an unparseable line entirely in name', () => {
+    expect(parseIngredientLine('salt and pepper to taste')).toEqual({ name: 'salt and pepper to taste', qty: '', unit: '', notes: '', section: '' })
+  })
+})
+
+describe('parseIngredientBlock', () => {
+  it('parses a multi-line block, skipping blanks', () => {
+    const rows = parseIngredientBlock('2 cups flour\n\n1/2 tsp salt\n3 eggs')
+    expect(rows).toHaveLength(3)
+    expect(rows[0].name).toBe('flour')
+    expect(rows[2].name).toBe('eggs')
   })
 })
 

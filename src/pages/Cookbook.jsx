@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { parseIngredientBlock } from '../lib/parseQty'
 import { useAuth } from '../hooks/useAuth'
 import { useRecipes } from '../hooks/useRecipes'
 import { useIngredientCoverage } from '../hooks/useIngredientCoverage'
@@ -162,6 +163,8 @@ export default function Cookbook() {
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
   const [createError, setCreateError] = useState(null)
   const [creating, setCreating] = useState(false)
+  const [showPaste, setShowPaste] = useState(false)
+  const [pasteText, setPasteText] = useState('')
 
   const [latestIngredients, setLatestIngredients] = useState([])
 
@@ -206,14 +209,16 @@ export default function Cookbook() {
     e.preventDefault()
     setImporting(true)
     setImportError(null)
-    const { error } = await importRecipe(url, user.id)
+    const { data, error } = await importRecipe(url, user.id)
+    setImporting(false)
     if (error) {
       setImportError(error)
-    } else {
-      setUrl('')
-      setShowAdd(false)
+      return
     }
-    setImporting(false)
+    setUrl('')
+    setShowAdd(false)
+    // Open the imported recipe so the user can review/fix the parse.
+    if (data?.id) navigate(`/cookbook/${data.id}`)
   }
 
   const handleRefreshImage = async (e, recipe) => {
@@ -386,6 +391,17 @@ export default function Cookbook() {
     setInstructions(''); setRecipeNotes(''); setScanError(null)
     setIngredients([{ name: '', qty: '', unit: '', notes: '', section: '' }])
     setShowAdd(false)
+  }
+
+  const handlePasteIngredients = () => {
+    const parsed = parseIngredientBlock(pasteText)
+    if (parsed.length === 0) { setShowPaste(false); setPasteText(''); return }
+    setIngredients(prev => {
+      const kept = prev.filter(i => i.name.trim())
+      return [...kept, ...parsed]
+    })
+    setPasteText('')
+    setShowPaste(false)
   }
 
   const addIngredientRow = (section = '') => {
@@ -625,7 +641,30 @@ export default function Cookbook() {
               </div>
               <input type="text" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Tags (comma separated)" className="input-field focus:ring-section-cookbook" />
               <div className="space-y-2">
-                <label className="text-sm font-medium text-warmgray-600">Ingredients</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-warmgray-600">Ingredients</label>
+                  {!showPaste && (
+                    <button type="button" onClick={() => setShowPaste(true)} className="text-sm text-section-cookbook font-medium">
+                      Paste a list
+                    </button>
+                  )}
+                </div>
+                {showPaste && (
+                  <div className="space-y-2 bg-cream rounded-xl p-2">
+                    <textarea
+                      value={pasteText}
+                      onChange={(e) => setPasteText(e.target.value)}
+                      placeholder={'Paste your ingredient list, one per line:\n2 cups flour\n1/2 tsp salt\n3 eggs'}
+                      className="input-field focus:ring-section-cookbook min-h-[120px] text-sm"
+                      rows={5}
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <button type="button" onClick={handlePasteIngredients} className="btn-primary bg-section-cookbook flex-1 py-2 text-sm">Add these</button>
+                      <button type="button" onClick={() => { setShowPaste(false); setPasteText('') }} className="px-4 py-2 text-sm text-warmgray-500">Cancel</button>
+                    </div>
+                  </div>
+                )}
                 {(() => {
                   const sections = []
                   let currentSection = null
