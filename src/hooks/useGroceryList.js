@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
 import { cacheGroceryItems, getCachedGroceryItems, queueWrite } from '../lib/db'
 import { getDefaultLocation, DEFAULT_UNITS } from '../lib/constants'
 
@@ -17,12 +18,14 @@ export function useGroceryList(householdId) {
       return
     }
 
-    const { data, error } = await supabase
-      .from('grocery_items')
-      .select('*, added_by_user:users!grocery_items_added_by_fkey(name), updated_by_user:users!grocery_items_updated_by_fkey(name)')
-      .eq('household_id', householdId)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true })
+    const { data, error } = await withQueryTimeout(
+      supabase
+        .from('grocery_items')
+        .select('*, added_by_user:users!grocery_items_added_by_fkey(name), updated_by_user:users!grocery_items_updated_by_fkey(name)')
+        .eq('household_id', householdId)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
+    )
 
     if (!error && data) {
       setItems(data)
@@ -35,7 +38,7 @@ export function useGroceryList(householdId) {
     setLoading(false)
   }, [householdId])
 
-  // Subscribe to real-time changes
+  // Subscribe to real-time changes + revalidate on app resume / token refresh
   useEffect(() => {
     fetchItems()
 
@@ -51,7 +54,12 @@ export function useGroceryList(householdId) {
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    const offRevalidate = onRevalidate(() => fetchItems())
+
+    return () => {
+      supabase.removeChannel(channel)
+      offRevalidate()
+    }
   }, [householdId, fetchItems])
 
   // Keep IndexedDB cache in sync with local state
@@ -109,16 +117,13 @@ export function useGroceryList(householdId) {
       return { error: null }
     }
 
-    // Online path — unchanged
-    const { data: maxData } = await supabase
-      .from('grocery_items')
-      .select('sort_order')
-      .eq('household_id', householdId)
-      .eq('store', targetStore)
-      .order('sort_order', { ascending: false })
-      .limit(1)
-
-    const nextOrder = (maxData?.[0]?.sort_order ?? 0) + 1
+    // Compute next sort_order from local state instead of a round trip — the
+    // realtime subscription keeps `items` current, so this saves a query on
+    // every add. A rare collision just ties on sort_order (created_at breaks it).
+    const maxSort = items
+      .filter(i => i.store === targetStore)
+      .reduce((max, i) => Math.max(max, i.sort_order ?? 0), 0)
+    const nextOrder = maxSort + 1
 
     const newItem = {
       household_id: householdId,
@@ -269,9 +274,18 @@ export function useGroceryList(householdId) {
 
   const clearChecked = async (userId) => {
     const checkedItems = items.filter(i => i.checked)
+    let failures = 0
     for (const item of checkedItems) {
-      await checkItem(item, userId)
+      try {
+        await checkItem(item, userId)
+      } catch (err) {
+        failures++
+        console.error('clearChecked failed for item', item.id, err)
+      }
     }
+    // checkItem refetches on its own DB errors; this catches anything that
+    // throws mid-loop so one bad item can't strand the remaining ones.
+    if (failures > 0) fetchItems()
   }
 
   const markChecked = (id) => {

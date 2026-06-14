@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
 
 export function useMealPicks(householdId) {
   const [picks, setPicks] = useState([])
@@ -7,11 +8,13 @@ export function useMealPicks(householdId) {
 
   const fetchPicks = useCallback(async () => {
     if (!householdId) return
-    const { data, error } = await supabase
-      .from('meal_picks')
-      .select('*')
-      .eq('household_id', householdId)
-      .order('created_at', { ascending: true })
+    const { data, error } = await withQueryTimeout(
+      supabase
+        .from('meal_picks')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('created_at', { ascending: true })
+    )
 
     if (!error && data) setPicks(data)
     setLoading(false)
@@ -32,7 +35,12 @@ export function useMealPicks(householdId) {
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    const offRevalidate = onRevalidate(() => fetchPicks())
+
+    return () => {
+      supabase.removeChannel(channel)
+      offRevalidate()
+    }
   }, [householdId, fetchPicks])
 
   const addPick = async ({ userId, recipeId, name, notes, imageUrl, section }) => {

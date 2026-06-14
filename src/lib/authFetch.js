@@ -1,16 +1,12 @@
 import { supabase } from './supabase'
+import { raceTimeout } from './sessionManager'
 
 const SESSION_TIMEOUT_MS = 2000
 const FETCH_TIMEOUT_MS = 55000
 
 async function getTokenWithTimeout() {
   try {
-    const result = await Promise.race([
-      supabase.auth.getSession(),
-      new Promise((resolve) =>
-        setTimeout(() => resolve({ __timeout: true }), SESSION_TIMEOUT_MS)
-      ),
-    ])
+    const result = await raceTimeout(supabase.auth.getSession(), SESSION_TIMEOUT_MS)
     if (result?.__timeout) return null
     return result?.data?.session?.access_token ?? null
   } catch {

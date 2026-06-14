@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { raceTimeout, onRevalidate } from '../lib/sessionManager'
 import { hasMatch } from '../lib/ingredientMatch'
 
 export function useIngredientCoverage(householdId, recipes) {
@@ -12,16 +13,20 @@ export function useIngredientCoverage(householdId, recipes) {
   const fetchData = useCallback(async () => {
     if (!householdId || recipeIds.length === 0) return
 
-    const [ingredientRes, inventoryRes] = await Promise.all([
-      supabase
-        .from('recipe_ingredients')
-        .select('recipe_id, name')
-        .in('recipe_id', recipeIds),
-      supabase
-        .from('inventory_items')
-        .select('name')
-        .eq('household_id', householdId),
-    ])
+    const [ingredientRes, inventoryRes] = await raceTimeout(
+      Promise.all([
+        supabase
+          .from('recipe_ingredients')
+          .select('recipe_id, name')
+          .in('recipe_id', recipeIds),
+        supabase
+          .from('inventory_items')
+          .select('name')
+          .eq('household_id', householdId),
+      ]),
+      8000,
+      [{ data: null }, { data: null }]
+    )
 
     if (ingredientRes.data) setAllIngredients(ingredientRes.data)
     if (inventoryRes.data) {
@@ -57,10 +62,13 @@ export function useIngredientCoverage(householdId, recipes) {
       }, debouncedFetch)
       .subscribe()
 
+    const offRevalidate = onRevalidate(() => fetchData())
+
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(inventoryChannel)
       supabase.removeChannel(ingredientChannel)
+      offRevalidate()
     }
   }, [householdId, fetchData, debouncedFetch])
 

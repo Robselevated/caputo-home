@@ -1,21 +1,28 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { TAXONOMY, DEFAULT_UNITS } from '../lib/constants'
 
 export default function CategorySection({ category, items, colorClass, accentColor, textColor, onUpdateQty, onEditItem, onDelete, onAddToGrocery, userId, location, dragHandleProps, showDragHandle = true }) {
   const [collapsed, setCollapsed] = useState(true)
-  const totalItems = items.length
-  const zeroQtyCount = items.filter(i => i.qty === 0).length
 
-  // Group by subcategory
-  const hasSubcategories = items.some(i => i.subcategory)
-  const groups = {}
-  if (hasSubcategories) {
-    for (const item of items) {
-      const key = item.subcategory || 'Other'
-      if (!groups[key]) groups[key] = []
-      groups[key].push(item)
+  // Derive counts + subcategory grouping once per items change, not on every
+  // render (e.g. collapse toggles no longer recompute the whole grouping).
+  const { totalItems, zeroQtyCount, hasSubcategories, groups } = useMemo(() => {
+    const hasSubs = items.some(i => i.subcategory)
+    const grouped = {}
+    if (hasSubs) {
+      for (const item of items) {
+        const key = item.subcategory || 'Other'
+        if (!grouped[key]) grouped[key] = []
+        grouped[key].push(item)
+      }
     }
-  }
+    return {
+      totalItems: items.length,
+      zeroQtyCount: items.filter(i => i.qty === 0).length,
+      hasSubcategories: hasSubs,
+      groups: grouped,
+    }
+  }, [items])
 
   return (
     <div className="space-y-4">

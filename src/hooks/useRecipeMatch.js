@@ -10,14 +10,14 @@ export function useRecipeMatch(householdId) {
     try {
       const { data: recipeIngredients, error: recipeError } = await supabase
         .from('recipe_ingredients')
-        .select('*')
+        .select('id, name, qty, unit')
         .eq('recipe_id', recipeId)
 
       if (recipeError) return { error: recipeError }
 
       const { data: inventoryItems, error: inventoryError } = await supabase
         .from('inventory_items')
-        .select('*')
+        .select('id, name, qty, unit, location')
         .eq('household_id', householdId)
 
       if (inventoryError) return { error: inventoryError }
@@ -95,9 +95,19 @@ export function useRecipeMatch(householdId) {
       }
     }
 
-    await Promise.all(updates)
+    // Supabase query builders resolve to { error } instead of rejecting, so a
+    // plain Promise.all "success" can still hide failed updates. Inspect each
+    // result and report how many didn't persist.
+    const results = await Promise.all(updates)
+    const failed = results.filter((r) => r?.error)
+    if (failed.length > 0) {
+      console.error(
+        `useRecipe: ${failed.length} inventory update(s) failed`,
+        failed.map((f) => f.error?.message)
+      )
+    }
 
-    return { decremented, nowOut, skipped }
+    return { decremented, nowOut, skipped, failedCount: failed.length }
   }
 
   const addDepletedToGroceryList = async (depletedItems, recipeName, userId) => {

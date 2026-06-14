@@ -23,15 +23,40 @@ export function useOfflineSync(householdId) {
     }
   }, [])
 
-  // Check pending count periodically
+  // Check pending count periodically while the app is visible. Pausing the poll
+  // when backgrounded avoids needless wakeups / battery drain — the resume
+  // handler re-checks on return anyway.
   useEffect(() => {
+    let interval = null
     const check = async () => {
       const count = await getPendingCount()
       setPendingCount(count)
     }
-    check()
-    const interval = setInterval(check, 5000)
-    return () => clearInterval(interval)
+    const start = () => {
+      if (interval) return
+      check()
+      interval = setInterval(check, 5000)
+    }
+    const stop = () => {
+      if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') start()
+      else stop()
+    }
+    if (typeof document === 'undefined' || document.visibilityState === 'visible') start()
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibility)
+    }
+    return () => {
+      stop()
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility)
+      }
+    }
   }, [])
 
   // Auto-sync when coming back online

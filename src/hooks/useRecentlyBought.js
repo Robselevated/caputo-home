@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
 
 export function useRecentlyBought(householdId) {
   const [items, setItems] = useState([])
@@ -8,12 +9,14 @@ export function useRecentlyBought(householdId) {
   const fetchItems = useCallback(async () => {
     if (!householdId) return
     const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-    const { data, error } = await supabase
-      .from('recently_bought')
-      .select('*, bought_by_user:users!recently_bought_bought_by_fkey(name)')
-      .eq('household_id', householdId)
-      .gte('bought_at', cutoff)
-      .order('bought_at', { ascending: false })
+    const { data, error } = await withQueryTimeout(
+      supabase
+        .from('recently_bought')
+        .select('*, bought_by_user:users!recently_bought_bought_by_fkey(name)')
+        .eq('household_id', householdId)
+        .gte('bought_at', cutoff)
+        .order('bought_at', { ascending: false })
+    )
 
     if (!error && data) setItems(data)
     setLoading(false)
@@ -34,7 +37,12 @@ export function useRecentlyBought(householdId) {
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    const offRevalidate = onRevalidate(() => fetchItems())
+
+    return () => {
+      supabase.removeChannel(channel)
+      offRevalidate()
+    }
   }, [householdId, fetchItems])
 
   const addBackToList = async (item, userId) => {

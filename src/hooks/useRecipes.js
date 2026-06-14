@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
 import { authFetch } from '../lib/authFetch'
 
 export function useRecipes(householdId) {
@@ -8,11 +9,13 @@ export function useRecipes(householdId) {
 
   const fetchRecipes = useCallback(async () => {
     if (!householdId) return
-    const { data, error } = await supabase
-      .from('recipes')
-      .select('*')
-      .eq('household_id', householdId)
-      .order('created_at', { ascending: false })
+    const { data, error } = await withQueryTimeout(
+      supabase
+        .from('recipes')
+        .select('*')
+        .eq('household_id', householdId)
+        .order('created_at', { ascending: false })
+    )
 
     if (!error && data) setRecipes(data)
     setLoading(false)
@@ -42,7 +45,12 @@ export function useRecipes(householdId) {
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    const offRevalidate = onRevalidate(() => fetchRecipes())
+
+    return () => {
+      supabase.removeChannel(channel)
+      offRevalidate()
+    }
   }, [householdId, fetchRecipes])
 
   const getRecipe = async (id) => {
@@ -200,8 +208,13 @@ export function useRecipes(householdId) {
 
       if (recipeError) return { error: recipeError }
 
-      // Replace ingredients
-      await supabase.from('recipe_ingredients').delete().eq('recipe_id', id)
+      // Replace ingredients — bail if the delete fails so we never leave
+      // duplicates (delete failed) or reinsert onto a half-cleared list.
+      const { error: deleteError } = await supabase
+        .from('recipe_ingredients')
+        .delete()
+        .eq('recipe_id', id)
+      if (deleteError) return { error: deleteError }
 
       if (parsed.ingredients && parsed.ingredients.length > 0) {
         const ingredients = parsed.ingredients.map((ing, i) => ({
@@ -250,7 +263,11 @@ export function useRecipes(householdId) {
     if (recipeError) return { error: recipeError }
 
     // Delete and reinsert ingredients (same pattern as reimportRecipe)
-    await supabase.from('recipe_ingredients').delete().eq('recipe_id', id)
+    const { error: deleteError } = await supabase
+      .from('recipe_ingredients')
+      .delete()
+      .eq('recipe_id', id)
+    if (deleteError) return { error: deleteError }
 
     if (ingredients && ingredients.length > 0) {
       const rows = ingredients.map((ing, i) => ({

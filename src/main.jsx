@@ -4,9 +4,16 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 import { recoverFromChunkError, looksLikeChunkError } from './lib/recovery'
+import { installResumeHandler } from './lib/sessionManager'
 
-// Defer the SW update check so it never competes with first paint.
-// VitePWA's autoUpdate handles activation; this just nudges an update fetch.
+// Re-validate the session and refetch data whenever iOS wakes the backgrounded
+// PWA. Installed once at module scope (not in a component) so React StrictMode
+// can't double-register the listeners.
+installResumeHandler()
+
+// Defer the SW update check so it never competes with first paint. The PWA uses
+// registerType 'prompt' (see vite.config.js) — this just nudges an update fetch
+// in the background; the new SW still waits for all windows to close to activate.
 if ('serviceWorker' in navigator) {
   setTimeout(() => {
     navigator.serviceWorker.ready

@@ -49,3 +49,23 @@ export function looksLikeChunkError(message) {
   const str = typeof message === 'string' ? message : String(message)
   return CHUNK_ERROR_PATTERNS.some((p) => str.includes(p))
 }
+
+// Lighter recovery for the resume path: when the app has been backgrounded long
+// enough that the token is certainly dead (or getSession hangs on wake), a plain
+// reload gets a fresh document + fresh session without nuking the SW/caches.
+// Shares the SAME 3-attempt / 24h counter as recoverFromChunkError so the two
+// paths can never combine into a reload loop. Never reloads while offline.
+export function softReloadViaRecovery() {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return
+  const now = Date.now()
+  let firstTs = parseInt(localStorage.getItem(RESET_TS_KEY) || '0', 10)
+  let count = parseInt(localStorage.getItem(RESET_COUNT_KEY) || '0', 10)
+  if (!firstTs || now - firstTs > WINDOW_MS) {
+    firstTs = now
+    count = 0
+    localStorage.setItem(RESET_TS_KEY, String(firstTs))
+  }
+  if (count >= MAX_RESETS) return
+  localStorage.setItem(RESET_COUNT_KEY, String(count + 1))
+  window.location.reload()
+}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
 import { DEFAULT_UNITS } from '../lib/constants'
 
 export function useInventory(householdId, location) {
@@ -8,14 +9,16 @@ export function useInventory(householdId, location) {
 
   const fetchItems = useCallback(async () => {
     if (!householdId) return
-    const { data, error } = await supabase
-      .from('inventory_items')
-      .select('*, updated_by_user:users!inventory_items_updated_by_fkey(name)')
-      .eq('household_id', householdId)
-      .eq('location', location)
-      .order('category')
-      .order('subcategory')
-      .order('name')
+    const { data, error } = await withQueryTimeout(
+      supabase
+        .from('inventory_items')
+        .select('*, updated_by_user:users!inventory_items_updated_by_fkey(name)')
+        .eq('household_id', householdId)
+        .eq('location', location)
+        .order('category')
+        .order('subcategory')
+        .order('name')
+    )
 
     if (!error && data) setItems(data)
     setLoading(false)
@@ -48,7 +51,12 @@ export function useInventory(householdId, location) {
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    const offRevalidate = onRevalidate(() => fetchItems())
+
+    return () => {
+      supabase.removeChannel(channel)
+      offRevalidate()
+    }
   }, [householdId, location, fetchItems])
 
   const addItem = async ({ name, qty, unit, category, subcategory, notes, userId }) => {

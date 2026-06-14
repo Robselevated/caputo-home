@@ -66,6 +66,10 @@ export default function RecipeDetail() {
     const result = await useRecipe(matchResult, recipe.name, user.id)
     setUseResult(result)
     setUsing(false)
+    if (result?.failedCount > 0) {
+      setSuccessMessage(`Heads up: ${result.failedCount} inventory update${result.failedCount !== 1 ? 's' : ''} didn't save. Check your connection and try again.`)
+      setTimeout(() => setSuccessMessage(null), 5000)
+    }
   }
 
   const handleAddDepletedToGroceryList = async () => {
