@@ -15,6 +15,10 @@ const AuthContext = createContext(null)
 // stranded householdId and left every page spinning forever.
 const PROFILE_TIMEOUT_MS = 6000
 const PROFILE_MAX_RETRIES = 4
+// Hard backstop: if we're online and the profile still hasn't loaded after this
+// long, stop spinning and surface a retry. Guarantees the household resolution
+// can never present as an infinite spinner again, whatever the cause.
+const PROFILE_HARD_TIMEOUT_MS = 15000
 
 function seedProfile() {
   const u = readPersistedUser()
@@ -28,6 +32,7 @@ export function AuthProvider({ children }) {
   // Seed profile synchronously so householdId is available on first paint.
   const [profile, setProfile] = useState(seedProfile)
   const [loading, setLoading] = useState(true)
+  const [profileError, setProfileError] = useState(false)
   const fetchedForUserRef = useRef(null)
   const currentUserIdRef = useRef(user?.id ?? null)
 
@@ -48,9 +53,10 @@ export function AuthProvider({ children }) {
           if (currentUserIdRef.current === userId) fetchProfile(userId, attempt + 1)
         }, delay)
       } else {
-        // Out of retries — release the guard so a later auth event / resume can
-        // try again, rather than wedging householdId forever.
+        // Out of retries — release the guard and surface an error so the UI can
+        // offer a retry instead of wedging householdId (and the spinner) forever.
         fetchedForUserRef.current = null
+        setProfileError(true)
       }
     }
 
@@ -71,12 +77,20 @@ export function AuthProvider({ children }) {
       if (result?.data) {
         setProfile(result.data)
         persistProfile(result.data)
+        setProfileError(false)
       }
     } catch (err) {
       console.warn('fetchProfile threw:', err?.message ?? err)
       retry()
     }
   }, [])
+
+  const retryProfile = useCallback(() => {
+    setProfileError(false)
+    fetchedForUserRef.current = null
+    const uid = currentUserIdRef.current
+    if (uid) fetchProfile(uid)
+  }, [fetchProfile])
 
   useEffect(() => {
     let mounted = true
@@ -107,7 +121,10 @@ export function AuthProvider({ children }) {
         const nextUser = session?.user ?? null
         setUser(nextUser)
         if (nextUser) {
-          fetchProfile(nextUser.id)
+          // Defer Supabase work out of the auth callback: calling getSession/
+          // queries synchronously here re-enters GoTrue's auth lock and can
+          // deadlock (the documented "don't await inside onAuthStateChange").
+          setTimeout(() => fetchProfile(nextUser.id), 0)
           // A fresh token after sign-in or refresh: tell data hooks to refetch
           // so they pick up the new session instead of holding stale results.
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
@@ -127,6 +144,15 @@ export function AuthProvider({ children }) {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Hard backstop watchdog: online + signed in + still no profile after the
+  // timeout => surface the error screen instead of an endless spinner.
+  useEffect(() => {
+    if (profile || !user || profileError) return
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return
+    const id = setTimeout(() => setProfileError(true), PROFILE_HARD_TIMEOUT_MS)
+    return () => clearTimeout(id)
+  }, [profile, user, profileError])
+
   const signIn = async (email, password) => {
     return supabase.auth.signInWithPassword({ email, password })
   }
@@ -137,11 +163,12 @@ export function AuthProvider({ children }) {
     setProfile(null)
     clearPersistedProfile()
     fetchedForUserRef.current = null
+    setProfileError(false)
   }
 
   const value = useMemo(
-    () => ({ user, profile, loading, signIn, signOut }),
-    [user, profile, loading]
+    () => ({ user, profile, loading, profileError, retryProfile, signIn, signOut }),
+    [user, profile, loading, profileError, retryProfile]
   )
 
   return (

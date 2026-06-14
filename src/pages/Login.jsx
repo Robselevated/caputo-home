@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { Navigate } from 'react-router-dom'
+import { BUILD_ID } from '../lib/buildId'
 
 export default function Login() {
   const { user, signIn } = useAuth()
@@ -63,6 +64,7 @@ export default function Login() {
           {submitting ? 'Signing in...' : 'Sign In'}
         </button>
       </form>
+      <p className="mt-8 text-warmgray-300 text-[11px] tracking-wide">v{BUILD_ID}</p>
     </div>
   )
 }

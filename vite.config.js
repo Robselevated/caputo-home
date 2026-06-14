@@ -3,6 +3,11 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Inject a short build id (Netlify sets COMMIT_REF on every deploy) so the
+  // running version is visible on-device for diagnosing update/activation gaps.
+  define: {
+    __BUILD_ID__: JSON.stringify((process.env.COMMIT_REF || 'local').slice(0, 7)),
+  },
   build: {
     rollupOptions: {
       output: {

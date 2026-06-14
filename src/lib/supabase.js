@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { makeTimeoutFetch } from './timeoutFetch'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -9,6 +10,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: false,
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+  },
+  global: {
+    // Bound every SDK request so a cold-radio token refresh can't stall forever
+    // and wedge GoTrue's init lock (the "spinner forever on first open" bug).
+    fetch: makeTimeoutFetch(),
   },
 })
 
