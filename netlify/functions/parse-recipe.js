@@ -37,6 +37,19 @@ For ingredients:
 
 Return ONLY a valid JSON object with this exact structure. No markdown, no explanation.`
 
+function extractRecipeJson(text) {
+  if (!text) return null
+  // Strip ```json fences + trailing prose, try a clean parse first.
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim()
+  try { return JSON.parse(cleaned) } catch (_) { /* fall through */ }
+  // Fall back to the first {...} block in case the model wrapped it in prose.
+  const match = cleaned.match(/\{[\s\S]*\}/)
+  if (match) {
+    try { return JSON.parse(match[0]) } catch (_) { /* give up */ }
+  }
+  return null
+}
+
 function extractOgImage(html) {
   const ogMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
     || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i)
@@ -323,7 +336,7 @@ export async function handler(event) {
     // Call Claude API to parse the recipe (22s timeout to fit in Netlify's 26s limit)
     const response = await anthropic.messages.create(
       {
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 4096,
         messages: [
           {
@@ -341,23 +354,12 @@ export async function handler(event) {
     )
 
     const text = response.content[0].text
-    // Parse JSON from response (handle potential markdown wrapping)
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    const recipe = extractRecipeJson(text)
 
-    if (!jsonMatch) {
+    if (!recipe || !recipe.name || !Array.isArray(recipe.ingredients)) {
       return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'Failed to parse recipe from response' }),
-      }
-    }
-
-    const recipe = JSON.parse(jsonMatch[0])
-
-    // Validate required fields
-    if (!recipe.name || !recipe.ingredients || !Array.isArray(recipe.ingredients)) {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'Invalid recipe data structure' }),
+        statusCode: 422,
+        body: JSON.stringify({ error: "That page doesn't look like a recipe. Double-check the link, or add it with Manual Entry." }),
       }
     }
 
@@ -367,6 +369,14 @@ export async function handler(event) {
         const parsed = parseIngredientLine(String(line))
         return { section: null, ...parsed }
       })
+    }
+
+    // Still nothing? It wasn't a real recipe page.
+    if (recipe.ingredients.length === 0) {
+      return {
+        statusCode: 422,
+        body: JSON.stringify({ error: "No recipe ingredients found on that page. Try a different link, or add it with Manual Entry." }),
+      }
     }
 
     // Use og:image as fallback if Claude didn't extract an image
@@ -381,9 +391,12 @@ export async function handler(event) {
     }
   } catch (err) {
     console.error('Recipe parsing error:', err)
+    const friendly = err?.name === 'AbortError'
+      ? 'That site took too long to read. Try again, or add it with Manual Entry.'
+      : "We couldn't read that site. Try again, or add it with Manual Entry."
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Recipe parsing failed', details: err.message }),
+      statusCode: 502,
+      body: JSON.stringify({ error: friendly }),
     }
   }
 }

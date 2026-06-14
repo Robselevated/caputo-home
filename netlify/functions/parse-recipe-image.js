@@ -113,7 +113,7 @@ export async function handler(event) {
     const imageCount = isMultiUrl ? image_urls.length : isMultiB64 ? images.length : 1
     const response = await anthropic.messages.create(
       {
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: imageCount > 1 ? 8192 : 4096,
         messages: [
           {

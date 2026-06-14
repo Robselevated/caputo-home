@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
 import { authFetch } from '../lib/authFetch'
+import { normalizeIngredientQty } from '../lib/parseQty'
 
 export function useRecipes(householdId) {
   const [recipes, setRecipes] = useState([])
@@ -80,9 +81,12 @@ export function useRecipes(householdId) {
 
       if (!response.ok) {
         const errBody = await response.json().catch(() => null)
-        const base = errBody?.error || 'Failed to parse recipe'
-        const detail = errBody?.details ? ` — ${errBody.details}` : ''
-        return { error: base + detail }
+        if (errBody?.error) return { error: errBody.error }
+        if (response.status === 429) return { error: "You've imported a lot recently — give it a few minutes and try again." }
+        if (response.status === 504 || response.status === 502) {
+          return { error: 'That site took too long to read. Try again, or add it with Manual Entry.' }
+        }
+        return { error: `Couldn't import that recipe (error ${response.status}). Try again, or add it with Manual Entry.` }
       }
 
       const parsed = await response.json()
@@ -155,21 +159,28 @@ export function useRecipes(householdId) {
     if (recipeError) return { error: recipeError }
 
     if (recipe.ingredients && recipe.ingredients.length > 0) {
-      const ingredients = recipe.ingredients.map((ing, i) => ({
-        recipe_id: newRecipe.id,
-        name: ing.name,
-        qty: ing.qty || null,
-        unit: ing.unit || null,
-        notes: ing.notes || null,
-        section: ing.section || null,
-        position: i,
-      }))
+      const ingredients = recipe.ingredients.map((ing, i) => {
+        const norm = normalizeIngredientQty(ing)
+        return {
+          recipe_id: newRecipe.id,
+          name: norm.name,
+          qty: norm.qty,
+          unit: ing.unit || null,
+          notes: norm.notes,
+          section: ing.section || null,
+          position: i,
+        }
+      })
 
       const { error: ingredientsError } = await supabase
         .from('recipe_ingredients')
         .insert(ingredients)
 
-      if (ingredientsError) return { error: ingredientsError }
+      if (ingredientsError) {
+        // Don't leave an orphan recipe with no ingredients behind.
+        await supabase.from('recipes').delete().eq('id', newRecipe.id)
+        return { error: ingredientsError }
+      }
     }
 
     return { data: newRecipe }
@@ -185,9 +196,12 @@ export function useRecipes(householdId) {
 
       if (!response.ok) {
         const errBody = await response.json().catch(() => null)
-        const base = errBody?.error || 'Failed to parse recipe'
-        const detail = errBody?.details ? ` — ${errBody.details}` : ''
-        return { error: base + detail }
+        if (errBody?.error) return { error: errBody.error }
+        if (response.status === 429) return { error: "You've imported a lot recently — give it a few minutes and try again." }
+        if (response.status === 504 || response.status === 502) {
+          return { error: 'That site took too long to read. Try again, or add it with Manual Entry.' }
+        }
+        return { error: `Couldn't import that recipe (error ${response.status}). Try again, or add it with Manual Entry.` }
       }
 
       const parsed = await response.json()
@@ -270,15 +284,18 @@ export function useRecipes(householdId) {
     if (deleteError) return { error: deleteError }
 
     if (ingredients && ingredients.length > 0) {
-      const rows = ingredients.map((ing, i) => ({
-        recipe_id: id,
-        name: ing.name,
-        qty: ing.qty || null,
-        unit: ing.unit || null,
-        notes: ing.notes || null,
-        section: ing.section || null,
-        position: i,
-      }))
+      const rows = ingredients.map((ing, i) => {
+        const norm = normalizeIngredientQty(ing)
+        return {
+          recipe_id: id,
+          name: norm.name,
+          qty: norm.qty,
+          unit: ing.unit || null,
+          notes: norm.notes,
+          section: ing.section || null,
+          position: i,
+        }
+      })
 
       const { error: ingredientsError } = await supabase
         .from('recipe_ingredients')

@@ -160,6 +160,8 @@ export default function Cookbook() {
   const [bulkReimporting, setBulkReimporting] = useState(false)
   const [bulkProgress, setBulkProgress] = useState(null) // { current, total }
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
+  const [createError, setCreateError] = useState(null)
+  const [creating, setCreating] = useState(false)
 
   const [latestIngredients, setLatestIngredients] = useState([])
 
@@ -369,15 +371,21 @@ export default function Cookbook() {
       notes: recipeNotes.trim() || null,
       ingredients: ingredients.filter(ing => ing.name.trim()),
     }
+    if (!name.trim()) { setCreateError('Add a recipe name to save it.'); return }
+    setCreating(true)
+    setCreateError(null)
     const { error } = await createRecipe(recipe, user.id)
-    if (!error) {
-      setName(''); setDescription(''); setImageUrl(''); setSourceImageUrl('')
-      setSourceImageUrls([])
-      setServings(''); setPrepTime(''); setCookTime(''); setTags('')
-      setInstructions(''); setRecipeNotes(''); setScanError(null)
-      setIngredients([{ name: '', qty: '', unit: '', notes: '', section: '' }])
-      setShowAdd(false)
+    setCreating(false)
+    if (error) {
+      setCreateError(typeof error === 'string' ? error : (error.message || 'Could not save recipe. Check your connection and try again.'))
+      return
     }
+    setName(''); setDescription(''); setImageUrl(''); setSourceImageUrl('')
+    setSourceImageUrls([])
+    setServings(''); setPrepTime(''); setCookTime(''); setTags('')
+    setInstructions(''); setRecipeNotes(''); setScanError(null)
+    setIngredients([{ name: '', qty: '', unit: '', notes: '', section: '' }])
+    setShowAdd(false)
   }
 
   const addIngredientRow = (section = '') => {
@@ -674,8 +682,11 @@ export default function Cookbook() {
               </div>
               <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Instructions" className="input-field focus:ring-section-cookbook min-h-[100px]" rows={4} />
               <textarea value={recipeNotes} onChange={(e) => setRecipeNotes(e.target.value)} placeholder="Notes, tweaks, modifications..." className="input-field focus:ring-section-cookbook min-h-[60px]" rows={2} />
-              <button type="submit" disabled={!name.trim()} className="btn-primary bg-section-cookbook w-full disabled:opacity-40">
-                Create Recipe
+              {createError && (
+                <div className="text-sm text-red-600 bg-red-50 p-2 rounded-xl">{createError}</div>
+              )}
+              <button type="submit" disabled={creating} className="btn-primary bg-section-cookbook w-full disabled:opacity-40">
+                {creating ? 'Creating...' : 'Create Recipe'}
               </button>
             </form>
           )}
