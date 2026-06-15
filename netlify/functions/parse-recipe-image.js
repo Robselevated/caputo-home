@@ -111,19 +111,25 @@ export async function handler(event) {
     }
 
     const imageCount = isMultiUrl ? image_urls.length : isMultiB64 ? images.length : 1
-    const response = await anthropic.messages.create(
-      {
-        model: 'claude-sonnet-4-6',
-        max_tokens: imageCount > 1 ? 8192 : 4096,
-        messages: [
-          {
-            role: 'user',
-            content: contentBlocks,
-          },
-        ],
-      },
-      { timeout: 22000 }
-    )
+    // OCR extraction runs fast at low effort / no thinking; beta path types
+    // effort, stable path is the fallback.
+    const imageParams = {
+      model: 'claude-sonnet-4-6',
+      max_tokens: imageCount > 1 ? 8192 : 4096,
+      messages: [
+        { role: 'user', content: contentBlocks },
+      ],
+    }
+    let response
+    try {
+      response = await anthropic.beta.messages.create(
+        { ...imageParams, thinking: { type: 'disabled' }, output_config: { effort: 'low' } },
+        { timeout: 9000 }
+      )
+    } catch (modelErr) {
+      console.warn('parse-recipe-image: beta call failed, falling back to stable:', modelErr?.message)
+      response = await anthropic.messages.create(imageParams, { timeout: 9000 })
+    }
 
     const text = response.content[0].text
     // Parse JSON from response (handle potential markdown wrapping)

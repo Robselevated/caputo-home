@@ -134,25 +134,32 @@ export async function handler(event) {
       ? { type: 'base64', media_type: media_type || 'image/jpeg', data: image_base64 }
       : { type: 'url', url: image_url }
 
-    const response = await anthropic.messages.create({
+    // Vision extraction needs no deep reasoning — run it fast (thinking off + low
+    // effort) so Sonnet 4.6's high-effort default doesn't slow the scan. effort/
+    // output_config are only typed on the beta path here, so fall back to stable.
+    const scanParams = {
       model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       messages: [
         {
           role: 'user',
           content: [
-            {
-              type: 'image',
-              source: imageSource,
-            },
-            {
-              type: 'text',
-              text: systemPrompt,
-            },
+            { type: 'image', source: imageSource },
+            { type: 'text', text: systemPrompt },
           ],
         },
       ],
-    })
+    }
+    let response
+    try {
+      response = await anthropic.beta.messages.create(
+        { ...scanParams, thinking: { type: 'disabled' }, output_config: { effort: 'low' } },
+        { timeout: 9000 }
+      )
+    } catch (modelErr) {
+      console.warn('claude-scan: beta call failed, falling back to stable:', modelErr?.message)
+      response = await anthropic.messages.create(scanParams, { timeout: 9000 })
+    }
 
     const text = response.content[0].text
     // Parse JSON from response (handle potential markdown wrapping)
