@@ -254,7 +254,7 @@ export default function RecipeDetail() {
                         <div key={i} className="flex items-baseline gap-2 text-sm">
                           <span className="w-1.5 h-1.5 bg-section-cookbook rounded-full shrink-0 mt-1.5" />
                           <span className="text-charcoal">
-                            {ing.qty && <span className="font-medium">{ing.qty} </span>}
+                            {(ing.qty_text ?? ing.qty) && <span className="font-medium">{ing.qty_text ?? ing.qty} </span>}
                             {ing.unit && <span className="text-warmgray-600">{ing.unit} </span>}
                             {ing.name}
                             {ing.notes && <span className="text-warmgray-500"> ({ing.notes})</span>}
@@ -355,7 +355,7 @@ export default function RecipeDetail() {
                       <div key={i} className="flex items-center gap-2 text-sm">
                         <span className="text-green-500">✓</span>
                         <span className="text-charcoal">
-                          {ing.qty && <span>{ing.qty} </span>}
+                          {(ing.qty_text ?? ing.qty) && <span>{ing.qty_text ?? ing.qty} </span>}
                           {ing.unit && <span>{ing.unit} </span>}
                           {ing.name}
                         </span>
@@ -378,7 +378,7 @@ export default function RecipeDetail() {
                       <div key={i} className="flex items-center gap-2 text-sm">
                         <span className="text-red-500">✗</span>
                         <span className="text-charcoal">
-                          {ing.qty && <span>{ing.qty} </span>}
+                          {(ing.qty_text ?? ing.qty) && <span>{ing.qty_text ?? ing.qty} </span>}
                           {ing.unit && <span>{ing.unit} </span>}
                           {ing.name}
                         </span>

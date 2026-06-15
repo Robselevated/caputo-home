@@ -165,8 +165,9 @@ export function useRecipes(householdId) {
           recipe_id: newRecipe.id,
           name: norm.name,
           qty: norm.qty,
+          qty_text: norm.qty_text,
           unit: ing.unit || null,
-          notes: norm.notes,
+          notes: norm.notes || null,
           section: ing.section || null,
           position: i,
         }
@@ -290,8 +291,9 @@ export function useRecipes(householdId) {
           recipe_id: id,
           name: norm.name,
           qty: norm.qty,
+          qty_text: norm.qty_text,
           unit: ing.unit || null,
-          notes: norm.notes,
+          notes: norm.notes || null,
           section: ing.section || null,
           position: i,
         }

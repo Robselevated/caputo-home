@@ -191,7 +191,8 @@ create table recipe_ingredients (
   id uuid primary key default gen_random_uuid(),
   recipe_id uuid references recipes(id) on delete cascade,
   name text not null,              -- must match inventory_items.name exactly (case-insensitive)
-  qty numeric,
+  qty numeric,                     -- numeric value for math (e.g. "Make This" inventory decrement)
+  qty_text text,                   -- verbatim quantity as typed for display ("1/2", "to taste")
   unit text,
   notes text,                      -- substitution notes per ingredient
   section text,                    -- ingredient group heading (e.g. 'Sauce', 'Chicken', 'Green Sauce')

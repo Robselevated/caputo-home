@@ -60,7 +60,7 @@ export default function RecipeEdit() {
     if (data.ingredients && data.ingredients.length > 0) {
       setIngredients(data.ingredients.map(ing => ({
         name: ing.name || '',
-        qty: ing.qty ? String(ing.qty) : '',
+        qty: ing.qty_text ?? (ing.qty != null ? String(ing.qty) : ''),
         unit: ing.unit || '',
         notes: ing.notes || '',
         section: ing.section || '',
@@ -154,7 +154,7 @@ export default function RecipeEdit() {
       if (parsed.ingredients?.length) {
         setIngredients(parsed.ingredients.map(ing => ({
           name: ing.name || '',
-          qty: ing.qty ? String(ing.qty) : '',
+          qty: ing.qty_text ?? (ing.qty != null ? String(ing.qty) : ''),
           unit: ing.unit || '',
           notes: ing.notes || '',
           section: ing.section || '',

@@ -65,18 +65,18 @@ describe('parseIngredientBlock', () => {
 })
 
 describe('normalizeIngredientQty', () => {
-  it('converts a fraction and leaves notes alone', () => {
+  it('keeps a numeric qty for math and the verbatim text for display', () => {
     expect(normalizeIngredientQty({ name: 'flour', qty: '1/2', notes: null }))
-      .toEqual({ name: 'flour', qty: 0.5, notes: null })
+      .toEqual({ name: 'flour', qty: 0.5, qty_text: '1/2', notes: null })
   })
 
-  it('stashes non-numeric quantity text into notes', () => {
+  it('stores non-numeric quantities verbatim with qty null', () => {
     expect(normalizeIngredientQty({ name: 'salt', qty: 'to taste', notes: null }))
-      .toEqual({ name: 'salt', qty: null, notes: 'to taste' })
+      .toEqual({ name: 'salt', qty: null, qty_text: 'to taste', notes: null })
   })
 
-  it('appends leftover to existing notes', () => {
-    expect(normalizeIngredientQty({ name: 'salt', qty: 'to taste', notes: 'fine grain' }))
-      .toEqual({ name: 'salt', qty: null, notes: 'fine grain (to taste)' })
+  it('maps an empty qty to null/null', () => {
+    expect(normalizeIngredientQty({ name: 'salt', qty: '', notes: null }))
+      .toEqual({ name: 'salt', qty: null, qty_text: null, notes: null })
   })
 })

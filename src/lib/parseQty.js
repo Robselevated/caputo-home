@@ -105,13 +105,11 @@ export function parseIngredientBlock(block) {
     .filter(Boolean)
 }
 
-// Coerce an ingredient's free-text qty into a numeric qty, stashing any
-// non-numeric remainder into notes so nothing the user typed is lost.
+// Build the row to store: a numeric `qty` (for math like "Make This") plus
+// `qty_text`, the verbatim string the user typed, so the recipe displays exactly
+// as written ("1/2 cup", "to taste") instead of "0.5 cup".
 export function normalizeIngredientQty(ing) {
-  const { qty, leftover } = parseQty(ing.qty)
-  let notes = ing.notes ?? null
-  if (leftover) {
-    notes = notes ? `${notes} (${leftover})` : leftover
-  }
-  return { ...ing, qty, notes }
+  const text = ing.qty == null ? '' : String(ing.qty).trim()
+  const { qty } = parseQty(text)
+  return { ...ing, qty, qty_text: text || null }
 }
