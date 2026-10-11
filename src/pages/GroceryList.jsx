@@ -15,7 +15,7 @@ import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-ki
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
 import SortableGroceryItem from '../components/SortableGroceryItem'
 import { STORES, UNITS, getDefaultStore } from '../lib/constants'
-import { runOneTimeInventoryCleanup } from '../lib/inventoryCleanup'
+import { usePendingAction } from '../hooks/usePendingAction'
 
 // Store accent colors for left bar + badges
 const storeAccentColors = {
@@ -80,26 +80,10 @@ export default function GroceryList() {
   const [expandedDays, setExpandedDays] = useState({})
   const storeSwitcherRef = useRef(null)
   const menuRef = useRef(null)
-  const pendingChecks = useRef({})
-
-  // Flush pending check-offs on navigation/unmount so a user who taps
-  // and leaves within the 1.5s undo window doesn't lose their checkmark.
-  useEffect(() => {
-    const flush = () => {
-      const pending = pendingChecks.current
-      pendingChecks.current = {}
-      for (const id in pending) {
-        const entry = pending[id]
-        clearTimeout(entry.timeoutId)
-        try { checkItem(entry.item, entry.userId) } catch {}
-      }
-    }
-    window.addEventListener('pagehide', flush)
-    return () => {
-      window.removeEventListener('pagehide', flush)
-      flush()
-    }
-  }, [checkItem])
+  // 1.5s undo window for check-offs. The hook flushes on pagehide/unmount and
+  // reads checkItem through a ref, so re-renders never fire it early (the old
+  // effect keyed on checkItem's identity flushed on every render).
+  const pendingChecks = usePendingAction((entry) => checkItem(entry.item, entry.userId), { delayMs: 1500 })
 
   // Add form state
   const [name, setName] = useState('')
@@ -126,14 +110,6 @@ export default function GroceryList() {
       setShowNotifBanner(true)
     }
   }, [permission])
-
-  // One-time inventory cleanup when the household is first known.
-  // Internally gated by a localStorage flag so it never runs twice.
-  useEffect(() => {
-    if (householdId && user?.id) {
-      runOneTimeInventoryCleanup(householdId, user.id)
-    }
-  }, [householdId, user?.id])
 
   const handleEnableNotifications = async () => {
     await requestPermission()
@@ -308,20 +284,14 @@ export default function GroceryList() {
 
   const handleCheck = (item) => {
     if (item.checked) {
-      // Undo: cancel pending removal and revert UI
-      const entry = pendingChecks.current[item.id]
-      if (entry) clearTimeout(entry.timeoutId)
-      delete pendingChecks.current[item.id]
+      // Undo: cancel the pending removal and revert the UI
+      pendingChecks.cancel(item.id)
       markUnchecked(item.id)
       return
     }
     markChecked(item.id)
     sendPushNotification(householdId, user.id, 'checked_off', item.name).catch(() => {})
-    const timeoutId = setTimeout(() => {
-      delete pendingChecks.current[item.id]
-      checkItem(item, user.id)
-    }, 1500)
-    pendingChecks.current[item.id] = { timeoutId, item, userId: user.id }
+    pendingChecks.schedule(item.id, { item, userId: user.id })
   }
 
   const startEdit = (item) => {

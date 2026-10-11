@@ -24,7 +24,13 @@ Database name: `caputo-home`, version 1
 
 **write_queue store** (keyPath: `id`, autoIncrement)
 - Queued mutations that couldn't reach Supabase
-- Each entry has: `type` (insert/update/delete), relevant payload fields, `timestamp`
+- Each entry has: `type`, relevant payload fields, `timestamp`, and `attempts`
+- Grocery types: `insert`, `update`, `delete`, `reorder`, `check` (carries the
+  kitchen `location`/`category`/`unit`; replayed through the
+  `check_off_grocery_item` RPC)
+- Kitchen types: `inventory_merge` (replayed through `merge_inventory_item`;
+  legacy `inventory_add` entries replay the same way), `inventory_update`,
+  `inventory_delete`
 - Indexed by `timestamp` for ordered replay
 
 ## Sync Sequence
@@ -56,7 +62,9 @@ Database name: `caputo-home`, version 1
    - `update`: patches the item by `itemId` with `changes`
    - `delete`: deletes by `itemId`
 5. After each successful write, `clearWrite(id)` removes it from the queue
-6. If a write fails, it stays in the queue and sync continues with the next one
+6. If a write fails (thrown error OR a `{ error }` response from supabase-js),
+   it stays in the queue, its `attempts` counter increments, and sync continues
+   with the next one. After 5 failed attempts the write is dropped and logged.
 7. After all writes processed, `pendingCount` refreshes
 
 ### Conflict handling

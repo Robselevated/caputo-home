@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './hooks/useAuth'
+import { ToastProvider } from './components/ui/Toast'
 import GroceryList from './pages/GroceryList'
 
 // Lazy-load secondary routes; GroceryList is eager since it's the landing page.
@@ -30,6 +31,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
+      <ToastProvider>
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -59,6 +61,7 @@ export default function App() {
           />
         </Routes>
       </Suspense>
+      </ToastProvider>
       </AuthProvider>
     </ErrorBoundary>
   )

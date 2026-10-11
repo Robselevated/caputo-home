@@ -8,7 +8,10 @@ export function useIngredientCoverage(householdId, recipes) {
   const [inventoryNames, setInventoryNames] = useState(new Set())
   const debounceRef = useRef(null)
 
-  const recipeIds = useMemo(() => recipes.map(r => r.id), [recipes])
+  // Key on the ids themselves, not the array identity: every recipes refetch
+  // used to tear down both channels and refetch coverage.
+  const idsKey = recipes.map(r => r.id).join(',')
+  const recipeIds = useMemo(() => (idsKey ? idsKey.split(',') : []), [idsKey])
 
   const fetchData = useCallback(async () => {
     if (!householdId || recipeIds.length === 0) return
@@ -53,21 +56,11 @@ export function useIngredientCoverage(householdId, recipes) {
       }, debouncedFetch)
       .subscribe()
 
-    const ingredientChannel = supabase
-      .channel('coverage_ingredients')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'recipe_ingredients',
-      }, debouncedFetch)
-      .subscribe()
-
     const offRevalidate = onRevalidate(() => fetchData())
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       supabase.removeChannel(inventoryChannel)
-      supabase.removeChannel(ingredientChannel)
       offRevalidate()
     }
   }, [householdId, fetchData, debouncedFetch])

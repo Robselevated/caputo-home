@@ -1,8 +1,14 @@
 import { useState, useMemo } from 'react'
 import { TAXONOMY, DEFAULT_UNITS } from '../lib/constants'
 
-export default function CategorySection({ category, items, colorClass, accentColor, textColor, onUpdateQty, onEditItem, onDelete, onAddToGrocery, userId, location, dragHandleProps, showDragHandle = true }) {
+export default function CategorySection({ category, items: allItems, colorClass, accentColor, textColor, onUpdateQty, onEditItem, onDelete, onAddToGrocery, userId, location, dragHandleProps, showDragHandle = true, hiddenIds = null }) {
   const [collapsed, setCollapsed] = useState(true)
+
+  // Rows with a pending (undo-able) delete are hidden, not removed.
+  const items = useMemo(
+    () => (hiddenIds && hiddenIds.size ? allItems.filter(i => !hiddenIds.has(i.id)) : allItems),
+    [allItems, hiddenIds]
+  )
 
   // Derive counts + subcategory grouping once per items change, not on every
   // render (e.g. collapse toggles no longer recompute the whole grouping).
@@ -35,7 +41,7 @@ export default function CategorySection({ category, items, colorClass, accentCol
               className="touch-none flex items-center justify-center cursor-grab active:cursor-grabbing p-1"
               aria-label={`Reorder ${category}`}
             >
-              <span className="material-symbols-outlined text-warmgray-400 text-lg">drag_indicator</span>
+              <span className="material-symbols-outlined text-warmgray-400 text-lg" aria-hidden="true">drag_indicator</span>
             </div>
           )}
           <div className={`w-1 h-6 ${accentColor || 'bg-warmgray-400'} rounded-full`} />
@@ -44,7 +50,7 @@ export default function CategorySection({ category, items, colorClass, accentCol
             className="flex items-center gap-2 active:opacity-70 transition-opacity"
           >
             <h3 className="font-heading text-xl font-bold text-charcoal">{category}</h3>
-            <span className={`material-symbols-outlined text-warmgray-400 text-lg transition-transform ${collapsed ? '' : 'rotate-180'}`}>
+            <span className={`material-symbols-outlined text-warmgray-400 text-lg transition-transform ${collapsed ? '' : 'rotate-180'}`} aria-hidden="true">
               expand_more
             </span>
           </button>
@@ -172,12 +178,17 @@ function InventoryItem({ item, accentColor, textColor, onUpdateQty, onEditItem, 
 
         {/* Qty controls */}
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => onUpdateQty(item.id, item.qty - 1, userId)}
-            className="w-8 h-8 rounded-full bg-cream flex items-center justify-center text-charcoal-light hover:bg-warmgray-200 transition-colors"
-          >
-            <span className="material-symbols-outlined text-sm">remove</span>
-          </button>
+          {item.qty > 0 ? (
+            <button
+              onClick={() => onUpdateQty(item.id, item.qty - 1, userId)}
+              aria-label={`Decrease ${item.name}`}
+              className="w-9 h-9 rounded-full bg-cream flex items-center justify-center text-charcoal-light active:bg-warmgray-200 transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm" aria-hidden="true">remove</span>
+            </button>
+          ) : (
+            <span className="w-9 h-9" aria-hidden="true" />
+          )}
 
           {editing ? (
             <input
@@ -202,26 +213,40 @@ function InventoryItem({ item, accentColor, textColor, onUpdateQty, onEditItem, 
 
           <button
             onClick={() => onUpdateQty(item.id, item.qty + 1, userId)}
-            className={`w-8 h-8 rounded-full ${accentColor || 'bg-warmgray-400'} text-white flex items-center justify-center hover:opacity-90 transition-colors`}
+            aria-label={`Increase ${item.name}`}
+            className={`w-9 h-9 rounded-full ${accentColor || 'bg-warmgray-400'} text-white flex items-center justify-center active:opacity-80 transition-opacity`}
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">add</span>
           </button>
         </div>
 
         {/* Actions */}
-        <button
-          onClick={() => onAddToGrocery(item, userId)}
-          className="text-section-grocery shrink-0"
-          title="Add to grocery list"
-        >
-          <span className="material-symbols-outlined text-lg">add_shopping_cart</span>
-        </button>
-        <button
-          onClick={() => onDelete(item.id)}
-          className="text-warmgray-300 hover:text-red-500 shrink-0 transition-colors"
-        >
-          <span className="material-symbols-outlined text-lg">delete_outline</span>
-        </button>
+        <div className="flex items-center gap-1 shrink-0 ml-1">
+          <button
+            onClick={() => onAddToGrocery(item, userId)}
+            aria-label={`Add ${item.name} to grocery list`}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-section-grocery active:bg-section-grocery/10 transition-colors"
+          >
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">add_shopping_cart</span>
+          </button>
+          {item.qty === 0 ? (
+            <button
+              onClick={() => onDelete(item)}
+              aria-label={`Remove ${item.name}`}
+              className="h-9 px-3 rounded-full bg-red-50 text-red-500 text-xs font-bold active:bg-red-100 transition-colors"
+            >
+              Remove
+            </button>
+          ) : (
+            <button
+              onClick={() => onDelete(item)}
+              aria-label={`Delete ${item.name}`}
+              className="w-9 h-9 rounded-full flex items-center justify-center text-warmgray-400 active:text-red-500 active:bg-red-50 transition-colors"
+            >
+              <span className="material-symbols-outlined text-lg" aria-hidden="true">delete_outline</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Edit Sheet */}

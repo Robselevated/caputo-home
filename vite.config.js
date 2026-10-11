@@ -28,7 +28,9 @@ export default defineConfig({
       // activates it cleanly with matching HTML + chunk hashes.
       registerType: 'prompt',
       injectRegister: 'auto',
-      includeAssets: ['icon-192.png', 'icon-512.png', 'apple-touch-icon.png'],
+      // Nothing extra in the precache: the manifest/home-screen icons are fetched
+      // by the OS directly and the big ones were costing ~1.2MB per deploy.
+      includeAssets: [],
       manifest: {
         name: 'Caputo Home',
         short_name: 'Caputo',
@@ -68,23 +70,16 @@ export default defineConfig({
         skipWaiting: false,
         clientsClaim: false,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globIgnores: ['**/icon-512.png', '**/apple-touch-icon.png'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/auth\/.*/i,
             handler: 'NetworkOnly',
           },
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-api',
-              networkTimeoutSeconds: 5,
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24
-              }
-            }
-          },
+          // No rule for /rest/v1/*: list responses must never be served stale.
+          // NetworkFirst used to hand back a cached pantry list on a slow
+          // network, which resurrected rows that had just been deleted. Offline
+          // reads come from the app-level cache instead.
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
             handler: 'CacheFirst',
@@ -94,6 +89,24 @@ export default defineConfig({
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 7
               }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'google-fonts-css',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-files',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 }
             }
           }
         ]

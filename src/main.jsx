@@ -11,15 +11,30 @@ import { installResumeHandler } from './lib/sessionManager'
 // can't double-register the listeners.
 installResumeHandler()
 
-// Defer the SW update check so it never competes with first paint. The PWA uses
-// registerType 'prompt' (see vite.config.js) — this just nudges an update fetch
-// in the background; the new SW still waits for all windows to close to activate.
+// Nudge a background SW update check well after first paint and the initial
+// data load (30s, only while visible), and again when connectivity returns.
+// The PWA uses registerType 'prompt' (see vite.config.js): the new SW still
+// waits for all windows to close before it activates.
 if ('serviceWorker' in navigator) {
-  setTimeout(() => {
+  const checkForUpdate = () => {
+    if (document.visibilityState !== 'visible') return
     navigator.serviceWorker.ready
       .then((reg) => reg.update())
       .catch(() => {})
-  }, 5000)
+  }
+  setTimeout(checkForUpdate, 30000)
+  window.addEventListener('online', checkForUpdate)
+
+  // One-time cleanup of the retired REST response cache (see vite.config.js).
+  try {
+    if (!localStorage.getItem('sw-rest-cache-purged') && 'caches' in window) {
+      caches.delete('supabase-api')
+        .then(() => localStorage.setItem('sw-rest-cache-purged', '1'))
+        .catch(() => {})
+    }
+  } catch {
+    // storage unavailable: nothing to purge
+  }
 }
 
 window.addEventListener('error', (event) => {

@@ -17,3 +17,31 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Hashed build output never changes under the same name: let browsers keep it
+# for a year without revalidating. Entry points (HTML, SW, manifest) must
+# always be revalidated so a new deploy is picked up on the next launch.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "no-cache"

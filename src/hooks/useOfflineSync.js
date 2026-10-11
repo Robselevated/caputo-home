@@ -1,8 +1,35 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { cacheGroceryItems, getCachedGroceryItems, queueWrite, getPendingWrites, clearWrite, getPendingCount, incrementWriteAttempts } from '../lib/db'
+import { checkOffGroceryItem } from '../lib/checkOff'
 
 const MAX_SYNC_ATTEMPTS = 5
+
+// supabase-js resolves with { error } instead of throwing. Turn that into a
+// throw so a failed replay is retried (and eventually dropped) instead of being
+// cleared from the queue as if it had succeeded.
+function ok(res) {
+  if (res?.error) throw res.error
+  return res
+}
+
+async function mergeInventory(data) {
+  const res = await supabase.rpc('merge_inventory_item', {
+    p_household_id: data.household_id,
+    p_name: data.name,
+    p_qty: data.qty ?? 1,
+    p_unit: data.unit ?? null,
+    p_location: data.location,
+    p_category: data.category,
+    p_subcategory: data.subcategory ?? null,
+    p_notes: data.notes ?? null,
+  })
+  if (res?.error?.code === 'PGRST202') {
+    // function not deployed yet: plain insert
+    return ok(await supabase.from('inventory_items').insert(data))
+  }
+  return ok(res)
+}
 
 export function useOfflineSync(householdId) {
   const [isOnline, setIsOnline] = useState(navigator.onLine)
@@ -95,62 +122,45 @@ export function useOfflineSync(householdId) {
         try {
           switch (write.type) {
             case 'insert': {
-              await supabase.from('grocery_items').insert(write.data)
+              ok(await supabase.from('grocery_items').insert(write.data))
               break
             }
             case 'update': {
-              await supabase.from('grocery_items').update(write.changes).eq('id', write.itemId)
+              ok(await supabase.from('grocery_items').update(write.changes).eq('id', write.itemId))
               break
             }
             case 'delete': {
-              await supabase.from('grocery_items').delete().eq('id', write.itemId)
+              ok(await supabase.from('grocery_items').delete().eq('id', write.itemId))
               break
             }
             case 'check': {
               const { item, householdId, userId } = write
-              await supabase.from('recently_bought').insert({
-                household_id: householdId,
-                name: item.name,
-                qty: item.qty,
-                unit: item.unit,
-                store: item.store,
-                notes: item.notes,
-                bought_by: userId,
-              })
-              await supabase.from('item_history').upsert(
-                { household_id: householdId, name: item.name },
-                { onConflict: 'household_id,name' }
-              )
-              await supabase.from('grocery_items').delete().eq('id', item.id)
+              ok(await checkOffGroceryItem(supabase, { item, householdId, userId }))
               break
             }
             case 'reorder': {
               const { orderedIds, userId } = write
-              await Promise.all(orderedIds.map((id, index) =>
+              const results = await Promise.all(orderedIds.map((id, index) =>
                 supabase.from('grocery_items').update({
                   sort_order: index,
                   updated_by: userId,
                   updated_at: new Date().toISOString(),
                 }).eq('id', id)
               ))
+              results.forEach(ok)
               break
             }
-            case 'inventory_add': {
-              const { data: inv } = await supabase
-                .from('inventory_items')
-                .select('id, qty')
-                .eq('household_id', write.data.household_id)
-                .ilike('name', write.data.name)
-                .limit(1)
-                .maybeSingle()
-              if (inv) {
-                await supabase.from('inventory_items').update({
-                  qty: (inv.qty || 0) + (write.data.qty || 1),
-                  updated_by: write.data.updated_by,
-                }).eq('id', inv.id)
-              } else {
-                await supabase.from('inventory_items').insert(write.data)
-              }
+            case 'inventory_add':
+            case 'inventory_merge': {
+              await mergeInventory(write.data)
+              break
+            }
+            case 'inventory_delete': {
+              ok(await supabase.from('inventory_items').delete().eq('id', write.itemId).select('id'))
+              break
+            }
+            case 'inventory_update': {
+              ok(await supabase.from('inventory_items').update(write.changes).eq('id', write.itemId).select('id'))
               break
             }
           }

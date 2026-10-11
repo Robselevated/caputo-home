@@ -6,6 +6,8 @@ import { useAuth } from '../hooks/useAuth'
 import { useInventory } from '../hooks/useInventory'
 import { useScanSession } from '../hooks/useScanSession'
 import { useCategoryOrder } from '../hooks/useCategoryOrder'
+import { useDeleteWithUndo } from '../hooks/useDeleteWithUndo'
+import { toast } from './ui/Toast'
 import { TAXONOMY, DEFAULT_UNITS } from '../lib/constants'
 import CategorySection from './CategorySection'
 import SortableCategoryWrapper from './SortableCategoryWrapper'
@@ -21,6 +23,9 @@ export default function InventoryPage({
   const householdId = profile?.household_id
   const { items, loading, addItem, updateQty, updateItem, deleteItem, addToGroceryList } = useInventory(householdId, location)
   const { scanning, results, error: scanError, uploadAndScan, confirmItems, cancelScan } = useScanSession(householdId)
+  const { requestDelete, hiddenIds } = useDeleteWithUndo(deleteItem, {
+    message: (item) => `${item.name} removed from ${title}`,
+  })
 
   const [showAdd, setShowAdd] = useState(false)
   const [search, setSearch] = useState('')
@@ -71,7 +76,7 @@ export default function InventoryPage({
     e.preventDefault()
     if (!name.trim() || !category) return
     const defaultUnit = DEFAULT_UNITS[location]?.[category] || 'count'
-    await addItem({
+    const res = await addItem({
       name,
       qty: qty ? Number(qty) : 1,
       unit: unit || defaultUnit,
@@ -80,6 +85,11 @@ export default function InventoryPage({
       notes,
       userId: user.id,
     })
+    if (res?.error) return
+    if (res?.merged) {
+      const total = res.item?.qty
+      toast({ message: `${name.trim()} was already in ${title}${total != null ? `, now ${total}` : ''}` })
+    }
     setName('')
     setQty('1')
     setUnit('')
@@ -297,7 +307,8 @@ export default function InventoryPage({
                         textColor={colorClass}
                         onUpdateQty={updateQty}
                         onEditItem={updateItem}
-                        onDelete={deleteItem}
+                        onDelete={requestDelete}
+                        hiddenIds={hiddenIds}
                         onAddToGrocery={addToGroceryList}
                         userId={user.id}
                         location={location}

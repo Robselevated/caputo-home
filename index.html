@@ -10,18 +10,25 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@300;400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@300;400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"></noscript>
+    <!-- Text fonts: swap in when ready. -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@300;400;500;600&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <!-- Icon font, subset to the names the app uses (regenerate the list with
+         `node scripts/material-icon-names.mjs`; src/test/iconSubset.test.js
+         fails if a new icon is missing). display=block so icon names never
+         flash as words while the font loads. -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0..1&icon_names=ac_unit,add,add_circle,add_shopping_cart,bakery_dining,cake,calendar_month,check,close,delete,delete_outline,dinner_dining,document_scanner,drag_indicator,eco,edit,egg_alt,expand_less,expand_more,favorite,inventory_2,kebab_dining,kitchen,link_off,local_cafe,local_fire_department,local_pizza,lunch_dining,menu_book,more_vert,notifications,outdoor_grill,photo_library,progress_activity,ramen_dining,refresh,remove,restaurant,schedule,search,sentiment_satisfied,set_meal,shelves,shopping_basket,shopping_cart,soup_kitchen,spa,sync,timer,warning&display=block" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@300;400;500;600&display=swap">
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0..1&icon_names=ac_unit,add,add_circle,add_shopping_cart,bakery_dining,cake,calendar_month,check,close,delete,delete_outline,dinner_dining,document_scanner,drag_indicator,eco,edit,egg_alt,expand_less,expand_more,favorite,inventory_2,kebab_dining,kitchen,link_off,local_cafe,local_fire_department,local_pizza,lunch_dining,menu_book,more_vert,notifications,outdoor_grill,photo_library,progress_activity,ramen_dining,refresh,remove,restaurant,schedule,search,sentiment_satisfied,set_meal,shelves,shopping_basket,shopping_cart,soup_kitchen,spa,sync,timer,warning&display=block">
+    </noscript>
     <title>Caputo Home</title>
   </head>
   <body class="bg-ivory text-charcoal antialiased font-body">
     <div id="root">
       <div id="splash" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:0 24px">
-        <img src="/caputoappicon.png" alt="" width="64" height="64" style="border-radius:16px;margin-bottom:16px">
-        <div id="splash-spinner" style="width:28px;height:28px;border:3px solid #d1ccc7;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite"></div>
+        <img src="/splash-icon.png" alt="" width="64" height="64" style="border-radius:16px">
         <button id="splash-retry" type="button" style="display:none;margin-top:28px;padding:10px 20px;background:#fff;border:1px solid #d1ccc7;border-radius:10px;font-family:system-ui,-apple-system,sans-serif;font-size:14px;font-weight:500;color:#444;cursor:pointer;-webkit-tap-highlight-color:transparent">Tap to reload</button>
       </div>
-      <style>@keyframes sp{to{transform:rotate(360deg)}}</style>
     </div>
     <script>
       // Self-recovery: if the splash hasn't been replaced in 12s, clear the SW +

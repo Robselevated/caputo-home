@@ -24,7 +24,7 @@ export default function Login() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-ivory px-6">
       <img
-        src="/caputoappicon.png"
+        src="/splash-icon.png"
         alt="Caputo Home"
         className="w-20 h-20 rounded-2xl shadow-dark-md mb-6"
       />

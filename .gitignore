@@ -14,3 +14,9 @@ dist
 
 # Firecrawl cache
 .firecrawl
+
+# Superpowers plan ledgers (local scratch)
+.superpowers
+
+# Claude Code local settings
+.claude/settings.local.json

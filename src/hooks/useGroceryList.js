@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
 import { cacheGroceryItems, getCachedGroceryItems, queueWrite } from '../lib/db'
-import { getDefaultLocation, DEFAULT_UNITS } from '../lib/constants'
+import { checkOffGroceryItem, checkOffParams } from '../lib/checkOff'
+import { toast } from '../components/ui/Toast'
 
 export function useGroceryList(householdId) {
   const [items, setItems] = useState([])
@@ -21,7 +22,7 @@ export function useGroceryList(householdId) {
     const { data, error } = await withQueryTimeout(
       supabase
         .from('grocery_items')
-        .select('*, added_by_user:users!grocery_items_added_by_fkey(name), updated_by_user:users!grocery_items_updated_by_fkey(name)')
+        .select('*')
         .eq('household_id', householdId)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true })
@@ -152,82 +153,28 @@ export function useGroceryList(householdId) {
   const checkItem = async (item, userId) => {
     if (!navigator.onLine) {
       setItems(prev => prev.filter(i => i.id !== item.id))
+      // One queue entry that carries the kitchen destination; replayed through
+      // the check-off RPC when back online.
+      const { location, category, unit } = checkOffParams(item)
       await queueWrite({
         type: 'check',
         item: { ...item },
         householdId,
         userId,
-      })
-      // Queue inventory add for when back online
-      const { location, category } = getDefaultLocation(item.name)
-      await queueWrite({
-        type: 'inventory_add',
-        data: {
-          household_id: householdId,
-          name: item.name,
-          qty: item.qty || 1,
-          unit: item.unit || DEFAULT_UNITS[location]?.[category] || 'count',
-          location,
-          category,
-          updated_by: userId,
-        },
-      })
-      return
-    }
-
-    // Online path — unchanged
-    const { error: insertError } = await supabase.from('recently_bought').insert({
-      household_id: householdId,
-      name: item.name,
-      qty: item.qty,
-      unit: item.unit,
-      store: item.store,
-      notes: item.notes,
-      bought_by: userId,
-    })
-
-    if (insertError) {
-      console.error('Failed to add to recently_bought:', insertError)
-      fetchItems()
-      return
-    }
-
-    await supabase.from('item_history').upsert(
-      { household_id: householdId, name: item.name },
-      { onConflict: 'household_id,name' }
-    )
-
-    // Auto-add to inventory (increment qty if already exists)
-    const { location, category } = getDefaultLocation(item.name)
-    const addQty = item.qty || 1
-    const { data: existing } = await supabase
-      .from('inventory_items')
-      .select('id, qty')
-      .eq('household_id', householdId)
-      .ilike('name', item.name)
-      .limit(1)
-      .maybeSingle()
-
-    if (existing) {
-      await supabase.from('inventory_items').update({
-        qty: (existing.qty || 0) + addQty,
-        updated_by: userId,
-      }).eq('id', existing.id)
-    } else {
-      await supabase.from('inventory_items').insert({
-        household_id: householdId,
-        name: item.name,
-        qty: addQty,
-        unit: item.unit || DEFAULT_UNITS[location]?.[category] || 'count',
         location,
         category,
-        updated_by: userId,
+        unit,
       })
+      return
     }
 
-    const { error: deleteError } = await supabase.from('grocery_items').delete().eq('id', item.id)
-    if (deleteError) {
-      console.error('Failed to delete grocery item:', deleteError)
+    // One transactional round trip (recently_bought + item_history + kitchen
+    // merge + delete). Falls back to the legacy multi-request path if the
+    // function is not deployed yet.
+    const { error } = await checkOffGroceryItem(supabase, { item, householdId, userId })
+    if (error) {
+      console.error('Check-off failed:', error)
+      toast({ message: `Couldn't check off ${item.name}`, tone: 'error' })
       fetchItems()
     }
   }

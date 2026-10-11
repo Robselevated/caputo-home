@@ -137,28 +137,20 @@ export function useScanSession(householdId) {
           { onConflict: 'household_id,name' }
         )
       } else {
-        const { data: matches, error: lookupErr } = await supabase
-          .from('inventory_items')
-          .select('id, qty')
-          .eq('household_id', householdId)
-          .eq('location', location)
-          .ilike('name', item.name)
-
-        if (lookupErr) {
-          errors.push(`${item.name}: ${lookupErr.message}`)
-          return
-        }
-
-        const existing = matches && matches.length > 0 ? matches[0] : null
-
-        if (existing) {
-          const { error: updateErr } = await supabase.from('inventory_items').update({
-            qty: existing.qty + (item.qty || 1),
-            updated_by: userId,
-            updated_at: new Date().toISOString(),
-          }).eq('id', existing.id)
-          if (updateErr) errors.push(`${item.name}: ${updateErr.message}`)
-        } else {
+        // One merge per item: increments the existing row for this
+        // household + location + normalized name, or inserts it.
+        const { error: mergeErr } = await supabase.rpc('merge_inventory_item', {
+          p_household_id: householdId,
+          p_name: item.name,
+          p_qty: item.qty || 1,
+          p_unit: item.unit || 'count',
+          p_location: location,
+          p_category: item.category || 'Other',
+          p_subcategory: item.subcategory || null,
+          p_notes: item.notes || null,
+        })
+        if (mergeErr?.code === 'PGRST202') {
+          // function not deployed yet: plain insert
           const { error: insertErr } = await supabase.from('inventory_items').insert({
             household_id: householdId,
             name: item.name,
@@ -171,6 +163,8 @@ export function useScanSession(householdId) {
             updated_by: userId,
           })
           if (insertErr) errors.push(`${item.name}: ${insertErr.message}`)
+        } else if (mergeErr) {
+          errors.push(`${item.name}: ${mergeErr.message}`)
         }
       }
     }
