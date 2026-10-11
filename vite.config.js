@@ -31,6 +31,9 @@ export default defineConfig({
       // Nothing extra in the precache: the manifest/home-screen icons are fetched
       // by the OS directly and the big ones were costing ~1.2MB per deploy.
       includeAssets: [],
+      // vite-plugin-pwa otherwise injects the manifest icons into the precache
+      // regardless of globIgnores; the OS fetches them on install instead.
+      includeManifestIcons: false,
       manifest: {
         name: 'Caputo Home',
         short_name: 'Caputo',

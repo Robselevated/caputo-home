@@ -225,3 +225,12 @@ describe('useInventory.addToGroceryList', () => {
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ tone: 'error' }))
   })
 })
+
+describe('useInventory connectivity', () => {
+  it('refetches when the browser comes back online (queued kitchen writes replay elsewhere, the list must catch up)', async () => {
+    await renderLoaded()
+    expect(supabase.callsFor('inventory_items', 'select')).toHaveLength(1)
+    await act(async () => { window.dispatchEvent(new Event('online')) })
+    await waitFor(() => expect(supabase.callsFor('inventory_items', 'select')).toHaveLength(2))
+  })
+})

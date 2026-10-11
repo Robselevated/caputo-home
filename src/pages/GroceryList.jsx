@@ -5,11 +5,9 @@ import { useRecentlyBought } from '../hooks/useRecentlyBought'
 import { useItemHistory } from '../hooks/useItemHistory'
 import { useScanSession } from '../hooks/useScanSession'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import { useOfflineSync } from '../hooks/useOfflineSync'
 import ItemAutocomplete from '../components/ItemAutocomplete'
 import PhotoScanner from '../components/PhotoScanner'
 import ReceiptReview from './ReceiptReview'
-import OfflineIndicator from '../components/OfflineIndicator'
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
@@ -63,7 +61,6 @@ export default function GroceryList() {
   const { getSuggestions } = useItemHistory(householdId)
   const { scanning, results, error: scanError, uploadAndScan, confirmItems, cancelScan } = useScanSession(householdId)
   const { permission, requestPermission, sendPushNotification } = usePushNotifications(user?.id)
-  const { isOnline, pendingCount, syncing, syncNow } = useOfflineSync(householdId)
 
   const [showAddForm, setShowAddForm] = useState(false)
   const [showRecentHistory, setShowRecentHistory] = useState(false)
@@ -337,7 +334,6 @@ export default function GroceryList() {
 
   return (
     <div>
-      <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} onSync={syncNow} />
 
       {showNotifBanner && (
         <div className="mx-6 mt-2 mb-0 bg-white border border-warmgray-200 rounded-xl p-3 flex items-center gap-3 shadow-dark-sm">

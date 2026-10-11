@@ -27,6 +27,13 @@ export function collectIconNames(srcDir) {
     }
     // { path: '/x', icon: 'name' }
     for (const m of text.matchAll(/\bicon:\s*'([a-z][a-z0-9_]*)'/g)) add(m[1])
+    // <PhotoScanner icon="receipt_long" /> and function defaults: icon = 'photo_camera'
+    for (const m of text.matchAll(/\bicon\s*=\s*['"]([a-z][a-z0-9_]*)['"]/g)) add(m[1])
+    // Over-inclusive guard: any short lowercase_snake literal within 400 chars after a
+    // material-symbols span opening. False positives only cost a few glyphs.
+    for (const m of text.matchAll(/material-symbols-outlined[\s\S]{0,400}?/g)) {
+      for (const lit of m[0].matchAll(/['"]([a-z][a-z0-9]*_[a-z0-9_]*)['"]/g)) add(lit[1])
+    }
   }
   return [...names].sort()
 }

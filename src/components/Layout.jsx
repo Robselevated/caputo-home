@@ -1,6 +1,14 @@
 import BottomNav from './BottomNav'
+import OfflineIndicator from './OfflineIndicator'
+import { useAuth } from '../hooks/useAuth'
+import { useOfflineSync } from '../hooks/useOfflineSync'
 
 export default function Layout({ children }) {
+  // The ONE offline-sync instance for the app: it replays queued writes when
+  // connectivity returns regardless of which tab is open.
+  const { profile } = useAuth()
+  const { isOnline, pendingCount, syncing, syncNow } = useOfflineSync(profile?.household_id)
+
   return (
     <div className="min-h-screen bg-ivory relative">
       {/* Top App Bar */}
@@ -17,6 +25,7 @@ export default function Layout({ children }) {
 
       {/* Main Content */}
       <main className="pb-32 max-w-md mx-auto pt-[calc(5rem+max(2rem,env(safe-area-inset-top,0px)))]">
+        <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} onSync={syncNow} />
         {children}
       </main>
 

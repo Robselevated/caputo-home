@@ -139,6 +139,7 @@ begin
       -- lost a race with the other phone: fold into the row that won
       update inventory_items
          set qty        = coalesce(qty, 0) + coalesce(p_qty, 1),
+             unit       = coalesce(unit, p_unit),
              updated_by = auth.uid(),
              updated_at = now()
        where household_id = p_household_id
@@ -201,9 +202,9 @@ as $$
    where g.id = u.id;
 $$;
 
-revoke execute on function merge_inventory_item(uuid,text,numeric,text,text,text,text,text) from anon;
-revoke execute on function check_off_grocery_item(uuid,text,text,text) from anon;
-revoke execute on function set_grocery_sort_order(uuid[]) from anon;
+revoke execute on function merge_inventory_item(uuid,text,numeric,text,text,text,text,text) from public, anon;
+revoke execute on function check_off_grocery_item(uuid,text,text,text) from public, anon;
+revoke execute on function set_grocery_sort_order(uuid[]) from public, anon;
 grant  execute on function merge_inventory_item(uuid,text,numeric,text,text,text,text,text) to authenticated;
 grant  execute on function check_off_grocery_item(uuid,text,text,text) to authenticated;
 grant  execute on function set_grocery_sort_order(uuid[]) to authenticated;

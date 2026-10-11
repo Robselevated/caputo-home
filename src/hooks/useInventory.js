@@ -50,10 +50,15 @@ export function useInventory(householdId, location) {
       .subscribe()
 
     const offRevalidate = onRevalidate(() => fetchItems())
+    // Queued kitchen writes replay (in Layout's useOfflineSync) when connectivity
+    // returns; catch the list up so a queued delete cannot look resurrected.
+    const onOnline = () => fetchItems()
+    window.addEventListener('online', onOnline)
 
     return () => {
       supabase.removeChannel(channel)
       offRevalidate()
+      window.removeEventListener('online', onOnline)
     }
   }, [householdId, location, fetchItems])
 
