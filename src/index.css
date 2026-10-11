@@ -28,13 +28,6 @@
 }
 
 @layer utilities {
-  /* Safe area insets for notched phones (iPhone X+) */
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  .pt-safe {
-    padding-top: env(safe-area-inset-top, 0px);
-  }
 
   /* Hide scrollbar for horizontal carousels */
   .no-scrollbar::-webkit-scrollbar {
@@ -43,69 +36,6 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
-  }
-}
-
-@layer components {
-  .btn-primary {
-    /* Default background so a bare .btn-primary is never white-on-ivory
-       (Login submit, boot Retry). Callers override with bg-section-*. */
-    @apply px-4 py-3 rounded-2xl font-semibold text-white bg-section-grocery transition-all active:scale-95;
-    box-shadow: 0 4px 12px rgba(44, 47, 48, 0.08);
-  }
-
-  .card {
-    @apply bg-dark-surface rounded-2xl border border-warmgray-100 p-4;
-    box-shadow: 0 4px 12px rgba(44, 47, 48, 0.03);
-  }
-
-  .input-field {
-    @apply w-full px-4 py-3 rounded-2xl border border-warmgray-200 bg-dark-surface text-charcoal placeholder-warmgray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-shadow;
-  }
-
-  /* Material Symbols base */
-  .material-symbols-outlined {
-    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  }
-
-  /* Editorial gutter for cookbook hero */
-  .editorial-gutter {
-    padding-left: 1.5rem;
-    border-left: 4px solid #9128ad;
-  }
-
-  /* Per-section editorial gutters */
-  .editorial-gutter-grocery {
-    padding-left: 1.5rem;
-    border-left: 4px solid #176a21;
-  }
-  .editorial-gutter-freezer {
-    padding-left: 1.5rem;
-    border-left: 4px solid #005f99;
-  }
-  .editorial-gutter-fridge {
-    padding-left: 1.5rem;
-    border-left: 4px solid #006A6A;
-  }
-  .editorial-gutter-pantry {
-    padding-left: 1.5rem;
-    border-left: 4px solid #C08B30;
-  }
-  .editorial-gutter-homegoods {
-    padding-left: 1.5rem;
-    border-left: 4px solid #9B6B7A;
-  }
-
-  /* Editorial shadow for Stitch cards */
-  .editorial-shadow {
-    box-shadow: 0 2px 8px rgba(44, 47, 48, 0.06), 0 0 1px rgba(0, 0, 0, 0.04);
-  }
-
-  /* Glass panel effect */
-  .glass-panel {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
   }
 }
 

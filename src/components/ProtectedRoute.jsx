@@ -2,19 +2,11 @@ import { useAuth } from '../hooks/useAuth'
 import { Navigate } from 'react-router-dom'
 import { useIsRestoring } from '@tanstack/react-query'
 import { softReloadViaRecovery } from '../lib/recovery'
-import { BUILD_ID } from '../lib/buildId'
-
-function VersionStamp() {
-  return <p className="mt-6 text-warmgray-300 text-[11px] tracking-wide">v{BUILD_ID}</p>
-}
+import BootScreen from './BootScreen'
+import { Button } from './ui/Button'
 
 function BootLoader() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-ivory">
-      <div className="w-8 h-8 border-4 border-warmgray-300 border-t-transparent rounded-full animate-spin" />
-      <VersionStamp />
-    </div>
-  )
+  return <BootScreen message="Opening your kitchen" />
 }
 
 export default function ProtectedRoute({ children }) {
@@ -29,32 +21,23 @@ export default function ProtectedRoute({ children }) {
 
   // The persisted query cache is being read from IndexedDB (tens of ms). A
   // blank ground reads as "instant"; a spinner would read as "loading".
-  if (isRestoring) return <div className="min-h-screen bg-ivory" />
+  if (isRestoring) return <div className="min-h-screen bg-ground" />
 
-  // Every protected page needs the household id (profile.household_id). Wait for
-  // it here — but NEVER forever: the watchdog in useAuth trips profileError, and
-  // the SDK fetch timeout means a stalled refresh can't strand us. This replaces
-  // the old "in-shell spinner that spins forever" with a bounded, recoverable state.
+  // Every protected page needs the household id (profile.household_id). Wait
+  // for it here, but never forever: the watchdog in useAuth trips profileError,
+  // and the SDK fetch timeout means a stalled refresh cannot strand us. This
+  // replaces the old "in-shell spinner that spins forever" with a bounded,
+  // recoverable state.
   if (!profile) {
     if (profileError) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-ivory px-6 text-center">
-          <h2 className="font-heading text-lg font-bold text-charcoal mb-2">Can't reach the server</h2>
-          <p className="text-warmgray-500 text-sm mb-5">Check your connection and try again.</p>
-          <div className="flex gap-3">
-            <button onClick={retryProfile} className="btn-primary px-5 py-2">Retry</button>
-            <button
-              onClick={softReloadViaRecovery}
-              className="px-5 py-2 rounded-2xl border border-warmgray-300 text-charcoal active:scale-95 transition-transform"
-            >
-              Reload
-            </button>
+        <BootScreen heading="Can't reach the server" message="Check your connection and try again.">
+          <div className="mt-5 flex gap-2">
+            <Button variant="secondary" onClick={retryProfile}>Retry</Button>
+            <Button variant="secondary" onClick={softReloadViaRecovery}>Reload</Button>
           </div>
-          <button onClick={signOut} className="mt-4 text-warmgray-400 text-sm underline">
-            Sign out
-          </button>
-          <VersionStamp />
-        </div>
+          <Button variant="ghost" onClick={signOut} className="mt-2">Sign out</Button>
+        </BootScreen>
       )
     }
     return <BootLoader />

@@ -93,16 +93,6 @@ export function getDefaultLocation(itemName) {
 // Common units
 export const UNITS = ['count', 'slices', 'lbs', 'oz', 'bags', 'boxes', 'cans', 'jars', 'bottles', 'packages']
 
-// Section colors (warm palette)
-export const SECTION_COLORS = {
-  grocery: { bg: 'bg-section-grocery', text: 'text-section-grocery', light: 'bg-section-grocery/10', ring: 'ring-section-grocery', border: 'border-section-grocery' },
-  freezer: { bg: 'bg-section-freezer', text: 'text-section-freezer', light: 'bg-section-freezer/10', ring: 'ring-section-freezer', border: 'border-section-freezer' },
-  fridge: { bg: 'bg-section-fridge', text: 'text-section-fridge', light: 'bg-section-fridge/10', ring: 'ring-section-fridge', border: 'border-section-fridge' },
-  pantry: { bg: 'bg-section-pantry', text: 'text-section-pantry', light: 'bg-section-pantry/10', ring: 'ring-section-pantry', border: 'border-section-pantry' },
-  cookbook: { bg: 'bg-section-cookbook', text: 'text-section-cookbook', light: 'bg-section-cookbook/10', ring: 'ring-section-cookbook', border: 'border-section-cookbook' },
-  home_goods: { bg: 'bg-section-homegoods', text: 'text-section-homegoods', light: 'bg-section-homegoods/10', ring: 'ring-section-homegoods', border: 'border-section-homegoods' },
-}
-
 // Full taxonomy: categories and subcategories per location
 export const TAXONOMY = {
   freezer: {

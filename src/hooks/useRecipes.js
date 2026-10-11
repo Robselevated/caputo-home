@@ -13,11 +13,11 @@ const newestFirst = (rows) => [...rows].sort((a, b) => String(b.created_at ?? ''
 
 function importErrorMessage(response, errBody) {
   if (errBody?.error) return errBody.error
-  if (response.status === 429) return "You've imported a lot recently — give it a few minutes and try again."
+  if (response.status === 429) return "You've imported a lot recently. Give it a few minutes and try again."
   if (response.status === 504 || response.status === 502) {
-    return 'That site took too long to read. Try again, or add it with Manual Entry.'
+    return 'That site took too long to read. Try again, or add it with Type it.'
   }
-  return `Couldn't import that recipe (error ${response.status}). Try again, or add it with Manual Entry.`
+  return `Couldn't import that recipe (error ${response.status}). Try again, or add it with Type it.`
 }
 
 async function parseRecipeUrl(url) {

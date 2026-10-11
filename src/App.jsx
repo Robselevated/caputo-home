@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './hooks/useAuth'
 import { ToastProvider } from './components/ui/Toast'
 import { QueryProvider } from './providers/QueryProvider'
+import { ListSkeleton } from './components/ui/Skeleton'
 import GroceryPage from './features/grocery/GroceryPage'
 import { kitchenRoutes } from './features/kitchen/routes'
 
@@ -36,10 +37,12 @@ const RecipeDetail = lazy(() => import('./pages/RecipeDetail'))
 const RecipeEdit = lazy(() => import('./pages/RecipeEdit'))
 const SuggestionDetail = lazy(() => import('./pages/SuggestionDetail'))
 
+// Route-level fallback while a page chunk loads: quiet placeholder tiles in
+// the page gutter, never a spinner.
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-4 border-warmgray-300 border-t-transparent rounded-full animate-spin" />
+    <div className="px-5 pt-16">
+      <ListSkeleton />
     </div>
   )
 }
