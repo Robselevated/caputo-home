@@ -1,7 +1,8 @@
-import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, arrayMove, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
+import { useListSensors, DRAG_INSTRUCTIONS } from '../../lib/dndSensors'
 import { Tile } from '../../components/ui/Tile'
 import { GroceryItemRow } from './GroceryItemRow'
 import { storeTheme, storeLabel } from './storeTheme'
@@ -21,10 +22,7 @@ function SortableRow({ item, ...rest }) {
 // One store's tinted tile with its rows; unchecked rows reorder by press-and-hold.
 export function GroceryStoreGroup({ store, items, onCheck, onQty, onOpen, onReorder }) {
   const theme = storeTheme(store)
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 6 } })
-  )
+  const sensors = useListSensors()
   const unchecked = items.filter(i => !i.checked)
 
   const handleDragEnd = ({ active, over }) => {
@@ -37,7 +35,7 @@ export function GroceryStoreGroup({ store, items, onCheck, onQty, onOpen, onReor
 
   return (
     <Tile tileClass={theme.tile} inkClass={theme.ink} heading={storeLabel(store)} count={unchecked.length}>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis]}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToVerticalAxis]} accessibility={{ screenReaderInstructions: DRAG_INSTRUCTIONS }}>
         <SortableContext items={unchecked.map(i => i.id)} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col gap-1.5">
             {items.map(item => (

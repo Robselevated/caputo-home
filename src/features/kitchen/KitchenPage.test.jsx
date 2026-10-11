@@ -39,6 +39,8 @@ describe('Kitchen', () => {
     localStorage.clear()
     supabase.setResult('inventory_items', 'select', { data: rows, error: null })
     supabase.setResult('inventory_items', 'delete', { data: [{ id: 'o' }], error: null })
+    supabase.setResult('inventory_items', 'update', { data: [{ id: 's' }], error: null })
+    supabase.setResult('rpc', 'merge_inventory_item', { data: { merged: false, item: { id: 'new', name: 'Rice', qty: 1, unit: 'bags', category: 'Dry Goods', location: 'pantry', household_id: 'hh' } }, error: null })
   })
 
   it('the legacy /pantry path shows the Pantry segment with that location\'s category tiles', async () => {
@@ -100,5 +102,49 @@ describe('Kitchen', () => {
     expect(within(dialog).getByLabelText('Category')).toHaveValue('Canned Goods')
     expect(within(dialog).getByLabelText('Quantity')).toHaveValue(3)
     expect(within(dialog).getByLabelText('Unit')).toHaveValue('cans')
+  })
+
+  it('the add sheet keeps its button disabled until name and category are set, then adds through the merge call', async () => {
+    renderAt('/kitchen/pantry')
+    await screen.findByText('Spaghetti')
+    fireEvent.click(screen.getByRole('button', { name: 'Add a pantry item' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Add to Pantry' })
+    const submit = within(dialog).getByRole('button', { name: 'Add to Pantry' })
+    expect(submit).toBeDisabled()
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Rice' } })
+    expect(submit).toBeDisabled()
+    fireEvent.change(within(dialog).getByLabelText('Category'), { target: { value: 'Dry Goods' } })
+    expect(submit).toBeEnabled()
+    await act(async () => { fireEvent.click(submit) })
+    const call = supabase.callsFor('rpc', 'merge_inventory_item')[0]
+    expect(call.args).toMatchObject({ p_name: 'Rice', p_location: 'pantry', p_category: 'Dry Goods', p_unit: 'bags' })
+  })
+
+  it('the add sheet focuses the name field; the edit sheet leaves the keyboard down', async () => {
+    renderAt('/kitchen/pantry')
+    await screen.findByText('Spaghetti')
+    fireEvent.click(screen.getByRole('button', { name: 'Add a pantry item' }))
+    const add = await screen.findByRole('dialog', { name: 'Add to Pantry' })
+    expect(document.activeElement).toBe(within(add).getByLabelText('Name'))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: 'More options for Black beans' }))
+    const edit = await screen.findByRole('dialog', { name: 'Edit item' })
+    expect(document.activeElement).not.toBe(within(edit).getByLabelText('Name'))
+  })
+
+  it('stepper taps write the new quantity and a row that reaches zero shows Out', async () => {
+    renderAt('/kitchen/pantry')
+    await screen.findByText('Spaghetti')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Fewer Spaghetti' })) })
+    expect(supabase.callsFor('inventory_items', 'update')[0].chain[0][1]).toMatchObject({ qty: 1 })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Fewer Spaghetti' })) })
+    expect(await screen.findByRole('button', { name: 'Remove Spaghetti' })).toBeInTheDocument()
+  })
+
+  it('a tile heading is a real heading that contains the disclosure button', async () => {
+    renderAt('/kitchen/pantry')
+    await screen.findByText('Spaghetti')
+    const heading = screen.getByRole('heading', { level: 2, name: 'Pasta' })
+    expect(within(heading).getByRole('button', { expanded: true })).toBeInTheDocument()
   })
 })

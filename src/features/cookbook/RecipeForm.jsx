@@ -80,7 +80,7 @@ export function RecipeForm({ initial, draft: controlled, onDraftChange, submitLa
 
       {scanner && (
         <section className="flex flex-col gap-2 rounded-row bg-control p-3">
-          <h3 className="font-heading text-[15px] font-bold text-ink">Fill from photos</h3>
+          <h2 className="font-heading text-[15px] font-bold text-ink">Fill from photos</h2>
           <ScanRecipeForm
             scan={scanner}
             hint="Screenshots of the ingredients and steps fill in the fields on this page. Anything already typed stays unless the photo has it."

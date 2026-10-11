@@ -92,7 +92,18 @@ export default function GroceryPage() {
     if (!res?.error) sendPushNotification(householdId, userId, 'added', name).catch(() => {})
   }
   const handleQty = (item, delta) => updateItem(item.id, { qty: Math.max(1, (item.qty ?? 1) + delta) }, userId)
-  const handleSave = (id, changes) => updateItem(id, changes, userId)
+  const handleSave = (id, changes) => {
+    const current = items.find(i => i.id === id)
+    if (current && storeLabel(changes.store) !== storeLabel(current.store)) {
+      // Moving store: land at the end of the new group, as a fresh add would.
+      const target = storeLabel(changes.store)
+      const maxSort = items
+        .filter(i => i.id !== id && storeLabel(i.store) === target)
+        .reduce((max, i) => Math.max(max, i.sort_order ?? 0), 0)
+      changes = { ...changes, sort_order: maxSort + 1 }
+    }
+    return updateItem(id, changes, userId)
+  }
   const handleReorder = (ids) => reorderItems(ids, userId)
 
   const enableNotifications = async () => { await requestPermission(); setShowNotifBanner(false) }
@@ -107,8 +118,8 @@ export default function GroceryPage() {
         <div className="flex items-center gap-3 rounded-row bg-surface py-2.5 pl-3.5 pr-2 shadow-soft">
           <Bell size={20} aria-hidden="true" className="shrink-0 text-accent-grocery" />
           <p className="flex-1 text-[13px] text-ink">Get a nudge when the list changes?</p>
-          <button type="button" onClick={enableNotifications} className="h-9 rounded-full bg-accent-grocery px-3 text-[13px] font-semibold text-white">Turn on</button>
-          <button type="button" onClick={dismissNotifications} className="h-9 rounded-full px-2.5 text-[13px] font-semibold text-ink-2">Not now</button>
+          <button type="button" onClick={enableNotifications} className="h-10 rounded-full bg-accent-grocery px-3.5 text-[13px] font-semibold text-white">Turn on</button>
+          <button type="button" onClick={dismissNotifications} className="h-10 rounded-full px-2.5 text-[13px] font-semibold text-ink-2">Not now</button>
         </div>
       )}
 

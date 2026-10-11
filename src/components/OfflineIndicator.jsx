@@ -10,7 +10,7 @@ export default function OfflineIndicator({ isOnline, pendingCount, syncing, onSy
         {isOnline ? changes : `Offline${pendingCount > 0 ? `, ${changes}` : ''}`}
       </span>
       {isOnline && pendingCount > 0 && (
-        <button type="button" onClick={onSync} disabled={syncing} className="h-8 rounded-full bg-ink px-3 text-xs font-semibold text-white disabled:opacity-50">
+        <button type="button" onClick={onSync} disabled={syncing} className="h-10 rounded-full bg-ink px-3.5 text-[13px] font-semibold text-white disabled:opacity-50">
           {syncing ? 'Syncing' : 'Sync now'}
         </button>
       )}

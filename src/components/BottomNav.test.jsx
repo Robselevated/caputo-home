@@ -24,4 +24,9 @@ describe('BottomNav', () => {
     renderAt('/grocery')
     expect(screen.getByRole('link', { name: 'Kitchen' })).toHaveAttribute('href', '/kitchen')
   })
+
+  it('colours the active Kitchen tab with the showing location\'s ink', () => {
+    renderAt('/kitchen/pantry')
+    expect(screen.getByRole('link', { name: 'Kitchen' })).toHaveClass('text-loc-pantry-ink')
+  })
 })

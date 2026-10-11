@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' }, profile: { household_id: 'hh' } }) }))
@@ -89,5 +89,18 @@ describe('CookbookPage', () => {
     const { container } = renderPage(false)
     expect(container.querySelector('.animate-pulse')).toBeInTheDocument()
     expect(screen.queryByText('Tacos')).not.toBeInTheDocument()
+  })
+
+  it('fetched ideas survive typing in the search box', async () => {
+    const { authFetch } = await import('../../lib/authFetch')
+    authFetch.mockResolvedValue({ ok: true, json: async () => [{ name: 'Beef tacos', description: 'Fast weeknight', ingredients: ['shells', 'beef'] }] })
+    renderPage()
+    await screen.findByText('Tacos')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Get ideas' })) })
+    expect(await screen.findByText('Beef tacos')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search recipes' }), { target: { value: 'sou' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search recipes' }), { target: { value: '' } })
+    expect(screen.getByText('Beef tacos')).toBeInTheDocument()
+    expect(authFetch).toHaveBeenCalledTimes(1)
   })
 })

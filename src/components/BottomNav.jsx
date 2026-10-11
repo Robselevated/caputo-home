@@ -4,7 +4,7 @@ import { locationFromPath, locationTheme } from '../features/kitchen/locationThe
 
 const TABS = [
   { to: '/grocery', label: 'Grocery', Icon: ShoppingCart, match: (p) => p.startsWith('/grocery'), active: () => 'text-accent-grocery' },
-  { to: '/kitchen', label: 'Kitchen', Icon: Refrigerator, match: (p) => /^\/(kitchen|fridge|freezer|pantry)(\/|$)/.test(p), active: (p) => locationTheme(locationFromPath(p)).accentText },
+  { to: '/kitchen', label: 'Kitchen', Icon: Refrigerator, match: (p) => /^\/(kitchen|fridge|freezer|pantry)(\/|$)/.test(p), active: (p) => locationTheme(locationFromPath(p)).ink },
   { to: '/planning', label: 'Planning', Icon: CalendarDays, match: (p) => p.startsWith('/planning'), active: () => 'text-accent-planning' },
   { to: '/cookbook', label: 'Cookbook', Icon: BookOpen, match: (p) => p.startsWith('/cookbook'), active: () => 'text-accent-cookbook' },
 ]
@@ -22,7 +22,7 @@ export default function BottomNav() {
               to={to}
               aria-current={isActive ? 'page' : undefined}
               className={`flex flex-col items-center justify-center gap-[3px] rounded-sm2 py-1 text-[11px] transition-colors ${
-                isActive ? `font-semibold ${active(pathname)}` : 'font-medium text-[#6B7070]'
+                isActive ? `font-semibold ${active(pathname)}` : 'font-medium text-ink-2'
               }`}
             >
               <Icon size={26} strokeWidth={isActive ? 2.2 : 2} aria-hidden="true" />

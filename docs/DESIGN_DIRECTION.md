@@ -42,8 +42,10 @@ page turns teal. Categories are too many to give each its own hue.
 | Home goods | `#F0E6E9` | `#6B3A4A` | `#9B6B7A` |
 
 Section accents (the active tab and the page's primary button): Grocery
-`#176A21`, Kitchen = the showing location's accent, Planning `#C75A2A`,
-Cookbook `#9128AD`.
+`#176A21`, Kitchen = the showing location's accent, Planning `#B44A1F`,
+Cookbook `#9128AD`. Accents are graphics colours: as text on white only the
+green, teal, blue and plum pass 4.5:1, so text that names the location (the
+active segment, the Kitchen tab label) uses the location ink instead.
 
 ## Type
 
@@ -79,7 +81,9 @@ Body text never drops below 13px. Inputs stay at 16px so iOS does not zoom.
   store pills carry their tile tint and ink.
 - Tile: tinted section with heading + count; rows are white, flat.
 - Row: round checkbox (2px ring in the store accent), name over a detail line,
-  stepper (neutral minus, bold count, accent plus). Tap the name to edit.
+  stepper (neutral minus, bold count, accent plus). Tap the name to edit;
+  press and hold it to reorder (dnd-kit MouseSensor + TouchSensor, never
+  PointerSensor, see src/lib/dndSensors.js).
 - Segmented control: track `#E9EDED`, round 16; active segment white with the
   location accent as text and the soft shadow.
 - Toast: ink, round 14, sits 14px above the tab bar, optional Undo.

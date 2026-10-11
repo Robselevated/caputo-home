@@ -43,4 +43,15 @@ describe('Sheet', () => {
     expect(document.activeElement).toBe(opener)
     opener.remove()
   })
+
+  it('blocks touch scrolling through the backdrop and contains overscroll in the panel', () => {
+    render(<Sheet open onClose={() => {}} title="Edit"><p>body</p></Sheet>)
+    expect(screen.getByTestId('sheet-backdrop')).toHaveClass('touch-none')
+    expect(screen.getByText('body').parentElement).toHaveClass('overscroll-contain')
+  })
+
+  it('focuses the panel itself, not the first field, so the keyboard stays down until a field is tapped', () => {
+    render(<Sheet open onClose={() => {}} title="Edit"><input aria-label="Name" /></Sheet>)
+    expect(document.activeElement).toBe(screen.getByRole('dialog'))
+  })
 })

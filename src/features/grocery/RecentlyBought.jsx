@@ -58,7 +58,7 @@ export function RecentlyBought({ items, onAddBack }) {
     <section className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between px-1">
         <h2 className="font-heading text-[17px] font-bold text-ink">Recently bought</h2>
-        <button type="button" onClick={() => setShowHistory(true)} className="flex h-9 items-center gap-1.5 rounded-full px-2 text-[13px] font-semibold text-accent-grocery">
+        <button type="button" onClick={() => setShowHistory(true)} className="flex h-10 items-center gap-1.5 rounded-full px-2 text-[13px] font-semibold text-accent-grocery">
           <History size={16} aria-hidden="true" />History
         </button>
       </div>
@@ -69,7 +69,7 @@ export function RecentlyBought({ items, onAddBack }) {
             type="button"
             onClick={() => onAddBack(i)}
             aria-label={`Add ${i.name} back to the list`}
-            className="flex h-9 shrink-0 items-center gap-1 rounded-full border border-hairline bg-surface pl-2.5 pr-3.5 text-[13px] font-semibold text-ink active:bg-control"
+            className="flex h-10 shrink-0 items-center gap-1 rounded-full border border-hairline bg-surface pl-2.5 pr-3.5 text-[13px] font-semibold text-ink active:bg-control"
           >
             <Plus size={16} aria-hidden="true" className="text-ink-3" />{i.name}
           </button>

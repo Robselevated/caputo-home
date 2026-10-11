@@ -83,7 +83,7 @@ export function ToastProvider({ children }) {
               <button
                 type="button"
                 onClick={() => { t.action.onClick?.(); dismiss(t.id) }}
-                className="shrink-0 h-9 px-3.5 rounded-[10px] bg-white/15 font-semibold active:opacity-70"
+                className="shrink-0 h-10 px-3.5 rounded-[10px] bg-white/15 font-semibold active:opacity-70"
               >
                 {t.action.label}
               </button>

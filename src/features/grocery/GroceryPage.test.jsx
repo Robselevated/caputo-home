@@ -39,6 +39,7 @@ describe('GroceryPage', () => {
     supabase.setResult('recently_bought', 'select', { data: [], error: null })
     supabase.setResult('item_history', 'select', { data: [], error: null })
     supabase.setResult('grocery_items', 'insert', (args) => ({ data: Array.isArray(args) ? args[0] : args, error: null }))
+    supabase.setResult('grocery_items', 'update', { data: [{ id: 'a' }], error: null })
   })
   afterEach(() => { vi.useRealTimers() })
 
@@ -96,5 +97,44 @@ describe('GroceryPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit Avocados' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit item' })
     expect(within(dialog).getByLabelText('Name')).toHaveValue('Avocados')
+  })
+
+  it('moving an item to another store in the edit sheet puts it at the end of that store', async () => {
+    renderPage()
+    await screen.findByText('Avocados')
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Avocados' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit item' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Costco' }))
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Save' })) })
+    const update = supabase.callsFor('grocery_items', 'update')[0]
+    expect(update.chain[0][1]).toMatchObject({ store: 'Costco', sort_order: 1 })
+  })
+
+  it('a recently bought chip puts the item back on the list', async () => {
+    supabase.setResult('recently_bought', 'select', { data: [{ id: 'rb1', household_id: 'hh', name: 'Eggs', qty: 1, unit: 'dozen', store: 'Costco', notes: null, bought_at: new Date().toISOString() }], error: null })
+    renderPage()
+    await screen.findByText('Avocados')
+    await act(async () => { fireEvent.click(await screen.findByRole('button', { name: 'Add Eggs back to the list' })) })
+    const insert = supabase.callsFor('grocery_items', 'insert')[0]
+    expect(insert.chain[0][1]).toMatchObject({ name: 'Eggs', store: 'Costco' })
+  })
+
+  it('add-bar suggestions are plain buttons in a labelled list, not a fake listbox', async () => {
+    supabase.setResult('item_history', 'select', { data: [{ name: 'Milk' }, { name: 'Millet' }], error: null })
+    renderPage()
+    await screen.findByText('Avocados')
+    const input = screen.getByRole('textbox', { name: 'Add to list' })
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'mil' } })
+    const list = await screen.findByRole('list', { name: 'Suggestions' })
+    expect(within(list).getAllByRole('button').map(b => b.textContent)).toEqual(['Milk', 'Millet'])
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
+
+  it('tells screen readers how reordering really works', async () => {
+    renderPage()
+    await screen.findByText('Avocados')
+    expect(screen.getAllByText('Press and hold an item, then drag it to reorder.').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/press space/i)).not.toBeInTheDocument()
   })
 })

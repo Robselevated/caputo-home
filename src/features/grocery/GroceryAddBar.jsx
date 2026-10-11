@@ -44,9 +44,9 @@ export function GroceryAddBar({ onAdd, getSuggestions, accentClass }) {
         <Button type="submit" className={accentClass}>Add</Button>
       </div>
       {suggestions.length > 0 && (
-        <ul role="listbox" aria-label="Suggestions" className="absolute inset-x-0 top-full z-20 mt-1.5 overflow-hidden rounded-bar bg-surface shadow-lift">
+        <ul aria-label="Suggestions" className="absolute inset-x-0 top-full z-20 mt-1.5 overflow-hidden rounded-bar bg-surface shadow-lift">
           {suggestions.map((s) => (
-            <li key={s} role="option" aria-selected="false">
+            <li key={s}>
               <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => add(s)} className="flex h-12 w-full items-center px-4 text-left text-base text-ink active:bg-control">
                 {s}
               </button>

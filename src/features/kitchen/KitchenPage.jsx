@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
+import { useListSensors, DRAG_INSTRUCTIONS } from '../../lib/dndSensors'
 import { Search, Plus, PackageOpen, Camera } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useInventory } from '../../hooks/useInventory'
@@ -22,7 +23,9 @@ import { InventoryCategory } from './InventoryCategory'
 import { InventoryAddSheet, InventoryEditSheet } from './InventorySheets'
 import { LOCATIONS, LOCATION_LABELS, locationTheme } from './locationTheme'
 
-const SEGMENTS = LOCATIONS.map(l => ({ value: l, label: LOCATION_LABELS[l], activeClass: locationTheme(l).accentText }))
+// Segment labels use the location ink, not the accent: the pantry amber is a
+// graphics colour and fails text contrast on white.
+const SEGMENTS = LOCATIONS.map(l => ({ value: l, label: LOCATION_LABELS[l], activeClass: locationTheme(l).ink }))
 
 function SortableCategory(props) {
   const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({ id: props.category, disabled: props.dragDisabled })
@@ -52,10 +55,7 @@ export default function KitchenPage({ location }) {
   const [editing, setEditing] = useState(null)
   const [collapsed, setCollapsed] = useState(() => new Set())
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 6 } })
-  )
+  const sensors = useListSensors()
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -137,7 +137,7 @@ export default function KitchenPage({ location }) {
       ) : grouped.length === 0 ? (
         <EmptyState icon={PackageOpen} title={search ? 'No matches' : `The ${lower} is empty`} hint={search ? 'Try a shorter word' : 'Tap + to add something, or scan a shelf'} />
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} onDragEnd={({ active, over }) => { if (over && active.id !== over.id) reorder(active.id, over.id) }}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalAxis]} accessibility={{ screenReaderInstructions: DRAG_INSTRUCTIONS }} onDragEnd={({ active, over }) => { if (over && active.id !== over.id) reorder(active.id, over.id) }}>
           <SortableContext items={grouped.map(([c]) => c)} strategy={verticalListSortingStrategy}>
             <div className="flex flex-col gap-4">
               {grouped.map(([category, rows]) => (

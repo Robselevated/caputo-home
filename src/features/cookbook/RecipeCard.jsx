@@ -34,7 +34,7 @@ export function RecipeCard({ recipe, coverage, refreshing, onOpen, onRefresh }) 
         )}
       </button>
       {canRefresh && (
-        <IconButton label={`Fetch a photo for ${recipe.name}`} variant="outline" size={36} className="absolute right-2 top-2" disabled={refreshing} onClick={() => onRefresh(recipe)}>
+        <IconButton label={`Fetch a photo for ${recipe.name}`} variant="outline" size={40} className="absolute right-2 top-2" disabled={refreshing} onClick={() => onRefresh(recipe)}>
           <RefreshCw size={18} aria-hidden="true" className={refreshing ? 'animate-spin' : ''} />
         </IconButton>
       )}

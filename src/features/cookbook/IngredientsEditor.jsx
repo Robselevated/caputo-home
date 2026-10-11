@@ -57,7 +57,7 @@ export function IngredientsEditor({ ingredients, onChange }) {
       <div className="flex items-center justify-between">
         <span className="text-[13px] font-semibold text-ink-2">Ingredients</span>
         {!pasting && (
-          <button type="button" onClick={() => setPasting(true)} className="flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-accent-cookbook active:bg-control">
+          <button type="button" onClick={() => setPasting(true)} className="flex h-10 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-accent-cookbook active:bg-control">
             <ClipboardPaste size={16} aria-hidden="true" />Paste a list
           </button>
         )}

@@ -140,7 +140,8 @@ export default function CookbookPage() {
         </div>
       )}
 
-      {!filtering && !booting && <SuggestionsPanel householdId={householdId} />}
+      {/* Stays mounted while filtering: the ideas came from a paid, slow call. */}
+      <div className={filtering || booting ? 'hidden' : ''}><SuggestionsPanel householdId={householdId} /></div>
 
       {booting ? (
         <GridSkeleton />

@@ -34,7 +34,7 @@ export function GroceryItemRow({ item, theme, onCheck, onQty, onOpen, sortable }
         className="flex min-w-0 flex-1 flex-col items-start gap-px py-1 text-left touch-manipulation"
       >
         <span className={`w-full truncate text-base font-semibold ${checked ? 'text-ink-2 line-through' : 'text-ink'}`}>{item.name}</span>
-        {detail && <span className={`w-full truncate text-[13px] ${checked ? 'text-[#6B7070]' : 'text-ink-2'}`}>{detail}</span>}
+        {detail && <span className={`w-full truncate text-[13px] text-ink-2`}>{detail}</span>}
       </button>
       {!checked && (
         <Stepper

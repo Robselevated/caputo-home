@@ -32,7 +32,7 @@ export function InventoryItemRow({ item, theme, onQty, onOpen, onBuy, onRemove }
         </div>
       ) : (
         <>
-          <Stepper value={item.qty} name={item.name} plusClass={theme.accentBg} onMinus={() => onQty(item, -1)} onPlus={() => onQty(item, 1)} />
+          <Stepper value={item.qty} name={item.name} plusClass={theme.accentBg} onMinus={() => onQty(item, -1)} onPlus={() => onQty(item, 1)} onValueTap={() => onOpen(item)} />
           <IconButton label={`More options for ${item.name}`} onClick={() => onOpen(item)}>
             <EllipsisVertical size={20} aria-hidden="true" />
           </IconButton>

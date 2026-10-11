@@ -14,7 +14,7 @@ function unitOptions(location, current) {
 
 // Shared form for adding and editing a kitchen item. Category drives the
 // subcategory list and the default unit, as the taxonomy says.
-function InventoryForm({ location, initial, submitLabel, accentBg, onSubmit, extra }) {
+function InventoryForm({ location, initial, submitLabel, accentBg, onSubmit, extra, autoFocusName = false }) {
   const taxonomy = TAXONOMY[location] || {}
   const categories = Object.keys(taxonomy)
   const [name, setName] = useState(initial.name || '')
@@ -49,7 +49,7 @@ function InventoryForm({ location, initial, submitLabel, accentBg, onSubmit, ext
   return (
     <form onSubmit={submit} className="flex flex-col gap-4 pb-2">
       <Field label="Name" htmlFor="inv-name">
-        <Input id="inv-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" required autoFocus />
+        <Input id="inv-name" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" required autoFocus={autoFocusName} />
       </Field>
       <Field label="Category" htmlFor="inv-category">
         <Select id="inv-category" value={category} onChange={(e) => changeCategory(e.target.value)} required>
@@ -80,7 +80,7 @@ function InventoryForm({ location, initial, submitLabel, accentBg, onSubmit, ext
         <Input id="inv-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Opened, brand, best by" />
       </Field>
       {extra}
-      <Button type="submit" className={`${accentBg}`}>{submitLabel}</Button>
+      <Button type="submit" className={accentBg} disabled={!name.trim() || !category}>{submitLabel}</Button>
     </form>
   )
 }
@@ -95,6 +95,7 @@ export function InventoryAddSheet({ open, location, theme, onClose, onAdd }) {
           initial={{ qty: 1 }}
           submitLabel={`Add to ${label}`}
           accentBg={theme.accentBg}
+          autoFocusName
           onSubmit={(values) => { onAdd(values); onClose() }}
         />
       )}
