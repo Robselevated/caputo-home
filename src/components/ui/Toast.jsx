@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 
 // Lightweight toast system. `toast()` can be called from anywhere (hooks,
-// plain modules); <ToastProvider> renders them. Restyled in the redesign pass.
+// plain modules); <ToastProvider> renders them.
 
 const listeners = new Set()
 let nextId = 1
@@ -68,14 +68,14 @@ export function ToastProvider({ children }) {
       {children}
       <div
         aria-live="polite"
-        className="fixed left-0 right-0 z-[70] flex flex-col items-center gap-2 px-4 pointer-events-none bottom-[calc(6rem+env(safe-area-inset-bottom,0px))]"
+        className="fixed left-0 right-0 z-[70] flex flex-col items-center gap-2 px-5 pointer-events-none bottom-[calc(76px+env(safe-area-inset-bottom,0px))]"
       >
         {toasts.map(t => (
           <div
             key={t.id}
             role="status"
-            className={`pointer-events-auto flex items-center gap-3 w-full max-w-sm rounded-xl px-4 py-3 text-sm text-white shadow-lg animate-slide-down ${
-              t.tone === 'error' ? 'bg-red-600' : 'bg-charcoal'
+            className={`pointer-events-auto flex items-center gap-3 w-full max-w-md rounded-row py-3 pl-4 pr-2.5 text-sm text-white shadow-toast animate-slide-down ${
+              t.tone === 'error' ? 'bg-danger-ink' : 'bg-ink'
             }`}
           >
             <span className="flex-1">{t.message}</span>
@@ -83,7 +83,7 @@ export function ToastProvider({ children }) {
               <button
                 type="button"
                 onClick={() => { t.action.onClick?.(); dismiss(t.id) }}
-                className="shrink-0 font-semibold px-3 py-2 -my-2 -mr-2 rounded-lg active:opacity-70"
+                className="shrink-0 h-9 px-3.5 rounded-[10px] bg-white/15 font-semibold active:opacity-70"
               >
                 {t.action.label}
               </button>

@@ -1,42 +1,36 @@
-import { NavLink } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+import { ShoppingCart, Refrigerator, CalendarDays, BookOpen } from 'lucide-react'
+import { locationFromPath, locationTheme } from '../features/kitchen/locationTheme'
 
-const navItems = [
-  { path: '/grocery', label: 'Grocery', icon: 'shopping_cart' },
-  { path: '/freezer', label: 'Freezer', icon: 'ac_unit' },
-  { path: '/fridge', label: 'Fridge', icon: 'kitchen' },
-  { path: '/pantry', label: 'Pantry', icon: 'inventory_2' },
-  { path: '/planning', label: 'Planning', icon: 'calendar_month' },
-  { path: '/cookbook', label: 'Cookbook', icon: 'menu_book' },
+const TABS = [
+  { to: '/grocery', label: 'Grocery', Icon: ShoppingCart, match: (p) => p.startsWith('/grocery'), active: () => 'text-accent-grocery' },
+  { to: '/kitchen', label: 'Kitchen', Icon: Refrigerator, match: (p) => /^\/(kitchen|fridge|freezer|pantry)(\/|$)/.test(p), active: (p) => locationTheme(locationFromPath(p)).accentText },
+  { to: '/planning', label: 'Planning', Icon: CalendarDays, match: (p) => p.startsWith('/planning'), active: () => 'text-accent-planning' },
+  { to: '/cookbook', label: 'Cookbook', Icon: BookOpen, match: (p) => p.startsWith('/cookbook'), active: () => 'text-accent-cookbook' },
 ]
 
 export default function BottomNav() {
+  const { pathname } = useLocation()
   return (
-    <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center h-20 bg-white/90 backdrop-blur-md rounded-t-[2rem] px-2 pb-safe shadow-[0_-1px_0_rgba(0,0,0,0.04),0_-12px_32px_rgba(44,47,48,0.06)]">
-      {navItems.map((item) => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          className={({ isActive }) =>
-            `flex flex-col items-center justify-center p-1.5 transition-transform duration-200 ${
-              isActive
-                ? 'bg-[#006A6A]/10 text-[#006A6A] rounded-2xl scale-110'
-                : 'text-warmgray-500'
-            }`
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <span
-                className="material-symbols-outlined text-xl mb-0.5"
-                style={isActive ? { fontVariationSettings: "'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24" } : undefined}
-              >
-                {item.icon}
-              </span>
-              <span className="text-[9px] font-medium tracking-wide">{item.label}</span>
-            </>
-          )}
-        </NavLink>
-      ))}
+    <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-50 border-t border-hairline bg-surface">
+      <div className="mx-auto grid max-w-md grid-cols-4 gap-1 px-3 pt-2 pb-[max(env(safe-area-inset-bottom,0px),0.75rem)]">
+        {TABS.map(({ to, label, Icon, match, active }) => {
+          const isActive = match(pathname)
+          return (
+            <Link
+              key={to}
+              to={to}
+              aria-current={isActive ? 'page' : undefined}
+              className={`flex flex-col items-center justify-center gap-[3px] rounded-sm2 py-1 text-[11px] transition-colors ${
+                isActive ? `font-semibold ${active(pathname)}` : 'font-medium text-[#6B7070]'
+              }`}
+            >
+              <Icon size={26} strokeWidth={isActive ? 2.2 : 2} aria-hidden="true" />
+              {label}
+            </Link>
+          )
+        })}
+      </div>
     </nav>
   )
 }

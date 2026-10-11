@@ -4,36 +4,22 @@ import { useAuth } from '../hooks/useAuth'
 import { useOfflineSync } from '../hooks/useOfflineSync'
 import { RealtimeProvider } from '../providers/RealtimeProvider'
 
+// App shell: no app-wide header (each page owns its title), the single
+// offline-sync instance, the single realtime channel, and the tab bar.
 export default function Layout({ children }) {
-  // The ONE offline-sync instance for the app: it replays queued writes when
-  // connectivity returns regardless of which tab is open.
   const { profile } = useAuth()
   const householdId = profile?.household_id
   const { isOnline, pendingCount, syncing, syncNow } = useOfflineSync(householdId)
 
   return (
     <RealtimeProvider householdId={householdId}>
-    <div className="min-h-screen bg-ivory relative">
-      {/* Top App Bar */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-ivory w-full px-6 pb-4 pt-[max(2rem,env(safe-area-inset-top,0px))]">
-        <div className="flex items-center justify-between w-full max-w-md mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-olive-light flex items-center justify-center">
-              <span className="text-section-grocery font-heading font-bold text-lg">C</span>
-            </div>
-            <h1 className="font-heading text-2xl font-bold tracking-tight text-charcoal">Caputo Home</h1>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="pb-32 max-w-md mx-auto pt-[calc(5rem+max(2rem,env(safe-area-inset-top,0px)))]">
-        <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} onSync={syncNow} />
-        {children}
-      </main>
-
-      <BottomNav />
-    </div>
+      <div className="min-h-screen bg-ground">
+        <main className="mx-auto max-w-md pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
+          <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} onSync={syncNow} />
+          {children}
+        </main>
+        <BottomNav />
+      </div>
     </RealtimeProvider>
   )
 }

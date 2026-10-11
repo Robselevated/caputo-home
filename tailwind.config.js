@@ -1,4 +1,8 @@
 /** @type {import('tailwindcss').Config} */
+// Tokens follow docs/DESIGN_DIRECTION.md. The `section-*`, `warmgray`,
+// `charcoal`, `ivory`, `cream` and `dark-*` entries are the pre-redesign set,
+// still used by pages that have not been moved yet; they go when the last
+// consumer does.
 export default {
   content: [
     "./index.html",
@@ -13,6 +17,28 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Redesign roles
+        ground: '#F5F7F7',
+        surface: '#FFFFFF',
+        ink: { DEFAULT: '#2C2F30', 2: '#5E6464', 3: '#8A9090' },
+        hairline: '#E6EAEA',
+        control: '#EEF1F1',
+        track: '#E9EDED',
+        danger: { ink: '#B42318', tile: '#FDECEA' },
+        accent: { grocery: '#176A21', planning: '#C75A2A', cookbook: '#9128AD' },
+        store: {
+          pilgrims: { tile: '#E1F0E3', ink: '#0F4F18', accent: '#176A21' },
+          costco: { tile: '#DCEAF6', ink: '#0B4A73', accent: '#005F99' },
+          grocery: { tile: '#F0E3F4', ink: '#6C1E82', accent: '#9128AD' },
+          other: { tile: '#EEF1F1', ink: '#404545', accent: '#5E6464' },
+        },
+        loc: {
+          pantry: { tile: '#F6E9D2', ink: '#6E4E12', accent: '#C08B30' },
+          fridge: { tile: '#DDF0EF', ink: '#0E5555', accent: '#006A6A' },
+          freezer: { tile: '#DCEAF6', ink: '#0B4A73', accent: '#005F99' },
+          home: { tile: '#F0E6E9', ink: '#6B3A4A', accent: '#9B6B7A' },
+        },
+        // Pre-redesign palette (legacy pages)
         olive: { DEFAULT: '#176a21', light: '#9df197', dark: '#025d16' },
         gold: { DEFAULT: '#C08B30', light: '#E0B56A', dark: '#9A7020' },
         charcoal: { DEFAULT: '#2c2f30', light: '#595c5c' },
@@ -41,53 +67,51 @@ export default {
         heading: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         body: ['"Be Vietnam Pro"', 'system-ui', 'sans-serif'],
       },
+      borderRadius: {
+        tile: '20px',
+        bar: '16px',
+        row: '14px',
+        sm2: '12px',
+      },
       boxShadow: {
+        soft: '0 2px 8px rgba(44, 47, 48, 0.06)',
+        lift: '0 2px 8px rgba(44, 47, 48, 0.08)',
+        toast: '0 8px 24px rgba(44, 47, 48, 0.18)',
+        sheet: '0 -8px 32px rgba(44, 47, 48, 0.18)',
         'dark-sm': '0 1px 3px 0 rgba(0, 0, 0, 0.06)',
         'dark': '0 4px 12px rgba(44, 47, 48, 0.03)',
         'dark-md': '0 6px 16px rgba(44, 47, 48, 0.06)',
         'dark-lg': '0 12px 32px rgba(44, 47, 48, 0.06)',
       },
       keyframes: {
-        'check-off': {
-          '0%': { transform: 'scale(1)' },
-          '30%': { transform: 'scale(1.3)' },
-          '60%': { transform: 'scale(0.9)' },
-          '100%': { transform: 'scale(1)' },
+        'sheet-up': {
+          '0%': { transform: 'translateY(100%)' },
+          '100%': { transform: 'translateY(0)' },
         },
-        'stagger-in': {
-          '0%': { opacity: '0', transform: 'translateY(8px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
         },
         'slide-down': {
           '0%': { opacity: '0', transform: 'translateY(-12px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
-        'expand': {
-          '0%': { opacity: '0', maxHeight: '0' },
-          '100%': { opacity: '1', maxHeight: '2000px' },
-        },
-        'press': {
+        'check-off': {
           '0%': { transform: 'scale(1)' },
-          '50%': { transform: 'scale(0.93)' },
+          '50%': { transform: 'scale(1.18)' },
           '100%': { transform: 'scale(1)' },
         },
         'float': {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-6px)' },
         },
-        'fade-in': {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
       },
       animation: {
-        'check-off': 'check-off 0.4s ease-out',
-        'stagger-in': 'stagger-in 0.3s ease-out forwards',
-        'slide-down': 'slide-down 0.3s ease-out forwards',
-        'expand': 'expand 0.3s ease-out forwards',
-        'press': 'press 0.15s ease-out',
+        'sheet-up': 'sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)',
+        'fade-in': 'fade-in 0.2s ease-out forwards',
+        'slide-down': 'slide-down 0.2s ease-out forwards',
+        'check-off': 'check-off 0.15s ease-out',
         'float': 'float 3s ease-in-out infinite',
-        'fade-in': 'fade-in 0.3s ease-out forwards',
       },
     },
   },

@@ -6,20 +6,15 @@ import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './hooks/useAuth'
 import { ToastProvider } from './components/ui/Toast'
 import { QueryProvider } from './providers/QueryProvider'
-import GroceryList from './pages/GroceryList'
+import GroceryPage from './features/grocery/GroceryPage'
+import { kitchenRoutes } from './features/kitchen/routes'
 
-// Lazy-load secondary routes; GroceryList is eager since it's the landing page.
-const loadFreezer = () => import('./pages/Freezer')
-const loadFridge = () => import('./pages/Fridge')
-const loadPantry = () => import('./pages/Pantry')
+// Lazy-load secondary routes; the grocery page is eager since it's the landing page.
 const loadCookbook = () => import('./pages/Cookbook')
 const loadMealPlanning = () => import('./pages/MealPlanning')
 
 const Login = lazy(() => import('./pages/Login'))
 const AuthCallback = lazy(() => import('./pages/AuthCallback'))
-const Freezer = lazy(loadFreezer)
-const Fridge = lazy(loadFridge)
-const Pantry = lazy(loadPantry)
 const Cookbook = lazy(loadCookbook)
 const MealPlanning = lazy(loadMealPlanning)
 
@@ -27,7 +22,7 @@ const MealPlanning = lazy(loadMealPlanning)
 // tap on a tab never shows the Suspense spinner.
 function usePreloadTabs() {
   useEffect(() => {
-    const run = () => { [loadPantry, loadFridge, loadFreezer, loadCookbook, loadMealPlanning].forEach(fn => fn().catch(() => {})) }
+    const run = () => { [loadCookbook, loadMealPlanning].forEach(fn => fn().catch(() => {})) }
     const idle = typeof requestIdleCallback === 'function'
       ? requestIdleCallback(run, { timeout: 6000 })
       : setTimeout(run, 3000)
@@ -67,10 +62,8 @@ export default function App() {
                 <Layout>
                   <Suspense fallback={<PageLoader />}>
                     <Routes>
-                      <Route path="/grocery" element={<GroceryList />} />
-                      <Route path="/freezer" element={<Freezer />} />
-                      <Route path="/fridge" element={<Fridge />} />
-                      <Route path="/pantry" element={<Pantry />} />
+                      <Route path="/grocery" element={<GroceryPage />} />
+                      {kitchenRoutes()}
                       <Route path="/planning" element={<MealPlanning />} />
                       <Route path="/cookbook" element={<Cookbook />} />
                       <Route path="/cookbook/suggestion" element={<SuggestionDetail />} />
