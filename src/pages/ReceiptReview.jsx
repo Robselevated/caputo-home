@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react'
 import { TAXONOMY, DEFAULT_UNITS, UNITS, SECTION_COLORS } from '../lib/constants'
 import { supabase } from '../lib/supabase'
+import { queryClient } from '../lib/queryClient'
+import { keys } from '../queries/keys'
 
 const LOCATIONS = ['fridge', 'freezer', 'pantry']
 
@@ -125,11 +127,10 @@ export default function ReceiptReview({ items, onConfirm, onCancel, householdId 
           .eq('household_id', householdId)
 
         if (groceryMatches) {
-          const toDelete = groceryMatches.filter(g =>
-            names.includes(g.name.toLowerCase())
-          )
-          for (const match of toDelete) {
-            await supabase.from('grocery_items').delete().eq('id', match.id)
+          const toDelete = groceryMatches.filter(g => names.includes(g.name.toLowerCase()))
+          if (toDelete.length > 0) {
+            await supabase.from('grocery_items').delete().in('id', toDelete.map(m => m.id))
+            queryClient.invalidateQueries({ queryKey: keys.grocery(householdId) })
           }
         }
       }

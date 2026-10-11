@@ -17,6 +17,9 @@ import { chainHas } from '../test/fakeSupabase'
 import { queueWrite } from '../lib/db'
 import { toast } from '../components/ui/Toast'
 import { useInventory } from './useInventory'
+import { createWrapper } from '../test/queryWrapper'
+import { keys } from '../queries/keys'
+import { applyChange } from '../lib/realtimeCache'
 
 const rice = { id: 'a', household_id: 'hh', location: 'pantry', name: 'Rice', category: 'Dry Goods', subcategory: null, qty: 1, unit: 'bags' }
 const beans = { id: 'b', household_id: 'hh', location: 'pantry', name: 'Beans', category: 'Canned', subcategory: null, qty: 2, unit: 'cans' }
@@ -25,11 +28,12 @@ function setOnline(value) {
   Object.defineProperty(window.navigator, 'onLine', { value, configurable: true })
 }
 
-async function renderLoaded() {
-  const hook = renderHook(() => useInventory('hh', 'pantry'))
+async function renderLoaded(existing) {
+  const { wrapper, qc } = existing ?? createWrapper()
+  const hook = renderHook(() => useInventory('hh', 'pantry'), { wrapper })
   await waitFor(() => expect(hook.result.current.loading).toBe(false))
   await waitFor(() => expect(hook.result.current.items).toHaveLength(2))
-  return hook
+  return { ...hook, qc, wrapper }
 }
 
 beforeEach(() => {
@@ -45,7 +49,6 @@ describe('useInventory load', () => {
     const sel = supabase.callsFor('inventory_items', 'select')[0]
     const selectArg = sel.chain.find(([m]) => m === 'select')[1]
     expect(selectArg).not.toContain('users')
-    expect(chainHas(sel, 'eq', 'location', 'pantry')).toBe(true)
   })
 })
 
@@ -100,7 +103,7 @@ describe('useInventory.addItem', () => {
 
   it('merges through the RPC and shows the returned row once, even after the realtime echo', async () => {
     supabase.setResult('rpc', 'merge_inventory_item', { data: { merged: false, item: apples }, error: null })
-    const { result } = await renderLoaded()
+    const { result, qc } = await renderLoaded()
     let res
     await act(async () => {
       res = await result.current.addItem({ name: ' Apples ', qty: 2, unit: 'count', category: 'Canned', userId: 'u1' })
@@ -111,7 +114,7 @@ describe('useInventory.addItem', () => {
       p_household_id: 'hh', p_name: 'Apples', p_qty: 2, p_location: 'pantry', p_category: 'Canned',
     }))
     expect(result.current.items.filter(i => i.id === 'c')).toHaveLength(1)
-    act(() => supabase.emit({ eventType: 'INSERT', new: apples, old: {} }))
+    act(() => { qc.setQueryData(keys.inventory('hh'), prev => applyChange(prev, { eventType: 'INSERT', new: apples, old: {} })) })
     expect(result.current.items.filter(i => i.id === 'c')).toHaveLength(1)
     expect(supabase.callsFor('inventory_items', 'select')).toHaveLength(1)
   })
@@ -160,25 +163,37 @@ describe('useInventory.addItem', () => {
   })
 })
 
-describe('useInventory realtime', () => {
-  it('removes a row on a DELETE payload that carries only old.id (no refetch)', async () => {
-    const { result } = await renderLoaded()
-    act(() => supabase.emit({ eventType: 'DELETE', old: { id: 'a' }, new: {} }))
-    expect(result.current.items.map(i => i.id)).toEqual(['b'])
+describe('useInventory shared cache', () => {
+  it('does not open its own realtime channel (RealtimeProvider owns realtime)', async () => {
+    await renderLoaded()
+    expect(supabase.channel).not.toHaveBeenCalled()
+  })
+
+  it('serves a location from the shared all-locations cache with no network call', async () => {
+    const { wrapper, qc } = createWrapper()
+    const milk = { id: 'm', household_id: 'hh', location: 'fridge', name: 'Milk', category: 'Dairy', subcategory: null, qty: 1 }
+    qc.setQueryData(keys.inventory('hh'), [beans, rice, milk])
+    const { result } = renderHook(() => useInventory('hh', 'pantry'), { wrapper })
+    expect(result.current.loading).toBe(false)
+    expect(result.current.items.map(i => i.id).sort()).toEqual(['a', 'b'])
+    await new Promise(r => setTimeout(r, 20))
+    expect(supabase.callsFor('inventory_items', 'select')).toHaveLength(0)
+  })
+
+  it('unmount and remount within staleTime shows data immediately and does not refetch', async () => {
+    const first = await renderLoaded()
+    first.unmount()
+    const { result } = renderHook(() => useInventory('hh', 'pantry'), { wrapper: first.wrapper })
+    expect(result.current.loading).toBe(false)
+    expect(result.current.items).toHaveLength(2)
+    await new Promise(r => setTimeout(r, 20))
     expect(supabase.callsFor('inventory_items', 'select')).toHaveLength(1)
   })
 
-  it('appends an INSERT for this location without refetching', async () => {
-    const { result } = await renderLoaded()
-    act(() => supabase.emit({ eventType: 'INSERT', old: {}, new: { id: 'z', location: 'pantry', name: 'Ziti', category: 'Pasta', subcategory: null, qty: 1 } }))
-    expect(result.current.items.map(i => i.id)).toContain('z')
-    expect(supabase.callsFor('inventory_items', 'select')).toHaveLength(1)
-  })
-
-  it('ignores an INSERT for another location', async () => {
-    const { result } = await renderLoaded()
-    act(() => supabase.emit({ eventType: 'INSERT', old: {}, new: { id: 'z', location: 'fridge', name: 'Milk', category: 'Dairy' } }))
-    expect(result.current.items.map(i => i.id)).toEqual(['b', 'a'])
+  it('fetches ALL locations in the one query', async () => {
+    await renderLoaded()
+    const sel = supabase.callsFor('inventory_items', 'select')[0]
+    expect(sel.chain.some(([m, col]) => m === 'eq' && col === 'location')).toBe(false)
   })
 })
 
@@ -227,10 +242,10 @@ describe('useInventory.addToGroceryList', () => {
 })
 
 describe('useInventory connectivity', () => {
-  it('refetches when the browser comes back online (queued kitchen writes replay elsewhere, the list must catch up)', async () => {
+  it('does not refetch fresh data on reconnect (the offline replay cancels, replays, then invalidates)', async () => {
     await renderLoaded()
+    await act(async () => { window.dispatchEvent(new Event('offline')); window.dispatchEvent(new Event('online')) })
+    await new Promise(r => setTimeout(r, 30))
     expect(supabase.callsFor('inventory_items', 'select')).toHaveLength(1)
-    await act(async () => { window.dispatchEvent(new Event('online')) })
-    await waitFor(() => expect(supabase.callsFor('inventory_items', 'select')).toHaveLength(2))
   })
 })

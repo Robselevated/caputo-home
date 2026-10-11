@@ -15,7 +15,6 @@
 // recovery path beyond the existing splash/chunk recovery in recovery.js.
 
 import { supabase, readPersistedUser } from './supabase'
-import { softReloadViaRecovery } from './recovery'
 
 // Resolve `promise`, but if it hasn't settled within `ms`, resolve to
 // `timeoutValue` instead. Single source of truth — useAuth and authFetch import
@@ -78,12 +77,21 @@ export async function resolveInitialSession({ timeoutMs = 3000 } = {}) {
 
 const revalidateListeners = new Set()
 
+// Resume and GoTrue's own TOKEN_REFRESHED land within milliseconds of each
+// other; one refetch burst is enough.
+const COALESCE_MS = 2000
+let lastEmitAt = 0
+
 export function onRevalidate(listener) {
   revalidateListeners.add(listener)
   return () => revalidateListeners.delete(listener)
 }
 
 export function emitRevalidate(reason) {
+  const now = Date.now()
+  const sinceLast = now - lastEmitAt
+  if (sinceLast >= 0 && sinceLast < COALESCE_MS) return
+  lastEmitAt = now
   for (const listener of revalidateListeners) {
     try {
       listener(reason)
@@ -95,8 +103,10 @@ export function emitRevalidate(reason) {
 
 // --- Realtime reconnect ----------------------------------------------------
 // iOS suspends the websocket while the PWA is backgrounded; on resume it can be
-// dead-but-"connected". Force a reconnect. Correctness is still guaranteed by
-// the refetch (emitRevalidate) — this just restores live updates.
+// dead-but-"connected". Force a reconnect; phoenix rejoins the existing
+// channels on the new socket (RealtimeProvider ignores the CHANNEL_ERROR the
+// deliberate disconnect triggers). Correctness is still guaranteed by the
+// refetch (emitRevalidate) — this just restores live updates.
 //
 // MUST await disconnect() before connect(): disconnect() synchronously drives a
 // healthy socket into the CLOSING state, and connect() short-circuits to a no-op
@@ -115,7 +125,12 @@ export async function reconnectRealtime() {
 // --- Resume handler --------------------------------------------------------
 
 const HIDDEN_SOFT_MS = 10 * 1000 // below this, a quick app-switch — do nothing
-const HIDDEN_HARD_MS = 30 * 60 * 1000 // above this, token is long dead — reload
+// There is deliberately no "hard" threshold any more: a long gap used to force
+// window.location.reload(), which turned most real opens of the installed PWA
+// into a cold boot. The persisted query cache paints instantly and the
+// bounded refetch catches up; an expired token is refreshed by the SDK behind
+// the (8s-bounded) fetch, and a dead refresh token signs out via
+// onAuthStateChange, which routes to /login.
 
 let installed = false
 let hiddenAt = null
@@ -124,8 +139,7 @@ let resuming = false
 // Exposed for unit testing the threshold decision in isolation.
 export function decideResumeAction(awayMs, online) {
   if (awayMs < HIDDEN_SOFT_MS) return 'ignore'
-  if (!online) return 'ignore' // offline: keep cache, never reload
-  if (awayMs > HIDDEN_HARD_MS) return 'reload'
+  if (!online) return 'ignore' // offline: keep cache, never refetch
   return 'revalidate'
 }
 
@@ -149,15 +163,14 @@ export function installResumeHandler() {
 
     resuming = true
     try {
-      if (action === 'reload') {
-        softReloadViaRecovery()
-        return
-      }
-      // revalidate: confirm the session refreshed (bounded), then refetch + relive
-      const res = await raceTimeout(supabase.auth.getSession(), 3000)
-      if (res?.__timeout) {
-        softReloadViaRecovery()
-        return
+      // Give the SDK a bounded moment to refresh the token, then refetch and
+      // bring the socket back whether or not it answered: every query is
+      // bounded, keeps its cached data on failure, and the SDK's own retry
+      // handles a cold radio.
+      try {
+        await raceTimeout(supabase.auth.getSession(), 3000)
+      } catch {
+        // ignore: refetch below surfaces any real auth problem
       }
       await reconnectRealtime()
       emitRevalidate('resume')

@@ -2,14 +2,17 @@ import BottomNav from './BottomNav'
 import OfflineIndicator from './OfflineIndicator'
 import { useAuth } from '../hooks/useAuth'
 import { useOfflineSync } from '../hooks/useOfflineSync'
+import { RealtimeProvider } from '../providers/RealtimeProvider'
 
 export default function Layout({ children }) {
   // The ONE offline-sync instance for the app: it replays queued writes when
   // connectivity returns regardless of which tab is open.
   const { profile } = useAuth()
-  const { isOnline, pendingCount, syncing, syncNow } = useOfflineSync(profile?.household_id)
+  const householdId = profile?.household_id
+  const { isOnline, pendingCount, syncing, syncNow } = useOfflineSync(householdId)
 
   return (
+    <RealtimeProvider householdId={householdId}>
     <div className="min-h-screen bg-ivory relative">
       {/* Top App Bar */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-ivory w-full px-6 pb-4 pt-[max(2rem,env(safe-area-inset-top,0px))]">
@@ -31,5 +34,6 @@ export default function Layout({ children }) {
 
       <BottomNav />
     </div>
+    </RealtimeProvider>
   )
 }

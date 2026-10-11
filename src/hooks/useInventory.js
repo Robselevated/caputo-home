@@ -1,81 +1,50 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
 import { queueWrite } from '../lib/db'
 import { toast } from '../components/ui/Toast'
 import { DEFAULT_UNITS } from '../lib/constants'
 import { normalizeName } from '../lib/normalizeName'
-import { applyInventoryChange, sortInventory } from '../lib/inventoryRealtime'
+import { sortInventory } from '../lib/inventoryRealtime'
+import { upsertById, removeById } from '../lib/realtimeCache'
+import { keys, STALE } from '../queries/keys'
+import { fetchInventory } from '../queries/fetchers'
+import { mergeInventoryItem, updateInventoryItem, deleteInventoryItem, insertGroceryItem } from '../queries/writes'
 
 const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
+const EMPTY = []
 
+// Kitchen inventory for one location, served from the ONE all-locations
+// cache (keys.inventory). Writes are optimistic against that cache and roll
+// back with a toast; realtime patches arrive through RealtimeProvider.
 export function useInventory(householdId, location) {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const itemsRef = useRef(items)
-  itemsRef.current = items
+  const qc = useQueryClient()
+  const key = keys.inventory(householdId)
 
-  const fetchItems = useCallback(async () => {
-    if (!householdId) return
-    const { data, error } = await withQueryTimeout(
-      supabase
-        .from('inventory_items')
-        .select('*')
-        .eq('household_id', householdId)
-        .eq('location', location)
-        .order('category')
-        .order('subcategory')
-        .order('name')
-    )
-    if (!error && data) setItems(data)
-    setLoading(false)
-  }, [householdId, location])
+  const { data: allItems = EMPTY, isPending } = useQuery({
+    queryKey: key,
+    queryFn: () => fetchInventory(supabase, householdId),
+    enabled: !!householdId,
+    staleTime: STALE.inventory,
+  })
 
-  useEffect(() => {
-    fetchItems()
+  const items = useMemo(
+    () => sortInventory(allItems.filter(i => i.location === location)),
+    [allItems, location]
+  )
 
-    // Realtime patches the list in place. DELETE is keyed on old.id only: with
-    // the default REPLICA IDENTITY the payload carries nothing else, which is
-    // why deletes from the other phone used to be ignored here.
-    const channel = supabase
-      .channel(`inventory_${location}_changes`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'inventory_items',
-        filter: `household_id=eq.${householdId}`,
-      }, (payload) => {
-        setItems(prev => applyInventoryChange(prev, payload, location))
-      })
-      .subscribe()
-
-    const offRevalidate = onRevalidate(() => fetchItems())
-    // Queued kitchen writes replay (in Layout's useOfflineSync) when connectivity
-    // returns; catch the list up so a queued delete cannot look resurrected.
-    const onOnline = () => fetchItems()
-    window.addEventListener('online', onOnline)
-
-    return () => {
-      supabase.removeChannel(channel)
-      offRevalidate()
-      window.removeEventListener('online', onOnline)
-    }
-  }, [householdId, location, fetchItems])
-
-  const upsertLocal = (row) => {
-    if (!row) return
-    setItems(prev => applyInventoryChange(prev, { eventType: 'INSERT', new: row, old: {} }, location))
-  }
+  const setAll = (updater) => qc.setQueryData(key, (prev) => updater(prev ?? []))
+  const snapshot = () => qc.getQueryData(key)
+  const findRow = (id) => (snapshot() ?? []).find(i => i.id === id)
 
   const addItem = async ({ name, qty, unit, category, subcategory, notes, userId }) => {
     if (!householdId) return { error: 'No household' }
     const cleanName = (name || '').trim()
-    const defaultUnit = DEFAULT_UNITS[location]?.[category] || 'count'
     const row = {
       household_id: householdId,
       name: cleanName,
       qty: qty ?? 1,
-      unit: unit || defaultUnit,
+      unit: unit || DEFAULT_UNITS[location]?.[category] || 'count',
       location,
       category,
       subcategory: subcategory || null,
@@ -83,93 +52,86 @@ export function useInventory(householdId, location) {
       updated_by: userId,
     }
 
+    await qc.cancelQueries({ queryKey: key })
+    const k = normalizeName(cleanName)
+    const existing = (snapshot() ?? []).find(i => i.location === location && normalizeName(i.name) === k)
+    const tempId = existing ? existing.id : crypto.randomUUID()
+    setAll(prev => existing
+      ? prev.map(i => (i.id === existing.id ? { ...i, qty: (i.qty || 0) + (row.qty || 1) } : i))
+      : sortInventory([...prev, { ...row, id: tempId, created_at: new Date().toISOString() }]))
+
     if (isOffline()) {
-      const key = normalizeName(cleanName)
-      const existing = itemsRef.current.find(i => normalizeName(i.name) === key)
-      if (existing) {
-        setItems(prev => prev.map(i => (i.id === existing.id ? { ...i, qty: (i.qty || 0) + (row.qty || 1) } : i)))
-      } else {
-        upsertLocal({ ...row, id: crypto.randomUUID(), created_at: new Date().toISOString() })
-      }
       await queueWrite({ type: 'inventory_merge', data: row })
       return { error: null, queued: true, merged: !!existing }
     }
 
-    const { data, error } = await supabase.rpc('merge_inventory_item', {
-      p_household_id: householdId,
-      p_name: cleanName,
-      p_qty: row.qty,
-      p_unit: row.unit,
-      p_location: location,
-      p_category: category,
-      p_subcategory: row.subcategory,
-      p_notes: row.notes,
-    })
-
-    if (!error && data?.item) {
-      upsertLocal(data.item)
-      return { error: null, merged: !!data.merged, item: data.item }
-    }
-
-    if (error?.code === 'PGRST202') {
-      // Function not deployed yet: plain insert so the app still works.
-      const { data: inserted, error: insErr } = await supabase
-        .from('inventory_items').insert(row).select().single()
-      if (insErr) {
-        toast({ message: `Couldn't add ${cleanName}`, tone: 'error' })
-        return { error: insErr }
+    try {
+      const { merged, item } = await mergeInventoryItem(supabase, { ...row, id: existing ? undefined : tempId })
+      if (item) {
+        setAll(prev => sortInventory(upsertById(item.id !== tempId ? removeById(prev, tempId) : prev, item)))
       }
-      upsertLocal(inserted)
-      return { error: null, merged: false, item: inserted }
+      return { error: null, merged, item }
+    } catch (error) {
+      // roll back only what this add changed
+      if (existing) setAll(prev => prev.map(i => (i.id === existing.id ? { ...i, qty: existing.qty } : i)))
+      else setAll(prev => removeById(prev, tempId))
+      toast({ message: `Couldn't add ${cleanName}`, tone: 'error' })
+      return { error }
     }
-
-    toast({ message: `Couldn't add ${cleanName}`, tone: 'error' })
-    return { error: error || { message: 'Unexpected response' } }
   }
 
   const updateItem = async (id, changes, userId) => {
     if (!householdId) return { error: 'No household' }
-    const prevRow = itemsRef.current.find(i => i.id === id)
-    const fullChanges = {
-      ...changes,
-      updated_by: userId,
-      updated_at: new Date().toISOString(),
-    }
-    setItems(prev => prev.map(i => (i.id === id ? { ...i, ...fullChanges } : i)))
+    const fullChanges = { ...changes, updated_by: userId, updated_at: new Date().toISOString() }
+    await qc.cancelQueries({ queryKey: key })
+    const prevRow = findRow(id)
+    setAll(prev => prev.map(i => (i.id === id ? { ...i, ...fullChanges } : i)))
 
     if (isOffline()) {
       await queueWrite({ type: 'inventory_update', itemId: id, changes: fullChanges })
       return { error: null, queued: true }
     }
 
-    const { error } = await supabase.from('inventory_items').update(fullChanges).eq('id', id).select('id')
-    if (error) {
-      if (prevRow) setItems(prev => prev.map(i => (i.id === id ? prevRow : i)))
+    try {
+      await updateInventoryItem(supabase, id, fullChanges)
+      return { error: null }
+    } catch (error) {
+      // Revert only the fields we changed so a concurrent realtime update survives.
+      if (prevRow) {
+        setAll(prev => prev.map(i => {
+          if (i.id !== id) return i
+          const reverted = { ...i }
+          for (const field of Object.keys(fullChanges)) reverted[field] = prevRow[field]
+          return reverted
+        }))
+      }
       toast({ message: `Couldn't update ${prevRow?.name ?? 'item'}`, tone: 'error' })
       return { error }
     }
-    return { error: null }
   }
 
-  const updateQty = async (id, newQty, userId) => {
-    if (!householdId) return { error: 'No household' }
-    return updateItem(id, { qty: Math.max(0, newQty) }, userId)
-  }
+  const updateQty = (id, newQty, userId) => updateItem(id, { qty: Math.max(0, newQty) }, userId)
 
   const deleteItem = async (id) => {
     if (!householdId) return { error: 'No household' }
-    const prevRow = itemsRef.current.find(i => i.id === id)
-    setItems(prev => prev.filter(i => i.id !== id))
+    await qc.cancelQueries({ queryKey: key })
+    const prevRow = findRow(id)
+    setAll(prev => removeById(prev, id))
 
     if (isOffline()) {
       await queueWrite({ type: 'inventory_delete', itemId: id })
       return { error: null, queued: true }
     }
 
-    // .select('id') makes a silent 0-row delete (RLS, already gone) visible.
-    const { data, error } = await supabase.from('inventory_items').delete().eq('id', id).select('id')
-    if (error) {
-      if (prevRow) setItems(prev => sortInventory([...prev.filter(i => i.id !== id), prevRow]))
+    try {
+      const { alreadyGone } = await deleteInventoryItem(supabase, id)
+      if (alreadyGone) {
+        console.warn('inventory delete affected 0 rows (already gone or blocked by RLS):', id)
+        return { error: null, alreadyGone: true }
+      }
+      return { error: null }
+    } catch (error) {
+      if (prevRow) setAll(prev => sortInventory(upsertById(prev, prevRow)))
       toast({
         message: `Couldn't remove ${prevRow?.name ?? 'item'}`,
         tone: 'error',
@@ -177,13 +139,13 @@ export function useInventory(householdId, location) {
       })
       return { error }
     }
-    if (!data || data.length === 0) return { error: null, alreadyGone: true }
-    return { error: null }
   }
 
   const addToGroceryList = async (item, userId) => {
     if (!householdId) return { error: 'No household' }
-    const { error } = await supabase.from('grocery_items').insert({
+    const groceryKey = keys.grocery(householdId)
+    const row = {
+      id: crypto.randomUUID(),
       household_id: householdId,
       name: item.name,
       qty: item.qty || 1,
@@ -193,14 +155,20 @@ export function useInventory(householdId, location) {
       checked: false,
       added_by: userId,
       updated_by: userId,
-    })
-    if (error) {
+      created_at: new Date().toISOString(),
+    }
+    qc.setQueryData(groceryKey, prev => (prev ? [...prev, row] : prev))
+    try {
+      const saved = await insertGroceryItem(supabase, row)
+      if (saved) qc.setQueryData(groceryKey, prev => (prev ? upsertById(prev, saved) : prev))
+      toast({ message: `${item.name} added to grocery list` })
+      return { error: null }
+    } catch (error) {
+      qc.setQueryData(groceryKey, prev => (prev ? removeById(prev, row.id) : prev))
       toast({ message: `Couldn't add ${item.name} to the grocery list`, tone: 'error' })
       return { error }
     }
-    toast({ message: `${item.name} added to grocery list` })
-    return { error: null }
   }
 
-  return { items, loading, addItem, updateQty, updateItem, deleteItem, addToGroceryList }
+  return { items, loading: isPending, addItem, updateQty, updateItem, deleteItem, addToGroceryList }
 }

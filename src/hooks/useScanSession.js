@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { authFetch } from '../lib/authFetch'
 import { TAXONOMY } from '../lib/constants'
+import { queryClient } from '../lib/queryClient'
+import { keys } from '../queries/keys'
 
 // Keywords to catch items Claude miscategorizes as "Other"
 const CATEGORY_KEYWORDS = {
@@ -180,6 +182,12 @@ export function useScanSession(householdId) {
         setError(`Failed to add: ${errors.join(', ')}`)
       }
       setResults(null)
+      // Realtime usually patches these; invalidating guarantees the list is
+      // right even if the socket is down.
+      if (householdId) {
+        queryClient.invalidateQueries({ queryKey: keys.inventory(householdId) })
+        if (location === 'receipt') queryClient.invalidateQueries({ queryKey: keys.recentlyBought(householdId) })
+      }
     } catch (err) {
       setError(err.message)
     }

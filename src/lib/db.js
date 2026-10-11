@@ -6,6 +6,27 @@ const DB_VERSION = 1
 let dbInstance = null
 let dbFailed = false
 
+// Listeners get the new pending count whenever the write queue changes, so
+// useOfflineSync can react instead of polling IndexedDB every few seconds.
+const queueListeners = new Set()
+
+export function onQueueChange(listener) {
+  queueListeners.add(listener)
+  return () => queueListeners.delete(listener)
+}
+
+async function notifyQueueChange() {
+  if (queueListeners.size === 0) return
+  const count = await getPendingCount()
+  for (const listener of queueListeners) {
+    try {
+      listener(count)
+    } catch {
+      // one bad listener must not break the others
+    }
+  }
+}
+
 async function getDB() {
   if (dbFailed) return null
   if (dbInstance) return dbInstance
@@ -64,6 +85,7 @@ export async function queueWrite(operation) {
       ...operation,
       timestamp: Date.now(),
     })
+    await notifyQueueChange()
   } catch (err) {
     console.warn('Queue write failed:', err.message)
   }
@@ -99,6 +121,7 @@ export async function clearWrite(id) {
   if (!db) return
   try {
     await db.delete('write_queue', id)
+    await notifyQueueChange()
   } catch (err) {
     console.warn('Clear write failed:', err.message)
   }
@@ -111,6 +134,7 @@ export async function clearAllWrites() {
     const tx = db.transaction('write_queue', 'readwrite')
     await tx.objectStore('write_queue').clear()
     await tx.done
+    await notifyQueueChange()
   } catch (err) {
     console.warn('Clear all writes failed:', err.message)
   }

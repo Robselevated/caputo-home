@@ -1,50 +1,32 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
+import { toast } from '../components/ui/Toast'
+import { upsertById, removeById } from '../lib/realtimeCache'
+import { keys, STALE } from '../queries/keys'
+import { fetchMealPicks } from '../queries/fetchers'
+import { insertMealPick, deleteMealPick, clearMealPickSection } from '../queries/writes'
+
+const EMPTY = []
+const oldestFirst = (rows) => [...rows].sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))
 
 export function useMealPicks(householdId) {
-  const [picks, setPicks] = useState([])
-  const [loading, setLoading] = useState(true)
+  const qc = useQueryClient()
+  const key = keys.mealPicks(householdId)
 
-  const fetchPicks = useCallback(async () => {
-    if (!householdId) return
-    const { data, error } = await withQueryTimeout(
-      supabase
-        .from('meal_picks')
-        .select('*')
-        .eq('household_id', householdId)
-        .order('created_at', { ascending: true })
-    )
+  const { data: picks = EMPTY, isPending } = useQuery({
+    queryKey: key,
+    queryFn: () => fetchMealPicks(supabase, householdId),
+    enabled: !!householdId,
+    staleTime: STALE.mealPicks,
+  })
 
-    if (!error && data) setPicks(data)
-    setLoading(false)
-  }, [householdId])
-
-  useEffect(() => {
-    fetchPicks()
-
-    const channel = supabase
-      .channel('meal_picks_changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'meal_picks',
-        filter: `household_id=eq.${householdId}`,
-      }, () => {
-        fetchPicks()
-      })
-      .subscribe()
-
-    const offRevalidate = onRevalidate(() => fetchPicks())
-
-    return () => {
-      supabase.removeChannel(channel)
-      offRevalidate()
-    }
-  }, [householdId, fetchPicks])
+  const setAll = (updater) => qc.setQueryData(key, (prev) => updater(prev ?? []))
+  const snapshot = () => qc.getQueryData(key)
 
   const addPick = async ({ userId, recipeId, name, notes, imageUrl, section }) => {
-    const { error } = await supabase.from('meal_picks').insert({
+    if (!householdId) return { error: 'No household' }
+    const row = {
+      id: crypto.randomUUID(),
       household_id: householdId,
       user_id: userId,
       recipe_id: recipeId || null,
@@ -52,27 +34,47 @@ export function useMealPicks(householdId) {
       notes: notes?.trim() || null,
       image_url: imageUrl || null,
       section: section || null,
-    })
-    return { error }
+    }
+    await qc.cancelQueries({ queryKey: key })
+    setAll(prev => oldestFirst([...prev, { ...row, created_at: new Date().toISOString() }]))
+    try {
+      const saved = await insertMealPick(supabase, row)
+      if (saved) setAll(prev => oldestFirst(upsertById(prev, saved)))
+      return { error: null }
+    } catch (error) {
+      setAll(prev => removeById(prev, row.id))
+      toast({ message: `Couldn't add ${row.name} to the plan`, tone: 'error' })
+      return { error }
+    }
   }
 
   const removePick = async (id) => {
-    setPicks(prev => prev.filter(p => p.id !== id))
-    const { error } = await supabase.from('meal_picks').delete().eq('id', id)
-    if (error) fetchPicks()
-    return { error }
+    await qc.cancelQueries({ queryKey: key })
+    const prevRow = (snapshot() ?? []).find(p => p.id === id)
+    setAll(prev => removeById(prev, id))
+    try {
+      await deleteMealPick(supabase, id)
+      return { error: null }
+    } catch (error) {
+      if (prevRow) setAll(prev => oldestFirst(upsertById(prev, prevRow)))
+      toast({ message: "Couldn't remove that pick", tone: 'error' })
+      return { error }
+    }
   }
 
   const clearSection = async (sectionName) => {
-    setPicks(prev => prev.filter(p => p.section !== sectionName))
-    const { error } = await supabase
-      .from('meal_picks')
-      .delete()
-      .eq('household_id', householdId)
-      .eq('section', sectionName)
-    if (error) fetchPicks()
-    return { error }
+    await qc.cancelQueries({ queryKey: key })
+    const removed = (snapshot() ?? []).filter(p => p.section === sectionName)
+    setAll(prev => prev.filter(p => p.section !== sectionName))
+    try {
+      await clearMealPickSection(supabase, householdId, sectionName)
+      return { error: null }
+    } catch (error) {
+      setAll(prev => oldestFirst(removed.reduce((acc, row) => upsertById(acc, row), prev)))
+      toast({ message: `Couldn't clear ${sectionName}`, tone: 'error' })
+      return { error }
+    }
   }
 
-  return { picks, loading, addPick, removePick, clearSection }
+  return { picks, loading: isPending, addPick, removePick, clearSection }
 }

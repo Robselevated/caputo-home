@@ -9,6 +9,8 @@ vi.mock('../lib/authFetch', () => ({ authFetch: vi.fn() }))
 
 import { supabase } from '../lib/supabase'
 import { useScanSession } from './useScanSession'
+import { queryClient } from '../lib/queryClient'
+import { keys } from '../queries/keys'
 
 beforeEach(() => {
   supabase.reset()
@@ -54,5 +56,16 @@ describe('useScanSession.confirmItems', () => {
       await result.current.confirmItems([{ name: 'Rice', qty: 1, category: 'Pasta' }], 'pantry', 'u1')
     })
     expect(result.current.error).toContain('Rice')
+  })
+})
+
+describe('useScanSession cache refresh', () => {
+  it('refreshes the kitchen cache after a scan confirm so the list updates without realtime', async () => {
+    supabase.setResult('rpc', 'merge_inventory_item', { data: { merged: false, item: {} }, error: null })
+    const spy = vi.spyOn(queryClient, 'invalidateQueries')
+    const { result } = renderHook(() => useScanSession('hh'))
+    await act(async () => { await result.current.confirmItems([{ name: 'Rice', qty: 1, category: 'Pasta' }], 'pantry', 'u1') })
+    expect(spy).toHaveBeenCalledWith({ queryKey: keys.inventory('hh') })
+    spy.mockRestore()
   })
 })

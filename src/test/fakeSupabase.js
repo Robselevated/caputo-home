@@ -20,6 +20,7 @@ export function createFakeSupabase() {
       results.clear()
       fake.calls.length = 0
       fake.channels.length = 0
+      fake.realtime.isConnected.mockImplementation(() => true)
     },
     callsFor(table, verb) {
       return fake.calls.filter(c => c.table === table && (!verb || c.verb === verb))
@@ -38,12 +39,13 @@ export function createFakeSupabase() {
         name,
         handlers: [],
         on: vi.fn((event, filter, handler) => { ch.handlers.push(handler); return ch }),
-        subscribe: vi.fn(() => ch),
+        subscribe: vi.fn((cb) => { ch.statusCallback = cb; return ch }),
       }
       fake.channels.push(ch)
       return ch
     }),
-    removeChannel: vi.fn(),
+    removeChannel: vi.fn(async () => 'ok'),
+    realtime: { isConnected: vi.fn(() => true), disconnect: vi.fn(async () => {}), connect: vi.fn() },
     auth: { getSession: vi.fn(async () => ({ data: { session: null }, error: null })) },
   }
 

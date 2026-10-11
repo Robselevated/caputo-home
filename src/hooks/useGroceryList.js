@@ -1,274 +1,204 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
-import { cacheGroceryItems, getCachedGroceryItems, queueWrite } from '../lib/db'
-import { checkOffGroceryItem, checkOffParams } from '../lib/checkOff'
+import { queueWrite } from '../lib/db'
 import { toast } from '../components/ui/Toast'
+import { checkOffGroceryItem, checkOffParams } from '../lib/checkOff'
+import { upsertById, removeById } from '../lib/realtimeCache'
+import { keys, STALE } from '../queries/keys'
+import { fetchGroceryItems } from '../queries/fetchers'
+import { insertGroceryItem, updateGroceryItem, deleteGroceryItem, setGrocerySortOrder } from '../queries/writes'
+import { invalidateDebounced } from '../queries/invalidate'
 
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
+const EMPTY = []
+
+const byOrder = (rows) => [...rows].sort((a, b) =>
+  (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))
+
+// Grocery list on the shared query cache. Every write is optimistic (the row
+// changes before the request), rolls back with a toast on failure, and queues
+// when offline. Realtime patches arrive through RealtimeProvider.
 export function useGroceryList(householdId) {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
+  const qc = useQueryClient()
+  const key = keys.grocery(householdId)
 
-  const fetchItems = useCallback(async () => {
-    if (!householdId) return
+  const { data: items = EMPTY, isPending } = useQuery({
+    queryKey: key,
+    queryFn: () => fetchGroceryItems(supabase, householdId),
+    enabled: !!householdId,
+    staleTime: STALE.grocery,
+  })
 
-    if (!navigator.onLine) {
-      const cached = await getCachedGroceryItems()
-      if (cached.length > 0) setItems(cached)
-      setLoading(false)
-      return
-    }
-
-    const { data, error } = await withQueryTimeout(
-      supabase
-        .from('grocery_items')
-        .select('*')
-        .eq('household_id', householdId)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: true })
-    )
-
-    if (!error && data) {
-      setItems(data)
-      cacheGroceryItems(data)
-    } else {
-      // Online but fetch failed — fall back to cache
-      const cached = await getCachedGroceryItems()
-      if (cached.length > 0) setItems(cached)
-    }
-    setLoading(false)
-  }, [householdId])
-
-  // Subscribe to real-time changes + revalidate on app resume / token refresh
-  useEffect(() => {
-    fetchItems()
-
-    const channel = supabase
-      .channel('grocery_items_changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'grocery_items',
-        filter: `household_id=eq.${householdId}`,
-      }, () => {
-        fetchItems()
-      })
-      .subscribe()
-
-    const offRevalidate = onRevalidate(() => fetchItems())
-
-    return () => {
-      supabase.removeChannel(channel)
-      offRevalidate()
-    }
-  }, [householdId, fetchItems])
-
-  // Keep IndexedDB cache in sync with local state
-  useEffect(() => {
-    if (items.length > 0) {
-      cacheGroceryItems(items)
-    }
-  }, [items])
-
-  // Re-fetch from Supabase when connectivity returns
-  useEffect(() => {
-    const handleOnline = () => fetchItems()
-    window.addEventListener('online', handleOnline)
-    return () => window.removeEventListener('online', handleOnline)
-  }, [fetchItems])
+  const setAll = (updater) => qc.setQueryData(key, (prev) => updater(prev ?? []))
+  const snapshot = () => qc.getQueryData(key)
+  const findRow = (id) => (snapshot() ?? []).find(i => i.id === id)
+  // Rollbacks are ROW-level, never a whole-list snapshot: concurrent writes
+  // (clear-checked fires one per item) must not resurrect each other's rows.
+  const putBack = (row) => { if (row) setAll(prev => byOrder(upsertById(prev, row))) }
+  const takeOut = (id) => setAll(prev => removeById(prev, id))
 
   const addItem = async ({ name, qty, unit, store, notes, userId }) => {
+    if (!householdId) return { error: 'No household' }
+    const cleanName = (name || '').trim()
     const targetStore = store || 'Grocery Store'
-
-    if (!navigator.onLine) {
-      const maxSort = items
-        .filter(i => i.store === targetStore)
-        .reduce((max, i) => Math.max(max, i.sort_order ?? 0), 0)
-
-      const newItem = {
-        id: crypto.randomUUID(),
-        household_id: householdId,
-        name: name.trim(),
-        qty: qty || null,
-        unit: unit || null,
-        store: store || null,
-        notes: notes || null,
-        checked: false,
-        sort_order: maxSort + 1,
-        added_by: userId,
-        updated_by: userId,
-        created_at: new Date().toISOString(),
-      }
-      setItems(prev => [...prev, newItem])
-      await queueWrite({
-        type: 'insert',
-        data: {
-          household_id: householdId,
-          name: name.trim(),
-          qty: qty || null,
-          unit: unit || null,
-          store: store || null,
-          notes: notes || null,
-          checked: false,
-          sort_order: maxSort + 1,
-          added_by: userId,
-          updated_by: userId,
-        },
-      })
-      return { error: null }
-    }
-
-    // Compute next sort_order from local state instead of a round trip — the
-    // realtime subscription keeps `items` current, so this saves a query on
-    // every add. A rare collision just ties on sort_order (created_at breaks it).
-    const maxSort = items
-      .filter(i => i.store === targetStore)
+    const current = snapshot() ?? []
+    const maxSort = current
+      .filter(i => (i.store || 'Grocery Store') === targetStore)
       .reduce((max, i) => Math.max(max, i.sort_order ?? 0), 0)
-    const nextOrder = maxSort + 1
-
-    const newItem = {
+    const row = {
+      id: crypto.randomUUID(),
       household_id: householdId,
-      name: name.trim(),
+      name: cleanName,
       qty: qty || null,
       unit: unit || null,
       store: store || null,
       notes: notes || null,
       checked: false,
-      sort_order: nextOrder,
+      sort_order: maxSort + 1,
       added_by: userId,
       updated_by: userId,
     }
-    const { error } = await supabase.from('grocery_items').insert(newItem)
 
-    if (!error) {
-      await supabase.from('item_history').upsert(
-        { household_id: householdId, name: name.trim() },
-        { onConflict: 'household_id,name' }
-      )
+    await qc.cancelQueries({ queryKey: key })
+    setAll(prev => byOrder([...prev, { ...row, created_at: new Date().toISOString() }]))
+
+    if (isOffline()) {
+      await queueWrite({ type: 'insert', data: row })
+      return { error: null, queued: true }
     }
 
-    return { error }
+    try {
+      const saved = await insertGroceryItem(supabase, row)
+      if (saved) setAll(prev => byOrder(upsertById(prev, saved)))
+      // Autocomplete memory; not worth blocking on.
+      supabase.from('item_history')
+        .upsert({ household_id: householdId, name: cleanName }, { onConflict: 'household_id,name' })
+        .then(() => invalidateDebounced(qc, keys.itemHistory(householdId)))
+        .catch(() => {})
+      return { error: null }
+    } catch (error) {
+      takeOut(row.id)
+      toast({ message: `Couldn't add ${cleanName}`, tone: 'error' })
+      return { error }
+    }
   }
 
   const checkItem = async (item, userId) => {
-    if (!navigator.onLine) {
-      setItems(prev => prev.filter(i => i.id !== item.id))
-      // One queue entry that carries the kitchen destination; replayed through
-      // the check-off RPC when back online.
+    if (!householdId) return { error: 'No household' }
+    await qc.cancelQueries({ queryKey: key })
+    const prevRow = findRow(item.id) ?? item
+    takeOut(item.id)
+
+    if (isOffline()) {
       const { location, category, unit } = checkOffParams(item)
-      await queueWrite({
-        type: 'check',
-        item: { ...item },
-        householdId,
-        userId,
-        location,
-        category,
-        unit,
-      })
-      return
+      await queueWrite({ type: 'check', item: { ...item }, householdId, userId, location, category, unit })
+      return { error: null, queued: true }
     }
 
-    // One transactional round trip (recently_bought + item_history + kitchen
-    // merge + delete). Falls back to the legacy multi-request path if the
-    // function is not deployed yet.
     const { error } = await checkOffGroceryItem(supabase, { item, householdId, userId })
     if (error) {
       console.error('Check-off failed:', error)
+      putBack(prevRow)
       toast({ message: `Couldn't check off ${item.name}`, tone: 'error' })
-      fetchItems()
+      return { error }
     }
-  }
-
-  const uncheckItem = async (item, userId) => {
-    await supabase.from('grocery_items').update({
-      checked: false,
-      checked_at: null,
-      updated_by: userId,
-      updated_at: new Date().toISOString(),
-    }).eq('id', item.id)
-  }
-
-  const deleteItem = async (id) => {
-    setItems(prev => prev.filter(i => i.id !== id))
-
-    if (!navigator.onLine) {
-      await queueWrite({ type: 'delete', itemId: id })
-      return
-    }
-
-    const { error } = await supabase.from('grocery_items').delete().eq('id', id)
-    if (error) {
-      console.error('Delete failed:', error)
-      fetchItems()
-    }
+    // The RPC wrote recently_bought + item_history + a kitchen row; realtime
+    // patches those caches, and this (burst-safe) invalidate is the fallback.
+    invalidateDebounced(qc, keys.recentlyBought(householdId))
+    invalidateDebounced(qc, keys.inventory(householdId))
+    return { error: null }
   }
 
   const updateItem = async (id, changes, userId) => {
-    const fullChanges = {
-      ...changes,
-      updated_by: userId,
-      updated_at: new Date().toISOString(),
-    }
+    if (!householdId) return { error: 'No household' }
+    const fullChanges = { ...changes, updated_by: userId, updated_at: new Date().toISOString() }
+    await qc.cancelQueries({ queryKey: key })
+    const prevRow = findRow(id)
+    setAll(prev => byOrder(prev.map(i => (i.id === id ? { ...i, ...fullChanges } : i))))
 
-    if (!navigator.onLine) {
-      setItems(prev => prev.map(i => i.id === id ? { ...i, ...fullChanges } : i))
+    if (isOffline()) {
       await queueWrite({ type: 'update', itemId: id, changes: fullChanges })
-      return
+      return { error: null, queued: true }
     }
 
-    await supabase.from('grocery_items').update(fullChanges).eq('id', id)
+    try {
+      await updateGroceryItem(supabase, id, fullChanges)
+      return { error: null }
+    } catch (error) {
+      if (prevRow) {
+        setAll(prev => byOrder(prev.map(i => {
+          if (i.id !== id) return i
+          const reverted = { ...i }
+          for (const field of Object.keys(fullChanges)) reverted[field] = prevRow[field]
+          return reverted
+        })))
+      }
+      toast({ message: `Couldn't update ${prevRow?.name ?? 'item'}`, tone: 'error' })
+      return { error }
+    }
+  }
+
+  const uncheckItem = (item, userId) => updateItem(item.id, { checked: false, checked_at: null }, userId)
+
+  const deleteItem = async (id) => {
+    if (!householdId) return { error: 'No household' }
+    await qc.cancelQueries({ queryKey: key })
+    const prevRow = findRow(id)
+    takeOut(id)
+
+    if (isOffline()) {
+      await queueWrite({ type: 'delete', itemId: id })
+      return { error: null, queued: true }
+    }
+
+    try {
+      await deleteGroceryItem(supabase, id)
+      return { error: null }
+    } catch (error) {
+      putBack(prevRow)
+      toast({ message: `Couldn't delete ${prevRow?.name ?? 'item'}`, tone: 'error' })
+      return { error }
+    }
   }
 
   const clearChecked = async (userId) => {
-    const checkedItems = items.filter(i => i.checked)
-    let failures = 0
-    for (const item of checkedItems) {
-      try {
-        await checkItem(item, userId)
-      } catch (err) {
-        failures++
-        console.error('clearChecked failed for item', item.id, err)
-      }
-    }
-    // checkItem refetches on its own DB errors; this catches anything that
-    // throws mid-loop so one bad item can't strand the remaining ones.
-    if (failures > 0) fetchItems()
+    const checked = (snapshot() ?? []).filter(i => i.checked)
+    await Promise.allSettled(checked.map(i => checkItem(i, userId)))
   }
 
   const markChecked = (id) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, checked: true, checked_at: new Date().toISOString() } : i))
+    setAll(prev => prev.map(i => (i.id === id ? { ...i, checked: true, checked_at: new Date().toISOString() } : i)))
   }
 
   const markUnchecked = (id) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, checked: false, checked_at: null } : i))
+    setAll(prev => prev.map(i => (i.id === id ? { ...i, checked: false, checked_at: null } : i)))
   }
 
   const reorderItems = async (orderedIds, userId) => {
-    // Optimistic local update
-    setItems(prev => {
-      const updates = new Map(orderedIds.map((id, idx) => [id, idx]))
-      return prev.map(i => updates.has(i.id) ? { ...i, sort_order: updates.get(i.id) } : i)
-    })
+    if (!householdId) return { error: 'No household' }
+    await qc.cancelQueries({ queryKey: key })
+    const snap = snapshot()
+    const positions = new Map(orderedIds.map((id, idx) => [id, idx]))
+    setAll(prev => byOrder(prev.map(i => (positions.has(i.id) ? { ...i, sort_order: positions.get(i.id) } : i))))
 
-    if (!navigator.onLine) {
+    if (isOffline()) {
       await queueWrite({ type: 'reorder', orderedIds, userId })
-      return
+      return { error: null, queued: true }
     }
 
-    const updates = orderedIds.map((id, index) =>
-      supabase.from('grocery_items').update({
-        sort_order: index,
-        updated_by: userId,
-        updated_at: new Date().toISOString(),
-      }).eq('id', id)
-    )
-    const results = await Promise.allSettled(updates)
-    const failed = results.filter(r => r.status === 'rejected')
-    if (failed.length > 0) {
-      console.error(`Reorder: ${failed.length} of ${results.length} updates failed`)
-      fetchItems()
+    try {
+      await setGrocerySortOrder(supabase, orderedIds, userId)
+      return { error: null }
+    } catch (error) {
+      // reorder is a single writer over the whole list; a snapshot is correct here
+      if (snap) qc.setQueryData(key, snap)
+      toast({ message: "Couldn't save the new order", tone: 'error' })
+      return { error }
     }
   }
 
-  return { items, loading, addItem, checkItem, uncheckItem, deleteItem, updateItem, clearChecked, markChecked, markUnchecked, reorderItems }
+  return {
+    items, loading: isPending,
+    addItem, checkItem, uncheckItem, deleteItem, updateItem, clearChecked, markChecked, markUnchecked, reorderItems,
+  }
 }

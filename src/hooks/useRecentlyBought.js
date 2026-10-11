@@ -1,53 +1,29 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { withQueryTimeout, onRevalidate } from '../lib/sessionManager'
+import { toast } from '../components/ui/Toast'
+import { upsertById, removeById } from '../lib/realtimeCache'
+import { keys, STALE } from '../queries/keys'
+import { fetchRecentlyBought } from '../queries/fetchers'
+import { insertGroceryItem } from '../queries/writes'
+
+const EMPTY = []
 
 export function useRecentlyBought(householdId) {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
+  const qc = useQueryClient()
 
-  const fetchItems = useCallback(async () => {
-    if (!householdId) return
-    const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-    const { data, error } = await withQueryTimeout(
-      supabase
-        .from('recently_bought')
-        .select('*, bought_by_user:users!recently_bought_bought_by_fkey(name)')
-        .eq('household_id', householdId)
-        .gte('bought_at', cutoff)
-        .order('bought_at', { ascending: false })
-    )
+  const { data: items = EMPTY, isPending } = useQuery({
+    queryKey: keys.recentlyBought(householdId),
+    queryFn: () => fetchRecentlyBought(supabase, householdId),
+    enabled: !!householdId,
+    staleTime: STALE.recentlyBought,
+  })
 
-    if (!error && data) setItems(data)
-    setLoading(false)
-  }, [householdId])
-
-  useEffect(() => {
-    fetchItems()
-
-    const channel = supabase
-      .channel('recently_bought_changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'recently_bought',
-        filter: `household_id=eq.${householdId}`,
-      }, () => {
-        fetchItems()
-      })
-      .subscribe()
-
-    const offRevalidate = onRevalidate(() => fetchItems())
-
-    return () => {
-      supabase.removeChannel(channel)
-      offRevalidate()
-    }
-  }, [householdId, fetchItems])
-
+  // Put a bought item back on the grocery list (optimistic on the grocery cache).
   const addBackToList = async (item, userId) => {
-    // Add back to grocery_items
-    await supabase.from('grocery_items').insert({
+    if (!householdId) return { error: 'No household' }
+    const groceryKey = keys.grocery(householdId)
+    const row = {
+      id: crypto.randomUUID(),
       household_id: householdId,
       name: item.name,
       qty: item.qty,
@@ -57,8 +33,19 @@ export function useRecentlyBought(householdId) {
       checked: false,
       added_by: userId,
       updated_by: userId,
-    })
+    }
+    qc.setQueryData(groceryKey, prev => (prev ? [...prev, { ...row, created_at: new Date().toISOString() }] : prev))
+    try {
+      const saved = await insertGroceryItem(supabase, row)
+      if (saved) qc.setQueryData(groceryKey, prev => (prev ? upsertById(prev, saved) : prev))
+      toast({ message: `${item.name} is back on the list` })
+      return { error: null }
+    } catch (error) {
+      qc.setQueryData(groceryKey, prev => (prev ? removeById(prev, row.id) : prev))
+      toast({ message: `Couldn't add ${item.name} back`, tone: 'error' })
+      return { error }
+    }
   }
 
-  return { items, loading, addBackToList }
+  return { items, loading: isPending, addBackToList }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { useRecipes } from '../hooks/useRecipes'
+import { useRecipes, useRecipe } from '../hooks/useRecipes'
 import { supabase } from '../lib/supabase'
 import { authFetch } from '../lib/authFetch'
 import { validateImageFile } from '../lib/uploadValidation'
@@ -11,9 +11,10 @@ export default function RecipeEdit() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
-  const { getRecipe, updateRecipe } = useRecipes(householdId)
+  const { updateRecipe } = useRecipes(householdId)
+  const { recipe, isPlaceholderData, error: recipeError } = useRecipe(id)
 
-  const [loading, setLoading] = useState(true)
+  const [populated, setPopulated] = useState(false)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
@@ -33,18 +34,12 @@ export default function RecipeEdit() {
   const [notes, setNotes] = useState('')
   const [ingredients, setIngredients] = useState([{ name: '', qty: '', unit: '', notes: '', section: '' }])
 
+  // Fill the form once from the full recipe (not the grid-row placeholder),
+  // and never again, so a background refetch can't clobber in-progress edits.
   useEffect(() => {
-    loadRecipe()
-  }, [id])
-
-  const loadRecipe = async () => {
-    setLoading(true)
-    const { data, error } = await getRecipe(id)
-    if (error || !data) {
-      setError('Recipe not found')
-      setLoading(false)
-      return
-    }
+    if (populated || !recipe || isPlaceholderData) return
+    const data = recipe
+    setPopulated(true)
 
     setName(data.name || '')
     setDescription(data.description || '')
@@ -66,9 +61,7 @@ export default function RecipeEdit() {
         section: ing.section || '',
       })))
     }
-
-    setLoading(false)
-  }
+  }, [recipe, isPlaceholderData, populated])
 
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0]
@@ -235,7 +228,14 @@ export default function RecipeEdit() {
     setIngredients(ingredients.filter((_, i) => i !== index))
   }
 
-  if (loading) {
+  if (!populated) {
+    if (recipeError) {
+      return (
+        <div className="px-4 pt-4">
+          <p className="text-warmgray-500">Recipe not found</p>
+        </div>
+      )
+    }
     return (
       <div className="flex items-center justify-center h-64">
         <div className="w-8 h-8 border-4 border-section-cookbook border-t-transparent rounded-full animate-spin" />

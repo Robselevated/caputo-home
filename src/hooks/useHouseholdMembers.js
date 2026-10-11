@@ -1,25 +1,16 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { keys, STALE } from '../queries/keys'
+import { fetchMembers } from '../queries/fetchers'
+
+const EMPTY = []
 
 export function useHouseholdMembers(householdId) {
-  const [members, setMembers] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  const fetchMembers = useCallback(async () => {
-    if (!householdId) return
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, name, email')
-      .eq('household_id', householdId)
-      .order('name')
-
-    if (!error && data) setMembers(data)
-    setLoading(false)
-  }, [householdId])
-
-  useEffect(() => {
-    fetchMembers()
-  }, [householdId, fetchMembers])
-
-  return { members, loading }
+  const { data: members = EMPTY, isPending } = useQuery({
+    queryKey: keys.members(householdId),
+    queryFn: () => fetchMembers(supabase, householdId),
+    enabled: !!householdId,
+    staleTime: STALE.members,
+  })
+  return { members, loading: isPending }
 }

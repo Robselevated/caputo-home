@@ -33,7 +33,10 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => readPersistedUser())
   // Seed profile synchronously so householdId is available on first paint.
   const [profile, setProfile] = useState(seedProfile)
-  const [loading, setLoading] = useState(true)
+  // With a persisted user AND profile the app paints at once from the query
+  // cache; the session check below still runs and can bounce to /login. Only a
+  // first login (nothing persisted) waits behind the boot loader.
+  const [loading, setLoading] = useState(() => !(readPersistedUser() && seedProfile()))
   const [profileError, setProfileError] = useState(false)
   const fetchedForUserRef = useRef(null)
   const currentUserIdRef = useRef(user?.id ?? null)

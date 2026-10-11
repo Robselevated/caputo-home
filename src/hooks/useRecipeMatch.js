@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { findMatch } from '../lib/ingredientMatch'
+import { queryClient } from '../lib/queryClient'
+import { keys } from '../queries/keys'
 
 export function useRecipeMatch(householdId) {
   const [loading, setLoading] = useState(false)
@@ -63,6 +65,7 @@ export function useRecipeMatch(householdId) {
 
       if (error) return { error }
 
+      queryClient.invalidateQueries({ queryKey: keys.grocery(householdId) })
       return { success: true }
     } catch (err) {
       return { error: err.message }
@@ -106,6 +109,7 @@ export function useRecipeMatch(householdId) {
         failed.map((f) => f.error?.message)
       )
     }
+    if (updates.length > 0) queryClient.invalidateQueries({ queryKey: keys.inventory(householdId) })
 
     return { decremented, nowOut, skipped, failedCount: failed.length }
   }
@@ -127,6 +131,7 @@ export function useRecipeMatch(householdId) {
       .from('grocery_items')
       .insert(groceryItems)
 
+    if (!error) queryClient.invalidateQueries({ queryKey: keys.grocery(householdId) })
     return { error }
   }
 

@@ -5,8 +5,9 @@ vi.mock('../lib/supabase', async () => {
   const { createFakeSupabase } = await import('../test/fakeSupabase')
   return { supabase: createFakeSupabase() }
 })
-const dbState = { writes: [] }
+const dbState = { writes: [], listeners: [] }
 vi.mock('../lib/db', () => ({
+  onQueueChange: vi.fn((listener) => { dbState.listeners.push(listener); return () => { dbState.listeners = dbState.listeners.filter(l => l !== listener) } }),
   queueWrite: vi.fn(async () => {}),
   cacheGroceryItems: vi.fn(async () => {}),
   getCachedGroceryItems: vi.fn(async () => []),
@@ -25,11 +26,14 @@ import { supabase } from '../lib/supabase'
 import { chainHas } from '../test/fakeSupabase'
 import { clearWrite, incrementWriteAttempts } from '../lib/db'
 import { useOfflineSync } from './useOfflineSync'
+import { queryClient } from '../lib/queryClient'
+import { keys } from '../queries/keys'
 
 beforeEach(() => {
   supabase.reset()
   vi.clearAllMocks()
   dbState.writes = []
+  dbState.listeners = []
   Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true })
 })
 
@@ -84,5 +88,47 @@ describe('useOfflineSync.syncNow replay', () => {
     await sync()
     expect(clearWrite).not.toHaveBeenCalled()
     expect(incrementWriteAttempts).toHaveBeenCalledWith(1)
+  })
+})
+
+describe('useOfflineSync queue awareness', () => {
+  it('tracks the pending count through queue-change events instead of polling', async () => {
+    vi.useFakeTimers()
+    try {
+      const { result } = renderHook(() => useOfflineSync('hh'))
+      await act(async () => {})
+      expect(dbState.listeners).toHaveLength(1)
+      act(() => dbState.listeners[0](3))
+      expect(result.current.pendingCount).toBe(3)
+      const before = (await import('../lib/db')).getPendingCount.mock.calls.length
+      await act(async () => { vi.advanceTimersByTime(20000) })
+      expect((await import('../lib/db')).getPendingCount.mock.calls.length).toBe(before)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('refreshes the grocery, kitchen and recently-bought caches after a replay', async () => {
+    dbState.writes = [{ id: 1, type: 'delete', itemId: 'g1' }]
+    supabase.setResult('grocery_items', 'delete', { data: null, error: null })
+    const spy = vi.spyOn(queryClient, 'invalidateQueries')
+    await sync()
+    expect(spy).toHaveBeenCalledWith({ queryKey: keys.grocery('hh') })
+    expect(spy).toHaveBeenCalledWith({ queryKey: keys.inventory('hh') })
+    expect(spy).toHaveBeenCalledWith({ queryKey: keys.recentlyBought('hh') })
+    spy.mockRestore()
+  })
+})
+
+describe('useOfflineSync vs reconnect refetch', () => {
+  it('cancels in-flight list refetches BEFORE replaying so a pre-replay response cannot overwrite offline edits', async () => {
+    dbState.writes = [{ id: 1, type: 'delete', itemId: 'g1' }]
+    const order = []
+    supabase.setResult('grocery_items', 'delete', () => { order.push('replay'); return { data: null, error: null } })
+    const cancelSpy = vi.spyOn(queryClient, 'cancelQueries').mockImplementation(async (f) => { order.push('cancel:' + f.queryKey[0]) })
+    await sync()
+    expect(order.slice(0, 3).sort()).toEqual(['cancel:grocery_items', 'cancel:inventory', 'cancel:recently_bought'])
+    expect(order[3]).toBe('replay')
+    cancelSpy.mockRestore()
   })
 })

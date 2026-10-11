@@ -95,14 +95,6 @@ export function readPersistedUser() {
   }
 }
 
-// Pause autoRefresh while hidden — Supabase's recommended PWA pattern.
-// Stops the SDK from getting stuck mid-refresh when iOS suspends the app.
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      supabase.auth.startAutoRefresh()
-    } else {
-      supabase.auth.stopAutoRefresh()
-    }
-  })
-}
+// Note: GoTrue (autoRefreshToken: true in a browser) already installs its own
+// visibilitychange handler that pauses/resumes auto-refresh and recovers the
+// session on wake. A second copy here used to double the work on every resume.

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { useRecipes } from '../hooks/useRecipes'
+import { useRecipes, useRecipe } from '../hooks/useRecipes'
 import { useRecipeMatch } from '../hooks/useRecipeMatch'
 import { useMealPicks } from '../hooks/useMealPicks'
 import { DEFAULT_SECTIONS } from '../lib/mealSections'
@@ -11,12 +11,15 @@ export default function RecipeDetail() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
-  const { getRecipe, reimportRecipe, deleteRecipe } = useRecipes(householdId)
-  const { matchIngredients, addMissingToGroceryList, useRecipe, addDepletedToGroceryList } = useRecipeMatch(householdId)
+  const { reimportRecipe, deleteRecipe } = useRecipes(householdId)
+  // Paints at once from the cached grid row; the full row (ingredients,
+  // instructions) fills in from the detail cache or one fetch.
+  const { recipe, loading, refetch } = useRecipe(id)
+  // `useRecipe` from the match hook is the "we cooked this" action, not a hook;
+  // renamed locally so it cannot shadow the detail hook above.
+  const { matchIngredients, addMissingToGroceryList, useRecipe: consumeRecipe, addDepletedToGroceryList } = useRecipeMatch(householdId)
   const { addPick } = useMealPicks(householdId)
 
-  const [recipe, setRecipe] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [showMakeThis, setShowMakeThis] = useState(false)
   const [matchResult, setMatchResult] = useState(null)
   const [matching, setMatching] = useState(false)
@@ -27,19 +30,6 @@ export default function RecipeDetail() {
   const [using, setUsing] = useState(false)
   const [showMealPlanPicker, setShowMealPlanPicker] = useState(false)
   const [addingToPlan, setAddingToPlan] = useState(false)
-
-  useEffect(() => {
-    loadRecipe()
-  }, [id])
-
-  const loadRecipe = async () => {
-    setLoading(true)
-    const { data, error } = await getRecipe(id)
-    if (!error && data) {
-      setRecipe(data)
-    }
-    setLoading(false)
-  }
 
   const handleMakeThis = async () => {
     setMatching(true)
@@ -63,7 +53,7 @@ export default function RecipeDetail() {
   const handleUseRecipe = async () => {
     if (!matchResult) return
     setUsing(true)
-    const result = await useRecipe(matchResult, recipe.name, user.id)
+    const result = await consumeRecipe(matchResult, recipe.name, user.id)
     setUseResult(result)
     setUsing(false)
     if (result?.failedCount > 0) {
@@ -87,7 +77,7 @@ export default function RecipeDetail() {
     setRefreshing(true)
     const { error } = await reimportRecipe(recipe.id, recipe.source_url)
     if (!error) {
-      await loadRecipe()
+      await refetch()
       setSuccessMessage('Recipe refreshed from source')
       setTimeout(() => setSuccessMessage(null), 3000)
     }

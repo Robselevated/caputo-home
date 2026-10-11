@@ -1,5 +1,6 @@
 import { useAuth } from '../hooks/useAuth'
 import { Navigate } from 'react-router-dom'
+import { useIsRestoring } from '@tanstack/react-query'
 import { softReloadViaRecovery } from '../lib/recovery'
 import { BUILD_ID } from '../lib/buildId'
 
@@ -18,12 +19,17 @@ function BootLoader() {
 
 export default function ProtectedRoute({ children }) {
   const { user, loading, profile, profileError, retryProfile, signOut } = useAuth()
+  const isRestoring = useIsRestoring()
 
   // Hold a loader until the boot session gate resolves (bounded to ~3s by
-  // resolveInitialSession's timeout).
+  // resolveInitialSession's timeout). Only a first login gets here.
   if (loading) return <BootLoader />
 
   if (!user) return <Navigate to="/login" replace />
+
+  // The persisted query cache is being read from IndexedDB (tens of ms). A
+  // blank ground reads as "instant"; a spinner would read as "loading".
+  if (isRestoring) return <div className="min-h-screen bg-ivory" />
 
   // Every protected page needs the household id (profile.household_id). Wait for
   // it here — but NEVER forever: the watchdog in useAuth trips profileError, and
