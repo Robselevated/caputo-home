@@ -45,3 +45,8 @@
   for = "/manifest.webmanifest"
   [headers.values]
     Cache-Control = "no-cache"
+
+# Functions import the shared ingredient parser from src/lib; esbuild follows
+# relative imports outside the functions directory.
+[functions]
+  node_bundler = "esbuild"

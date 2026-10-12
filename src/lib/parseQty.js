@@ -6,6 +6,8 @@
 // any leftover human text so the caller can keep it (e.g. in notes) instead of
 // losing it — keeping manual entry forgiving.
 
+import { parseIngredientLine as parseLineShared, parseIngredientRows, formatQty } from './ingredientParse'
+
 const UNICODE_FRACTIONS = {
   '½': 0.5, '⅓': 1 / 3, '⅔': 2 / 3, '¼': 0.25, '¾': 0.75,
   '⅕': 0.2, '⅖': 0.4, '⅗': 0.6, '⅘': 0.8, '⅙': 1 / 6, '⅚': 5 / 6,
@@ -53,62 +55,32 @@ export function parseQty(raw) {
   return { qty: null, leftover: s }
 }
 
-const UNIT_WORDS = new Set([
-  'cups', 'cup', 'tbsp', 'tablespoons', 'tablespoon', 'tsp', 'teaspoons', 'teaspoon',
-  'oz', 'ounces', 'ounce', 'lbs', 'lb', 'pounds', 'pound', 'grams', 'gram', 'g', 'kg',
-  'ml', 'liters', 'liter', 'l', 'quarts', 'quart', 'pints', 'pint', 'gallons', 'gallon',
-  'cans', 'can', 'packages', 'package', 'pkg', 'slices', 'slice', 'cloves', 'clove',
-  'heads', 'head', 'bunches', 'bunch', 'stalks', 'stalk', 'pieces', 'piece', 'sprigs',
-  'sprig', 'sticks', 'stick', 'pinch', 'dash', 'handful', 'count',
-])
-
-// Forgivingly parse one pasted line ("2 cups flour, sifted") into an ingredient
-// row. Anything it can't split confidently just lands in `name`, so nothing is lost.
+// Line parsing lives in ingredientParse.js (shared with the Netlify functions).
+// These wrappers keep the editor's row shape: amount and unit as typed.
 export function parseIngredientLine(line) {
-  let text = String(line || '').trim()
-  text = text.replace(/^\s*[-•*]\s*/, '').replace(/^\s*\d+[.)]\s+/, '') // strip bullets / "1. "
-  if (!text) return null
-
-  let notes = ''
-  const comma = text.indexOf(',')
-  let main = text
-  if (comma > 0) {
-    main = text.slice(0, comma).trim()
-    notes = text.slice(comma + 1).trim()
-  }
-
-  let qty = ''
-  let rest = main
-  const qtyMatch = main.match(/^((?:\d+\s+\d+\/\d+)|(?:\d+\s*\/\s*\d+)|(?:\d+(?:\.\d+)?)|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])\s*/)
-  if (qtyMatch) {
-    qty = qtyMatch[1].trim()
-    rest = main.slice(qtyMatch[0].length).trim()
-  }
-
-  let unit = ''
-  const firstWord = rest.split(/\s+/)[0] || ''
-  if (UNIT_WORDS.has(firstWord.toLowerCase().replace(/\.$/, ''))) {
-    unit = firstWord.replace(/\.$/, '')
-    rest = rest.slice(firstWord.length).trim()
-  }
-
-  return { name: rest || main, qty, unit, notes, section: '' }
+  const r = parseLineShared(line)
+  if (!r || r.name === undefined) return null
+  return { name: r.name, qty: r.qty_text, unit: r.unit_text, notes: r.notes, section: '' }
 }
 
-// Parse a pasted block (one ingredient per line) into ingredient rows.
 export function parseIngredientBlock(block) {
-  return String(block || '')
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map(parseIngredientLine)
-    .filter(Boolean)
+  return parseIngredientRows(block)
 }
 
 // Build the row to store: a numeric `qty` (for math like "Make This") plus
 // `qty_text`, the verbatim string the user typed, so the recipe displays exactly
 // as written ("1/2 cup", "to taste") instead of "0.5 cup".
 export function normalizeIngredientQty(ing) {
+  // Already carries the written amount (imports, scans): keep it, number it.
+  if (typeof ing.qty_text === 'string' && ing.qty_text.trim()) {
+    const text = ing.qty_text.trim()
+    const qty = typeof ing.qty === 'number' && Number.isFinite(ing.qty) ? ing.qty : parseQty(text).qty
+    return { ...ing, qty, qty_text: text }
+  }
+  // A bare number (older imports): write it the way a cook would.
+  if (typeof ing.qty === 'number') {
+    return { ...ing, qty: Number.isFinite(ing.qty) ? ing.qty : null, qty_text: formatQty(ing.qty) || null }
+  }
   const text = ing.qty == null ? '' : String(ing.qty).trim()
   const { qty } = parseQty(text)
   return { ...ing, qty, qty_text: text || null }

@@ -50,8 +50,8 @@ describe('parseIngredientLine', () => {
   it('strips bullets / list numbers', () => {
     expect(parseIngredientLine('- 1 onion, diced')).toEqual({ name: 'onion', qty: '1', unit: '', notes: 'diced', section: '' })
   })
-  it('puts an unparseable line entirely in name', () => {
-    expect(parseIngredientLine('salt and pepper to taste')).toEqual({ name: 'salt and pepper to taste', qty: '', unit: '', notes: '', section: '' })
+  it('reads "to taste" as the amount', () => {
+    expect(parseIngredientLine('salt and pepper to taste')).toEqual({ name: 'salt and pepper', qty: 'to taste', unit: '', notes: '', section: '' })
   })
 })
 
