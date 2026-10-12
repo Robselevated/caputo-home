@@ -139,9 +139,20 @@ export function parseIngredientLine(raw, { section = '' } = {}) {
   }
   rest = rest.trim()
 
-  // Parentheticals ("(15 oz)", "(optional)") become notes wherever they sit.
+  // Parentheticals ("(15 oz)", "(optional)") become notes wherever they sit;
+  // a price in parentheses ("($0.32)", Budget Bytes style) is dropped.
   const notes = []
-  rest = rest.replace(/\(([^)]*)\)/g, (_, inner) => { if (inner.trim()) notes.push(inner.trim()); return ' ' }).replace(/\s+/g, ' ').trim()
+  rest = rest.replace(/\(([^)]*)\)/g, (_, inner) => {
+    const t = inner.trim().replace(/^\$[\d.,]+(?:\s*(?:each|ea\.?))?$/i, '')
+    if (t) notes.push(t.replace(/,?\s*\$[\d.,]+\s*$/, '').trim() || t)
+    return ' '
+  }).replace(/\s+/g, ' ').trim()
+  // A size glued to a container: "15oz. can", "8 oz package" -> unit can, size in notes.
+  const sized = rest.match(/^(\d+(?:\.\d+)?)\s*(oz|ounce|ounces|g|gram|grams|ml|lb|lbs|pound|pounds)\.?\s+(can|cans|jar|jars|package|packages|pkg|bag|bags|box|boxes|bottle|bottles|container|containers)\b\.?\s*/i)
+  if (sized && qty != null) {
+    notes.unshift(`${sized[1]} ${normalizeUnit(sized[2]) || sized[2]}`)
+    rest = `${sized[3]} ${rest.slice(sized[0].length)}`.trim()
+  }
 
   // "to taste" / "as needed" at the end is the amount when there is none.
   const tail = rest.match(TASTE_RE)

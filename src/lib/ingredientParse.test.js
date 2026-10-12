@@ -26,6 +26,9 @@ describe('parseIngredientLine', () => {
     ['a pinch of nutmeg', row({ name: 'nutmeg', qty_text: 'pinch' })],
     ['4 fl oz heavy cream', row({ name: 'heavy cream', qty: 4, qty_text: '4', unit: 'fl oz', unit_text: 'fl oz' })],
     ['3 eggs', row({ name: 'eggs', qty: 3, qty_text: '3' })],
+    ['1 15oz. can fire roasted tomatoes ($1.00)', row({ name: 'fire roasted tomatoes', qty: 1, qty_text: '1', unit: 'can', unit_text: 'can', notes: '15 oz' })],
+    ['1 yellow onion ($0.32)', row({ name: 'yellow onion', qty: 1, qty_text: '1' })],
+    ['2 (8 oz) packages cream cheese', row({ name: 'cream cheese', qty: 2, qty_text: '2', unit: 'package', unit_text: 'packages', notes: '8 oz' })],
   ])('%s', (line, expected) => {
     expect(parseIngredientLine(line)).toEqual(expected)
   })
