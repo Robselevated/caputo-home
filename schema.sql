@@ -547,3 +547,32 @@ end $$;
 revoke execute on function replace_recipe_ingredients(uuid, jsonb) from public, anon;
 grant execute on function replace_recipe_ingredients(uuid, jsonb) to authenticated;
 notify pgrst, 'reload schema';
+
+-- ------------------------------------------------------------
+-- 2026-10-12: freshness stock clock (see sql/2026-10-12-freshness.sql)
+-- ------------------------------------------------------------
+alter table inventory_items
+  add column if not exists stocked_at timestamptz default now(),
+  add column if not exists checked_at timestamptz;
+
+-- The add column filled existing rows with the migration time; use their history.
+update inventory_items set stocked_at = coalesce(updated_at, created_at);
+
+create or replace function inventory_items_stock_clock()
+returns trigger language plpgsql as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.stocked_at is null then new.stocked_at := now(); end if;
+  elsif coalesce(new.qty, 0) > coalesce(old.qty, 0)
+        and new.stocked_at is not distinct from old.stocked_at then
+    new.stocked_at := now();
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists inventory_items_stock_clock on inventory_items;
+create trigger inventory_items_stock_clock
+  before insert or update on inventory_items
+  for each row execute function inventory_items_stock_clock();
+
+notify pgrst, 'reload schema';

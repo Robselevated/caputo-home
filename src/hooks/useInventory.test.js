@@ -248,4 +248,17 @@ describe('useInventory connectivity', () => {
     await new Promise(r => setTimeout(r, 30))
     expect(supabase.callsFor('inventory_items', 'select')).toHaveLength(1)
   })
+
+  it('also exposes every location as allItems', async () => {
+    supabase.setResult('inventory_items', 'select', { data: [
+      { id: 'a', household_id: 'hh', name: 'Rice', location: 'pantry', category: 'Dry Goods', qty: 1 },
+      { id: 'b', household_id: 'hh', name: 'Milk', location: 'fridge', category: 'Dairy', qty: 1 },
+    ], error: null })
+    const { wrapper } = createWrapper()
+    const { result } = renderHook(() => useInventory('hh', 'pantry'), { wrapper })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.items.map(i => i.name)).toEqual(['Rice'])
+    expect(result.current.allItems.map(i => i.name).sort()).toEqual(['Milk', 'Rice'])
+  })
 })
+

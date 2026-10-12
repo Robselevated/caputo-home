@@ -54,4 +54,12 @@ describe('Sheet', () => {
     render(<Sheet open onClose={() => {}} title="Edit"><input aria-label="Name" /></Sheet>)
     expect(document.activeElement).toBe(screen.getByRole('dialog'))
   })
+
+  it('can take the full screen for a review', () => {
+    render(<Sheet open size="full" onClose={() => {}} title="Still have these?"><p>body</p></Sheet>)
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.className).toMatch(/h-\[100dvh\]/)
+    expect(dialog.className).not.toMatch(/rounded-t/)
+  })
 })
+

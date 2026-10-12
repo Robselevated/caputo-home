@@ -170,5 +170,5 @@ export function useInventory(householdId, location) {
     }
   }
 
-  return { items, loading: isPending, addItem, updateQty, updateItem, deleteItem, addToGroceryList }
+  return { items, allItems, loading: isPending, addItem, updateQty, updateItem, deleteItem, addToGroceryList }
 }

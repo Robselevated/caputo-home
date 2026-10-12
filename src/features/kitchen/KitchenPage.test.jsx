@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, act, within } from '@testing-library/react'
+import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes } from 'react-router-dom'
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' }, profile: { household_id: 'hh' } }) }))
@@ -146,5 +146,88 @@ describe('Kitchen', () => {
     await screen.findByText('Spaghetti')
     const heading = screen.getByRole('heading', { level: 2, name: 'Pasta' })
     expect(within(heading).getByRole('button', { expanded: true })).toBeInTheDocument()
+  })
+})
+
+describe('freshness check', () => {
+  const DAY = 86400000
+  const ago = (n) => new Date(Date.now() - n * DAY).toISOString()
+  const fresh = (o) => ({ household_id: 'hh', subcategory: null, unit: 'count', notes: null, created_at: ago(60), checked_at: null, qty: 1, ...o })
+  const stale = [
+    fresh({ id: 'm', name: 'Milk', location: 'fridge', category: 'Dairy', stocked_at: ago(12) }),
+    fresh({ id: 'c', name: 'Chicken thighs', location: 'freezer', category: 'Chicken', stocked_at: ago(200) }),
+    fresh({ id: 'r', name: 'Rice', location: 'pantry', category: 'Dry Goods', stocked_at: ago(300) }),
+  ]
+  const DISMISSED = 'freshness:dismissed'
+
+  beforeEach(() => {
+    supabase.reset()
+    localStorage.clear()
+    supabase.setResult('inventory_items', 'update', { data: [{ id: 'm' }], error: null })
+  })
+  const seed = (data) => supabase.setResult('inventory_items', 'select', { data, error: null })
+
+  it('shows a card naming items past their usual shelf life, from any segment', async () => {
+    seed(stale)
+    renderAt('/kitchen/pantry')
+    const card = await screen.findByRole('region', { name: 'Freshness check' })
+    expect(card).toHaveTextContent('2 things might have gone off')
+    expect(card).toHaveTextContent('Chicken thighs')
+    expect(card).toHaveTextContent('Milk')
+    expect(card).not.toHaveTextContent('Rice')
+  })
+
+  it('shows no card when everything is fresh, or before the database has the new columns', async () => {
+    seed([fresh({ id: 'm', name: 'Milk', location: 'fridge', category: 'Dairy', stocked_at: ago(2) })])
+    const { unmount } = renderAt('/kitchen/fridge')
+    await screen.findByText('Milk')
+    expect(screen.queryByRole('region', { name: 'Freshness check' })).not.toBeInTheDocument()
+    unmount()
+    seed(stale.map(({ checked_at, stocked_at, ...r }) => r))
+    renderAt('/kitchen/fridge')
+    await screen.findByText('Milk')
+    expect(screen.queryByRole('region', { name: 'Freshness check' })).not.toBeInTheDocument()
+  })
+
+  it('Not now hides the card for today and leaves a quiet button', async () => {
+    seed(stale)
+    renderAt('/kitchen/fridge')
+    const card = await screen.findByRole('region', { name: 'Freshness check' })
+    fireEvent.click(within(card).getByRole('button', { name: 'Not now' }))
+    expect(screen.queryByRole('region', { name: 'Freshness check' })).not.toBeInTheDocument()
+    expect(localStorage.getItem(DISMISSED)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(screen.getByRole('button', { name: 'Check freshness (2)' })).toBeInTheDocument()
+  })
+
+  it('Review opens the full-screen list; Still good stamps checked_at', async () => {
+    seed(stale)
+    renderAt('/kitchen/fridge')
+    const card = await screen.findByRole('region', { name: 'Freshness check' })
+    fireEvent.click(within(card).getByRole('button', { name: 'Review' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Still have these?' })
+    expect(within(dialog).getByText('12 days in the fridge, usually 7')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Milk is still good' })) })
+    const update = supabase.callsFor('inventory_items', 'update')[0]
+    expect(update.chain[0][1]).toHaveProperty('checked_at')
+    expect(update.chain[0][1]).not.toHaveProperty('qty')
+    expect(within(dialog).queryByText('Milk')).not.toBeInTheDocument()
+  })
+
+  it('Toss it waits for the undo window, Undo keeps the item, leaving marks it out', async () => {
+    seed(stale)
+    const { unmount } = renderAt('/kitchen/fridge')
+    fireEvent.click(within(await screen.findByRole('region', { name: 'Freshness check' })).getByRole('button', { name: 'Review' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Still have these?' })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Toss Milk' })) })
+    expect(supabase.callsFor('inventory_items', 'update')).toHaveLength(0)
+    const toastEl = (await screen.findByText('Milk marked out')).closest('[role="status"]')
+    await act(async () => { fireEvent.click(within(toastEl).getByRole('button', { name: 'Undo' })) })
+    expect(within(dialog).getByText('Milk')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Toss Chicken thighs' })) })
+    await act(async () => { unmount() })
+    await waitFor(() => expect(supabase.callsFor('inventory_items', 'update')).toHaveLength(1))
+    const update = supabase.callsFor('inventory_items', 'update')[0]
+    expect(update.chain[0][1]).toMatchObject({ qty: 0 })
+    expect(update.chain).toEqual(expect.arrayContaining([['eq', 'id', 'c']]))
   })
 })

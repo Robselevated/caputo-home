@@ -8,7 +8,7 @@ import { IconButton } from './IconButton'
 // itself takes focus (not its first field) so opening a sheet never pops the
 // keyboard; a form that wants the keyboard sets autoFocus on its field. onClose
 // is read through a ref so a parent re-render never re-runs the focus dance.
-export function Sheet({ open, onClose, title, children, footer }) {
+export function Sheet({ open, onClose, title, children, footer, size = 'sheet' }) {
   const titleId = useId()
   const panelRef = useRef(null)
   const onCloseRef = useRef(onClose)
@@ -46,7 +46,7 @@ export function Sheet({ open, onClose, title, children, footer }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative w-full max-w-md max-h-[88dvh] flex flex-col bg-surface rounded-t-[24px] shadow-sheet animate-sheet-up outline-none pb-[max(env(safe-area-inset-bottom,0px),1rem)]"
+        className={`relative w-full max-w-md flex flex-col bg-surface shadow-sheet animate-sheet-up outline-none pb-[max(env(safe-area-inset-bottom,0px),1rem)] ${size === 'full' ? 'h-[100dvh] max-h-none pt-[env(safe-area-inset-top,0px)]' : 'max-h-[88dvh] rounded-t-[24px]'}`}
       >
         <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-2">
           <h2 id={titleId} className="font-heading text-xl font-bold text-ink">{title}</h2>

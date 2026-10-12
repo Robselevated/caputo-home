@@ -21,6 +21,10 @@ import PhotoScanner from '../../components/PhotoScanner'
 import ScanReview from '../../pages/ScanReview'
 import { InventoryCategory } from './InventoryCategory'
 import { InventoryAddSheet, InventoryEditSheet } from './InventorySheets'
+import { useFreshness } from './useFreshness'
+import { FreshnessCard } from './FreshnessCard'
+import { FreshnessSheet } from './FreshnessSheet'
+import { Button } from '../../components/ui/Button'
 import { LOCATIONS, LOCATION_LABELS, locationTheme } from './locationTheme'
 
 // Segment labels use the location ink, not the accent: the pantry amber is a
@@ -45,7 +49,8 @@ export default function KitchenPage({ location }) {
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
   const userId = user?.id
-  const { items, loading, addItem, updateQty, updateItem, deleteItem, addToGroceryList } = useInventory(householdId, location)
+  const { items, allItems, loading, addItem, updateQty, updateItem, deleteItem, addToGroceryList } = useInventory(householdId, location)
+  const fresh = useFreshness({ allItems, updateItem, updateQty, userId })
   const { scanning, results, error: scanError, uploadAndScan, confirmItems, cancelScan } = useScanSession(householdId)
   const { orderedCategories, reorder } = useCategoryOrder(location)
   const { requestDelete, hiddenIds } = useDeleteWithUndo(deleteItem, { message: (item) => `${item.name} removed from ${label}` })
@@ -111,6 +116,16 @@ export default function KitchenPage({ location }) {
         action={<PhotoScanner label={`Scan the ${lower}`} icon={Camera} scanning={scanning} onCapture={(file) => uploadAndScan(file, location, userId)} />}
       />
 
+      {fresh.ready && fresh.count > 0 && !fresh.dismissedToday && (
+        <FreshnessCard
+          count={fresh.count}
+          namesLine={fresh.namesLine}
+          theme={theme}
+          onReview={() => { fresh.dismiss(); fresh.setOpen(true) }}
+          onDismiss={fresh.dismiss}
+        />
+      )}
+
       <SegmentedControl label="Location" options={SEGMENTS} value={location} onChange={(loc) => navigate(`/kitchen/${loc}`)} />
 
       <div className="flex items-center gap-2 rounded-tile bg-surface py-1.5 pl-4 pr-1.5 shadow-soft">
@@ -159,6 +174,19 @@ export default function KitchenPage({ location }) {
           </SortableContext>
         </DndContext>
       )}
+
+      {fresh.ready && fresh.count > 0 && fresh.dismissedToday && (
+        <Button variant="ghost" size="sm" className="self-center" onClick={() => fresh.setOpen(true)}>Check freshness ({fresh.count})</Button>
+      )}
+
+      <FreshnessSheet
+        open={fresh.open}
+        suspects={fresh.suspects}
+        onKeep={fresh.keep}
+        onToss={fresh.toss}
+        onKeepAll={fresh.keepAll}
+        onClose={() => fresh.setOpen(false)}
+      />
 
       <InventoryAddSheet open={adding} location={location} theme={theme} onClose={() => setAdding(false)} onAdd={handleAdd} />
       <InventoryEditSheet item={editing} location={location} theme={theme} onClose={() => setEditing(null)} onSave={handleSave} onDelete={requestDelete} onBuy={handleBuy} />
