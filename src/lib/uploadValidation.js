@@ -1,17 +1,20 @@
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5MB
 
+const TYPE_MESSAGE = 'Only JPEG, PNG, and WebP images are allowed.'
+
+// A file picked straight from the device, uploaded as is (the dish photo).
 export function validateImageFile(file) {
-  // iOS HEIC/HEIF: detect by extension if browser reports empty type
-  const ext = file.name?.split('.').pop()?.toLowerCase()
-  if (ext === 'heic' || ext === 'heif' || file.type === 'image/heic' || file.type === 'image/heif') {
-    return 'HEIC photos are not supported. On your iPhone, go to Settings > Camera > Formats and select "Most Compatible" to shoot in JPEG, then retake or re-export the photo.'
-  }
-  if (!ALLOWED_TYPES.includes(file.type)) {
-    return 'Only JPEG, PNG, and WebP images are allowed.'
-  }
-  if (file.size > MAX_SIZE_BYTES) {
-    return 'Image must be under 5MB.'
-  }
+  if (!ALLOWED_TYPES.includes(file.type)) return TYPE_MESSAGE
+  if (file.size > MAX_SIZE_BYTES) return 'Image must be under 5MB.'
+  return null
+}
+
+// A blob we produced ourselves (a compressed scan tile): checked after
+// compression, so the size limit is the one the request can carry.
+export function validateImageBlob(blob, { maxBytes = MAX_SIZE_BYTES } = {}) {
+  if (!blob || typeof blob.size !== 'number') return 'That photo could not be converted.'
+  if (!ALLOWED_TYPES.includes(blob.type)) return TYPE_MESSAGE
+  if (blob.size > maxBytes) return 'That photo is too large to send, even compressed. Take a screenshot of it instead.'
   return null
 }

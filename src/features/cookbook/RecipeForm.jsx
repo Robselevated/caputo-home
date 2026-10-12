@@ -83,8 +83,8 @@ export function RecipeForm({ initial, draft: controlled, onDraftChange, submitLa
           <h2 className="font-heading text-[15px] font-bold text-ink">Fill from photos</h2>
           <ScanRecipeForm
             scan={scanner}
-            hint="Screenshots of the ingredients and steps fill in the fields on this page. Anything already typed stays unless the photo has it."
-            onParsed={({ parsed, sourceImageUrls: urls }) => update(d => applyParsed(d, parsed, urls[0]))}
+            hint="Screenshots of the ingredients and steps fill in whatever is still empty on this page and add their ingredients to the list. Anything you typed stays."
+            onParsed={({ parsed }) => update(d => applyParsed(d, parsed))}
           />
         </section>
       )}

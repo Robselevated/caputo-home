@@ -10,7 +10,7 @@ import { toast } from '../../components/ui/Toast'
 import { BackLink } from './BackLink'
 import { RecipeForm } from './RecipeForm'
 import { draftFromRecipe } from './recipeDraft'
-import { scanPhotosInline } from './recipeScan'
+import { scanPhotos } from './recipeScan'
 
 export default function RecipeEditPage() {
   const { id } = useParams()
@@ -49,7 +49,7 @@ export default function RecipeEditPage() {
           householdId={householdId}
           imagePathPrefix={id}
           idPrefix="edit"
-          scanner={scanPhotosInline}
+          scanner={scanPhotos}
           footer={<Button variant="secondary" onClick={back}>Cancel</Button>}
         />
       ) : error && !recipe ? (

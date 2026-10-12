@@ -1,8 +1,39 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { findMatch } from '../lib/ingredientMatch'
+import { findMatch, cleanGroceryName } from '../lib/ingredientMatch'
+import { convertQty } from '../lib/units'
+import { normalizeUnit, formatQty } from '../lib/ingredientParse'
 import { queryClient } from '../lib/queryClient'
 import { keys } from '../queries/keys'
+
+const isBlank = (unit) => unit == null || String(unit).trim() === ''
+const round3 = (n) => Math.round(n * 1000) / 1000
+
+// "8 oz", "1 package": the amount as written plus the canonical unit.
+function amountLabel(qty, qtyText, unit) {
+  const unitLabel = normalizeUnit(unit) ?? (isBlank(unit) ? '' : String(unit).trim())
+  return [qtyText || formatQty(qty), unitLabel].filter(Boolean).join(' ')
+}
+
+// How much of the inventory row a recipe line uses, in the row's unit. A blank
+// unit on either side is a plain count. null when the pair cannot be compared:
+// different families (oz vs cup), different count units (can vs box) or an
+// unknown unit.
+function usedAmount(item, inv) {
+  const recipeUnit = normalizeUnit(item.unit) ?? (isBlank(item.unit) ? 'count' : null)
+  const invUnit = normalizeUnit(inv.unit) ?? (isBlank(inv.unit) ? 'count' : null)
+  if (!recipeUnit || !invUnit) return null
+  return convertQty(item.qty, recipeUnit, invUnit)
+}
+
+// Recipe ingredient rows as grocery rows with shoppable names; rows whose
+// name cleans to nothing are dropped.
+function toGroceryRows(items, build) {
+  return items
+    .map(item => ({ item, name: cleanGroceryName(item.name) }))
+    .filter(({ name }) => name)
+    .map(({ item, name }) => build(item, name))
+}
 
 export function useRecipeMatch(householdId) {
   const [loading, setLoading] = useState(false)
@@ -47,17 +78,18 @@ export function useRecipeMatch(householdId) {
 
   const addMissingToGroceryList = async (missingItems, recipeName, userId, householdId) => {
     try {
-      const groceryItems = missingItems.map(item => ({
+      const groceryItems = toGroceryRows(missingItems, (item, name) => ({
         household_id: householdId,
-        name: item.name,
-        qty: item.qty,
-        unit: item.unit,
+        name,
+        qty: item.qty ?? null,
+        unit: item.unit ?? null,
         store: null,
         notes: `For: ${recipeName}`,
         checked: false,
         added_by: userId,
         updated_by: userId,
       }))
+      if (groceryItems.length === 0) return { success: true, added: 0 }
 
       const { error } = await supabase
         .from('grocery_items')
@@ -66,12 +98,16 @@ export function useRecipeMatch(householdId) {
       if (error) return { error }
 
       queryClient.invalidateQueries({ queryKey: keys.grocery(householdId) })
-      return { success: true }
+      return { success: true, added: groceryItems.length }
     } catch (err) {
       return { error: err.message }
     }
   }
 
+  // "I made this": take each matched ingredient out of the kitchen. A line
+  // with no amount ("to taste") or with a unit that cannot be compared to the
+  // row's unit is skipped and says why; everything else subtracts the amount
+  // converted into the row's unit.
   const useRecipe = async (matchResult, recipeName, userId) => {
     const decremented = []
     const nowOut = []
@@ -80,22 +116,30 @@ export function useRecipeMatch(householdId) {
 
     for (const item of matchResult.inInventory) {
       const inv = item.inventoryItem
-      const unitsMatch = !item.unit || !inv.unit || item.unit === inv.unit
-
-      if (unitsMatch) {
-        const newQty = Math.max(0, inv.qty - (item.qty || 1))
-        updates.push(
-          supabase.from('inventory_items').update({
-            qty: newQty,
-            updated_by: userId,
-            updated_at: new Date().toISOString(),
-          }).eq('id', inv.id)
-        )
-        decremented.push({ ...item, oldQty: inv.qty, newQty })
-        if (newQty === 0) nowOut.push(item)
-      } else {
-        skipped.push({ ...item, reason: `${item.unit} vs ${inv.unit}` })
+      const qty = Number(item.qty)
+      if (item.qty == null || item.qty === '' || !Number.isFinite(qty)) {
+        skipped.push({ ...item, reason: 'no amount', detail: item.qty_text || '' })
+        continue
       }
+
+      const used = usedAmount(item, inv)
+      if (used == null) {
+        const detail = `${amountLabel(item.qty, item.qty_text, item.unit)} vs ${amountLabel(inv.qty, null, inv.unit)}`
+        skipped.push({ ...item, reason: 'units differ', detail })
+        continue
+      }
+
+      const oldQty = Number(inv.qty) || 0
+      const newQty = Math.max(0, round3(oldQty - used))
+      updates.push(
+        supabase.from('inventory_items').update({
+          qty: newQty,
+          updated_by: userId,
+          updated_at: new Date().toISOString(),
+        }).eq('id', inv.id)
+      )
+      decremented.push({ ...item, oldQty, newQty, used })
+      if (newQty === 0) nowOut.push(item)
     }
 
     // Supabase query builders resolve to { error } instead of rejecting, so a
@@ -115,9 +159,9 @@ export function useRecipeMatch(householdId) {
   }
 
   const addDepletedToGroceryList = async (depletedItems, recipeName, userId) => {
-    const groceryItems = depletedItems.map(item => ({
+    const groceryItems = toGroceryRows(depletedItems, (item, name) => ({
       household_id: householdId,
-      name: item.name,
+      name,
       qty: item.inventoryItem?.qty || 1,
       unit: item.inventoryItem?.unit || item.unit,
       store: null,
@@ -126,6 +170,7 @@ export function useRecipeMatch(householdId) {
       added_by: userId,
       updated_by: userId,
     }))
+    if (groceryItems.length === 0) return { error: null }
 
     const { error } = await supabase
       .from('grocery_items')

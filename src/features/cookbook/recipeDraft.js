@@ -37,19 +37,29 @@ export function draftFromRecipe(recipe) {
   }
 }
 
-// A scan only fills in what it found, so anything already typed survives.
+const blank = (v) => str(v).trim() === ''
+const emptyRow = (row) => blank(row.name) && blank(row.qty) && blank(row.unit) && blank(row.notes)
+
+// A scan fills in only what is still empty, so anything already typed wins.
+// Its ingredients join the list after the typed rows; they replace the rows
+// only when every one of them is blank (the starter row, or a section header
+// with nothing under it).
 export function applyParsed(draft, parsed, sourceImageUrl) {
   const next = { ...draft }
-  if (parsed.name) next.name = parsed.name
-  if (parsed.description) next.description = parsed.description
-  if (parsed.servings) next.servings = String(parsed.servings)
-  if (parsed.prep_time) next.prepTime = String(parsed.prep_time)
-  if (parsed.cook_time) next.cookTime = String(parsed.cook_time)
-  if (parsed.tags?.length) next.tags = parsed.tags.join(', ')
-  if (parsed.instructions) next.instructions = parsed.instructions
-  if (parsed.ingredients?.length) next.ingredients = rows(parsed.ingredients)
-  if (parsed.image_url) next.imageUrl = parsed.image_url
-  if (sourceImageUrl) next.sourceImageUrl = sourceImageUrl
+  const fill = (field, value) => { if (blank(next[field]) && !blank(value)) next[field] = String(value) }
+  fill('name', parsed.name)
+  fill('description', parsed.description)
+  fill('servings', parsed.servings)
+  fill('prepTime', parsed.prep_time)
+  fill('cookTime', parsed.cook_time)
+  fill('tags', parsed.tags?.length ? parsed.tags.join(', ') : '')
+  fill('instructions', parsed.instructions)
+  fill('imageUrl', parsed.image_url)
+  fill('sourceImageUrl', sourceImageUrl)
+  if (parsed.ingredients?.length) {
+    const typed = (draft.ingredients || []).filter(r => !emptyRow(r))
+    next.ingredients = [...typed, ...rows(parsed.ingredients)]
+  }
   return next
 }
 

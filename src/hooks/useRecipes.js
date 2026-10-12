@@ -36,6 +36,21 @@ async function parseRecipeUrl(url) {
   return { parsed: await response.json() }
 }
 
+// Pasted recipe text -> the import contract, through the paste function.
+// Standalone (not part of the hook) so the paste form can call it directly.
+export async function parseRecipeText(text) {
+  const response = await authFetch('/.netlify/functions/parse-recipe-text', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!response.ok) {
+    const errBody = await response.json().catch(() => null)
+    return { error: importErrorMessage(response, errBody) }
+  }
+  return { parsed: await response.json() }
+}
+
 const toInt = (v) => {
   const n = typeof v === 'string' ? parseInt(v, 10) : v
   return Number.isInteger(n) && n > 0 ? n : null

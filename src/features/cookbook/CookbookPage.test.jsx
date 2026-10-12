@@ -73,7 +73,7 @@ describe('CookbookPage', () => {
     expect(screen.getByText('Tacos')).toBeInTheDocument()
   })
 
-  it('the + button opens the add sheet with Link, Type it and Photo modes', async () => {
+  it('the + button opens the add sheet with Link, Type it, Photo and Paste modes', async () => {
     renderPage()
     await screen.findByText('Tacos')
     fireEvent.click(screen.getByRole('button', { name: 'Add a recipe' }))
@@ -81,6 +81,10 @@ describe('CookbookPage', () => {
     expect(within(dialog).getByRole('tab', { name: 'Link' })).toHaveAttribute('aria-selected', 'true')
     expect(within(dialog).getByRole('tab', { name: 'Type it' })).toBeInTheDocument()
     expect(within(dialog).getByRole('tab', { name: 'Photo' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: 'Paste' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Paste' }))
+    expect(within(dialog).getByRole('button', { name: 'Read this text' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Link' }))
     expect(within(dialog).getByRole('button', { name: 'Import recipe' })).toBeInTheDocument()
   })
 

@@ -11,7 +11,7 @@ vi.mock('../components/ui/Toast', () => { const toast = vi.fn(() => 1); toast.di
 import { supabase } from '../lib/supabase'
 import { createWrapper } from '../test/queryWrapper'
 import { keys } from '../queries/keys'
-import { useRecipes, useRecipe } from './useRecipes'
+import { useRecipes, useRecipe, parseRecipeText } from './useRecipes'
 import { authFetch } from '../lib/authFetch'
 
 const tacos = { id: 'r1', household_id: 'hh', name: 'Tacos', image_url: null, tags: [], created_at: '2026-01-02T00:00:00Z' }
@@ -182,3 +182,27 @@ describe('replacing ingredients on edit', () => {
   })
 })
 
+
+describe('parseRecipeText', () => {
+  const parsed = { name: 'Pancakes', via: 'text', ingredients: [{ section: null, name: 'flour', qty: 2, qty_text: '2', unit: 'cup', notes: null }] }
+
+  it('posts the text to the paste function and returns the parsed recipe', async () => {
+    authFetch.mockResolvedValue({ ok: true, status: 200, json: async () => parsed })
+    const res = await parseRecipeText('2 cups flour\nMix and bake.')
+    expect(res).toEqual({ parsed })
+    expect(authFetch).toHaveBeenCalledTimes(1)
+    const [url, init] = authFetch.mock.calls[0]
+    expect(url).toBe('/.netlify/functions/parse-recipe-text')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body)).toEqual({ text: '2 cups flour\nMix and bake.' })
+  })
+
+  it('returns the server message on an error reply, and a plain fallback when there is none', async () => {
+    authFetch.mockResolvedValue({ ok: false, status: 422, json: async () => ({ error: 'No ingredients found there.' }) })
+    expect(await parseRecipeText('hello')).toEqual({ error: 'No ingredients found there.' })
+    authFetch.mockResolvedValue({ ok: false, status: 429, json: async () => { throw new Error('not json') } })
+    expect((await parseRecipeText('hello')).error).toMatch(/imported a lot recently/)
+    authFetch.mockResolvedValue({ ok: false, status: 504, json: async () => null })
+    expect((await parseRecipeText('hello')).error).toMatch(/too long/)
+  })
+})

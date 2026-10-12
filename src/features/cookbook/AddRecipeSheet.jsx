@@ -6,14 +6,16 @@ import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { toast } from '../../components/ui/Toast'
 import { RecipeForm } from './RecipeForm'
 import { ScanRecipeForm } from './ScanRecipeForm'
+import PasteTextForm from './PasteTextForm'
 import { applyParsed, emptyDraft } from './recipeDraft'
 import { errorText } from './recipeFormat'
-import { scanPhotosViaStorage } from './recipeScan'
+import { scanPhotos } from './recipeScan'
 
 const MODES = [
   { value: 'url', label: 'Link', activeClass: 'text-accent-cookbook' },
   { value: 'manual', label: 'Type it', activeClass: 'text-accent-cookbook' },
   { value: 'scan', label: 'Photo', activeClass: 'text-accent-cookbook' },
+  { value: 'paste', label: 'Paste', activeClass: 'text-accent-cookbook' },
 ]
 
 function ImportUrlForm({ onImport }) {
@@ -42,12 +44,11 @@ function ImportUrlForm({ onImport }) {
   )
 }
 
-function ManualRecipeForm({ draft, onDraftChange, sourceImageUrls, householdId, onCreate }) {
+function ManualRecipeForm({ draft, onDraftChange, householdId, onCreate }) {
   return (
     <RecipeForm
       draft={draft}
       onDraftChange={onDraftChange}
-      sourceImageUrls={sourceImageUrls}
       householdId={householdId}
       imagePathPrefix="dish"
       idPrefix="new"
@@ -63,11 +64,9 @@ function ManualRecipeForm({ draft, onDraftChange, sourceImageUrls, householdId, 
 export function AddRecipeSheet({ open, onClose, householdId, onImport, onCreate }) {
   const [mode, setMode] = useState('url')
   const [draft, setDraft] = useState(emptyDraft)
-  const [sourceImageUrls, setSourceImageUrls] = useState([])
 
-  const handleParsed = ({ parsed, sourceImageUrls: urls }) => {
-    setDraft(d => applyParsed(d, parsed, urls[0]))
-    setSourceImageUrls(urls)
+  const handleParsed = ({ parsed }) => {
+    setDraft(d => applyParsed(d, parsed))
     setMode('manual')
   }
 
@@ -75,7 +74,6 @@ export function AddRecipeSheet({ open, onClose, householdId, onImport, onCreate 
     const res = await onCreate(recipe)
     if (!res?.error) {
       setDraft(emptyDraft())
-      setSourceImageUrls([])
       setMode('url')
     }
     return res
@@ -87,11 +85,17 @@ export function AddRecipeSheet({ open, onClose, householdId, onImport, onCreate 
         <SegmentedControl label="How to add" options={MODES} value={mode} onChange={setMode} />
         {mode === 'url' && <ImportUrlForm onImport={onImport} />}
         {mode === 'manual' && (
-          <ManualRecipeForm draft={draft} onDraftChange={setDraft} sourceImageUrls={sourceImageUrls} householdId={householdId} onCreate={handleCreate} />
+          <ManualRecipeForm draft={draft} onDraftChange={setDraft} householdId={householdId} onCreate={handleCreate} />
+        )}
+        {mode === 'paste' && (
+          <PasteTextForm
+            onParsed={(parsed) => handleParsed({ parsed, sourceImageUrls: [] })}
+            onLocalList={(d) => { setDraft(prev => ({ ...prev, ...d })); setMode('manual') }}
+          />
         )}
         {mode === 'scan' && (
           <ScanRecipeForm
-            scan={(files) => scanPhotosViaStorage(files, householdId)}
+            scan={scanPhotos}
             onParsed={handleParsed}
             hint="Pick every page of the recipe at once. We read them and fill in the form for you to check before saving."
           />

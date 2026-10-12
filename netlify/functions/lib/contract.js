@@ -65,6 +65,8 @@ export function normalizeContract(raw, { sourceUrl = null, via = 'model', fallba
 
 export const NO_RECIPE = "That page doesn't look like a recipe. Double-check the link, or add it with Type it."
 export const NO_INGREDIENTS = 'No ingredients found there. Try a different link, or add it with Type it.'
+export const NO_RECIPE_TEXT = "That text doesn't look like a recipe. Paste the ingredients and steps, or add it with Type it."
+export const NO_INGREDIENTS_TEXT = 'No ingredients found in that text. Paste the ingredient list too, or add it with Type it.'
 export const TOO_LONG = 'That is too long to read in one go. Try a shorter page or fewer screenshots.'
 export const TOO_SLOW = 'That site took too long to read. Try again, or add it with Type it.'
 export const UNREADABLE = "We couldn't read that site. Try again, or add it with Type it."

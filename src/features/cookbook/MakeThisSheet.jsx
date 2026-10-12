@@ -22,6 +22,13 @@ function Rows({ items, detail = ingredientDetail }) {
   )
 }
 
+// Why "I made this" left a row alone, from the consume result's reason codes.
+function skipText(item) {
+  if (item.reason === 'no amount') return 'Skipped: no amount in the recipe'
+  if (item.reason === 'units differ') return item.detail ? `Skipped: units differ, ${item.detail}` : 'Skipped: units differ'
+  return item.reason ? `Skipped: ${item.reason}` : 'Skipped'
+}
+
 function UpdateSummary({ result }) {
   const unit = (item) => item.inventoryItem?.unit || ''
   return (
@@ -34,7 +41,7 @@ function UpdateSummary({ result }) {
           <p className="rounded-row bg-danger-tile px-3 py-2 text-[13px] font-semibold text-danger-ink">Now out: {result.nowOut.map(i => i.name).join(', ')}</p>
         )}
         {result.skipped.length > 0 && (
-          <Rows items={result.skipped} detail={(it) => `Skipped, units differ (${it.reason})`} />
+          <Rows items={result.skipped} detail={skipText} />
         )}
       </div>
     </Tile>
