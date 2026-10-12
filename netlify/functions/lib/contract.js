@@ -30,7 +30,7 @@ export function normalizeContract(raw, { sourceUrl = null, via = 'model', fallba
     }
     const name = str(i?.name)
     if (!name) return null
-    let qty_text = str(i.qty_text) || (typeof i.qty === 'number' ? formatQty(i.qty) : null) || null
+    let qty_text = str(i.qty_text) || (typeof i.qty === 'number' ? formatQty(i.qty) : str(i.qty)) || null
     let unit = normalizeUnit(i.unit) || null
     // "2 pounds" with unit "lb": the amount is the number, the unit lives in `unit`.
     if (qty_text) {
@@ -68,6 +68,7 @@ export const NO_INGREDIENTS = 'No ingredients found there. Try a different link,
 export const NO_RECIPE_TEXT = "That text doesn't look like a recipe. Paste the ingredients and steps, or add it with Type it."
 export const NO_INGREDIENTS_TEXT = 'No ingredients found in that text. Paste the ingredient list too, or add it with Type it.'
 export const TOO_LONG = 'That is too long to read in one go. Try a shorter page or fewer screenshots.'
+export const TOO_LONG_TEXT = 'That is a lot of text. Paste just the recipe, without the comments.'
 export const TOO_SLOW = 'That site took too long to read. Try again, or add it with Type it.'
 export const UNREADABLE = "We couldn't read that site. Try again, or add it with Type it."
 

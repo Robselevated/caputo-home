@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { parseRecipeFromText } from './recipe-text.js'
 import { createDeadline } from './budget.js'
-import { NO_RECIPE_TEXT as NO_RECIPE, NO_INGREDIENTS_TEXT as NO_INGREDIENTS, TOO_LONG, TOO_SLOW, UNREADABLE } from './contract.js'
+import { NO_RECIPE_TEXT as NO_RECIPE, NO_INGREDIENTS_TEXT as NO_INGREDIENTS, TOO_LONG_TEXT as TOO_LONG, TOO_SLOW, UNREADABLE } from './contract.js'
 import { RECIPE_TEXT_PROMPT } from './prompts.js'
 
 const PASTE = `Grandma's pancakes

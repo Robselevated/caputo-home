@@ -26,6 +26,6 @@ export async function handler(event) {
   if (!images.length) return json(400, { error: NO_PHOTOS })
 
   const { status, body } = await parseRecipeFromImages(images, { client: makeClient(), deadline })
-  if (status === 200) recordUsage(user.id, 'parse-recipe-image').catch(() => {})
+  if (status === 200) await recordUsage(user.id, 'parse-recipe-image').catch(() => {})
   return json(status, body)
 }

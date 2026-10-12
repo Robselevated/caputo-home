@@ -90,7 +90,7 @@ export function AddRecipeSheet({ open, onClose, householdId, onImport, onCreate 
         {mode === 'paste' && (
           <PasteTextForm
             onParsed={(parsed) => handleParsed({ parsed, sourceImageUrls: [] })}
-            onLocalList={(d) => { setDraft(prev => ({ ...prev, ...d })); setMode('manual') }}
+            onLocalList={(d) => { setDraft(prev => applyParsed(prev, d)); setMode('manual') }}
           />
         )}
         {mode === 'scan' && (

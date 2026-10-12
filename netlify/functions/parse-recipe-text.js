@@ -26,6 +26,6 @@ export async function handler(event) {
   if (typeof text !== 'string') return json(400, { error: EMPTY_TEXT })
 
   const { status, body } = await parseRecipeFromText(text, { client: makeClient(), deadline })
-  if (status === 200) recordUsage(user.id, 'parse-recipe').catch(() => {})
+  if (status === 200) await recordUsage(user.id, 'parse-recipe').catch(() => {})
   return json(status, body)
 }

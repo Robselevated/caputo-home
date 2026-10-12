@@ -21,4 +21,10 @@ describe('normalizeContract', () => {
     const r = normalizeContract({ name: ' Soup ', servings: '4', prep_time: 10.4, cook_time: '20', image_url: 'not a url', instructions: ['Chop.', '2. Simmer.'], tags: ['a', '', 'b'] }, { sourceUrl: 'https://x/y', via: 'model', fallbackImage: 'https://x/og.jpg' })
     expect(r).toMatchObject({ name: 'Soup', servings: 4, prep_time: null, cook_time: 20, image_url: 'https://x/og.jpg', instructions: '1. Chop.\n2. Simmer.', tags: ['a', 'b'], source_url: 'https://x/y', via: 'model' })
   })
+
+  it('keeps a string amount the model put in qty', () => {
+    const r = normalizeContract({ name: 'X', ingredients: [{ name: 'flour', qty: '1/2' }] })
+    expect(r.ingredients[0]).toMatchObject({ qty: 0.5, qty_text: '1/2' })
+  })
 })
+

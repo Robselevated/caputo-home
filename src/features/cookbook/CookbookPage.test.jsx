@@ -107,4 +107,20 @@ describe('CookbookPage', () => {
     expect(screen.getByText('Beef tacos')).toBeInTheDocument()
     expect(authFetch).toHaveBeenCalledTimes(1)
   })
+
+  it('a pasted ingredient list is added after rows already typed', async () => {
+    renderPage()
+    await screen.findByText('Tacos')
+    fireEvent.click(screen.getByRole('button', { name: /add a recipe/i }))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Type it' }))
+    fireEvent.change(within(dialog).getByLabelText('Ingredient 1 name'), { target: { value: 'typed thing' } })
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Paste' }))
+    fireEvent.change(within(dialog).getByLabelText('Recipe text'), { target: { value: '2 cups flour\n1 tsp salt' } })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Read this text' })) })
+    expect(await within(dialog).findByLabelText('Ingredient 1 name')).toHaveValue('typed thing')
+    expect(within(dialog).getByLabelText('Ingredient 2 name')).toHaveValue('flour')
+    expect(within(dialog).getByLabelText('Ingredient 3 name')).toHaveValue('salt')
+  })
 })
+

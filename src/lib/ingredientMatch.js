@@ -33,7 +33,7 @@ const QUALIFIERS = [
 const MEANINGFUL = new Set(['brown', 'white', 'ground', 'sweet', 'dark'])
 // Colour and variety words that do not change what the thing is for cooking:
 // a recipe's "onion" is satisfied by a "yellow onion" on the shelf.
-const VARIETY = new Set(['yellow', 'red', 'green', 'purple', 'baby', 'jumbo', 'mini', 'roma', 'russet', 'yukon', 'gold', 'vidalia', 'spanish', 'ripe', 'firm', 'regular', 'classic', 'original', 'cherry', 'grape', 'heirloom', 'beefsteak', 'navel', 'fuji', 'gala', 'honeycrisp', 'bartlett', 'hass', 'iceberg', 'romaine', 'curly', 'flat', 'wild', 'farmed', 'atlantic', 'king', 'jasmine', 'basmati', 'long-grain', 'short-grain'])
+const VARIETY = new Set(['yellow', 'red', 'purple', 'baby', 'jumbo', 'mini', 'roma', 'russet', 'yukon', 'gold', 'vidalia', 'spanish', 'ripe', 'firm', 'regular', 'classic', 'original', 'cherry', 'grape', 'heirloom', 'beefsteak', 'navel', 'fuji', 'gala', 'honeycrisp', 'bartlett', 'hass', 'iceberg', 'romaine', 'curly', 'flat', 'wild', 'farmed', 'atlantic', 'king', 'jasmine', 'basmati', 'long-grain', 'short-grain'])
 
 // Joining words that carry no meaning of their own.
 const STOP = new Set(['and', 'or', 'of', 'with', 'for', 'the', 'a', 'an', 'in', 'on', 'to', 'at', 'from', 'plus'])
@@ -54,7 +54,7 @@ const ALIASES = {
   'cornstarch': 'corn starch',
   'corn starch': 'cornstarch',
   'baking soda': 'bicarbonate of soda',
-  'bell pepper': 'pepper',
+  'pepper': 'black pepper',
   'garlic cloves': 'garlic',
   'garlic clove': 'garlic',
   'egg': 'eggs',
@@ -152,7 +152,7 @@ const subset = (a, b) => a.every(x => b.includes(x))
 
 // 3 exact, 1 subset with the head noun agreeing, 0 otherwise.
 // A qualifier that names a different thing when only one side has it.
-const STRICT = new Set(['sweet'])
+const STRICT = new Set(['sweet', 'brown'])
 
 function compare(a, b) {
   if (!a.core.length || !b.core.length) return 0

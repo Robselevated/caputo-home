@@ -4,7 +4,7 @@
 // "1/2", "to taste", or "1-2" would otherwise make the whole save fail (and,
 // today, fail silently). This converts what it can to a number and hands back
 // any leftover human text so the caller can keep it (e.g. in notes) instead of
-// losing it — keeping manual entry forgiving.
+// losing it, keeping manual entry forgiving.
 
 import { parseIngredientLine as parseLineShared, parseIngredientRows, formatQty } from './ingredientParse'
 
@@ -47,11 +47,15 @@ export function parseQty(raw) {
     return { qty: round(parseInt(frac[1], 10) / parseInt(frac[2], 10)), leftover: null }
   }
 
-  // Leading number then text, e.g. "2 (or 3)" — keep the number, preserve the text.
+  // A range keeps its low number for math and the text for display.
+  const ranged = parseLineShared(`${s} x`)
+  if (ranged && ranged.name !== undefined && ranged.qty != null && ranged.qty_text === s) return { qty: ranged.qty, leftover: s }
+
+  // Leading number then text, e.g. "2 (or 3)": keep the number, preserve the text.
   const lead = s.match(/^(\d+(?:\.\d+)?)\s+(.+)$/)
   if (lead) return { qty: parseFloat(lead[1]), leftover: lead[2] }
 
-  // Not a number at all ("to taste", "a pinch", "1-2") — keep it as text.
+  // Not a number at all ("to taste", "a pinch"): keep it as text.
   return { qty: null, leftover: s }
 }
 

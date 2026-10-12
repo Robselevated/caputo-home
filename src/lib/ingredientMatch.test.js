@@ -39,7 +39,8 @@ describe('namesMatch: what still has to match', () => {
   })
 
   it('a single-token name matches only exactly or by alias', () => {
-    expect(namesMatch('pepper', 'black pepper')).toBe(false)
+    expect(namesMatch('pepper', 'black pepper')).toBe(true)
+    expect(namesMatch('pepper', 'bell pepper')).toBe(false)
     expect(namesMatch('fresh', 'fresh basil')).toBe(false)
     expect(namesMatch('fresh', 'fresh')).toBe(true)
   })
@@ -96,8 +97,6 @@ describe('qualifiers that carry meaning', () => {
   })
 
   it.each([
-    ['brown sugar', 'sugar'],
-    ['sugar', 'brown sugar'],
     ['white sugar', 'sugar'],
     ['ground beef', 'beef'],
     ['brown sugar', 'brown sugar'],
@@ -217,6 +216,15 @@ describe('cleanGroceryName', () => {
       ['ham', 'graham crackers', false], ['potato', 'sweet potato', false],
     ])('%s vs %s -> %s', (a, b, expected) => {
       expect(namesMatch(a, b)).toBe(expected)
+    })
+  })
+
+  describe('products that merely share a word', () => {
+    it('does not let green onions stand in for onions, or sugar for brown sugar', () => {
+      expect(namesMatch('onion', 'green onion')).toBe(false)
+      expect(namesMatch('sugar', 'brown sugar')).toBe(false)
+      expect(namesMatch('brown sugar', 'sugar')).toBe(false)
+      expect(findMatch('onion', [{ name: 'Green onions', qty: 3 }, { name: 'Yellow onion', qty: 2 }])?.name).toBe('Yellow onion')
     })
   })
 })

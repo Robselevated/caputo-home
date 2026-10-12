@@ -44,4 +44,12 @@ describe('fetchContent', () => {
     const fetchImpl = vi.fn(async () => resp(200, LD, 'http://127.0.0.1/admin'))
     await expect(fetchContent('https://example.com/r', createDeadline(50000), { fetchImpl })).rejects.toMatchObject({ code: 'invalid_url' })
   })
+
+  it('reports a site that is merely down as unreachable, not blocked', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(resp(503, '', 'https://blog.test/x'))
+      .mockResolvedValueOnce(resp(500, JSON.stringify({ success: false, error: 'internal' }), 'https://api.firecrawl.dev/v1/scrape'))
+    await expect(fetchContent('https://blog.test/x', createDeadline(50000), { fetchImpl, firecrawlKey: 'k' })).rejects.toMatchObject({ code: 'fetch_failed' })
+  })
 })
+

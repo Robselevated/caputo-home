@@ -17,6 +17,7 @@ const QTY_RE = new RegExp(`^(${NUM})(?=\\s|$|[A-Za-z(])`)
 const MULT_RE = /^(\d+)\s*x\s+(?=\S)/i
 const PINCH_RE = /^(?:an?\s+)?(pinch|dash|splash|handful|drizzle|squeeze|sprinkle|knob|few sprigs|sprig)(?:es)?\s+of\s+/i
 const TASTE_RE = /,?\s*\b(to taste|as needed|or to taste|or more to taste|or as needed)\s*$/i
+const PURPOSE_RE = /,?\s*\b(for (?:garnish|serving|drizzling|topping|dusting|brushing|frying|greasing|the pan|sprinkling))\s*$/i
 const FL_OZ_RE = /^(fl\.?\s*oz\.?|fluid ounces?)\b\.?\s*/i
 const FRAC_ONLY = new RegExp(`^[${FRAC}]$`)
 
@@ -51,6 +52,7 @@ const UNIT_ALIASES = {
   clove: 'clove', cloves: 'clove', head: 'head', heads: 'head', bunch: 'bunch', bunches: 'bunch', stalk: 'stalk', stalks: 'stalk',
   piece: 'piece', pieces: 'piece', sprig: 'sprig', sprigs: 'sprig', pinch: 'pinch', pinches: 'pinch', dash: 'dash', dashes: 'dash',
   handful: 'handful', handfuls: 'handful', count: 'count', ear: 'ear', ears: 'ear', fillet: 'fillet', fillets: 'fillet',
+  rib: 'rib', ribs: 'rib', leaf: 'leaf', leaves: 'leaf', scoop: 'scoop', scoops: 'scoop', drop: 'drop', drops: 'drop',
 }
 
 export const UNITS = [...new Set(Object.values(UNIT_ALIASES))]
@@ -148,7 +150,7 @@ export function parseIngredientLine(raw, { section = '' } = {}) {
     return ' '
   }).replace(/\s+/g, ' ').trim()
   // A size glued to a container: "15oz. can", "8 oz package" -> unit can, size in notes.
-  const sized = rest.match(/^(\d+(?:\.\d+)?)\s*(oz|ounce|ounces|g|gram|grams|ml|lb|lbs|pound|pounds)\.?\s+(can|cans|jar|jars|package|packages|pkg|bag|bags|box|boxes|bottle|bottles|container|containers)\b\.?\s*/i)
+  const sized = rest.match(/^(\d+(?:\.\d+)?)\s*-?\s*(oz|ounce|ounces|g|gram|grams|ml|lb|lbs|pound|pounds)\.?\s*-?\s+(can|cans|jar|jars|package|packages|pkg|bag|bags|box|boxes|bottle|bottles|container|containers)\b\.?\s*/i)
   if (sized && qty != null) {
     notes.unshift(`${sized[1]} ${normalizeUnit(sized[2]) || sized[2]}`)
     rest = `${sized[3]} ${rest.slice(sized[0].length)}`.trim()
@@ -160,6 +162,12 @@ export function parseIngredientLine(raw, { section = '' } = {}) {
     rest = rest.slice(0, tail.index).trim()
     if (!qty_text) qty_text = tail[1].toLowerCase().replace(/^or /, '')
     else notes.push(tail[1].toLowerCase())
+  }
+  // "for garnish" / "for serving" is a note, not part of the name.
+  const purpose = rest.match(PURPOSE_RE)
+  if (purpose) {
+    rest = rest.slice(0, purpose.index).trim()
+    notes.push(purpose[1].toLowerCase())
   }
 
   let unit = ''

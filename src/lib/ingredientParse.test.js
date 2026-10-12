@@ -29,6 +29,9 @@ describe('parseIngredientLine', () => {
     ['1 15oz. can fire roasted tomatoes ($1.00)', row({ name: 'fire roasted tomatoes', qty: 1, qty_text: '1', unit: 'can', unit_text: 'can', notes: '15 oz' })],
     ['1 yellow onion ($0.32)', row({ name: 'yellow onion', qty: 1, qty_text: '1' })],
     ['2 (8 oz) packages cream cheese', row({ name: 'cream cheese', qty: 2, qty_text: '2', unit: 'package', unit_text: 'packages', notes: '8 oz' })],
+    ['1 15-ounce can chickpeas', row({ name: 'chickpeas', qty: 1, qty_text: '1', unit: 'can', unit_text: 'can', notes: '15 oz' })],
+    ['2 ribs celery', row({ name: 'celery', qty: 2, qty_text: '2', unit: 'rib', unit_text: 'ribs' })],
+    ['Fresh parsley for garnish', row({ name: 'Fresh parsley', notes: 'for garnish' })],
   ])('%s', (line, expected) => {
     expect(parseIngredientLine(line)).toEqual(expected)
   })

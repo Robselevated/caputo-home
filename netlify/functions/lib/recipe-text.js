@@ -1,7 +1,7 @@
 import { createDeadline } from './budget.js'
 import { callModel, extractJson } from './anthropicClient.js'
 import { RECIPE_TEXT_PROMPT } from './prompts.js'
-import { normalizeContract, reply, errorStatus, NO_RECIPE_TEXT as NO_RECIPE, NO_INGREDIENTS_TEXT as NO_INGREDIENTS, TOO_LONG, UNREADABLE } from './contract.js'
+import { normalizeContract, reply, errorStatus, NO_RECIPE_TEXT as NO_RECIPE, NO_INGREDIENTS_TEXT as NO_INGREDIENTS, TOO_LONG_TEXT as TOO_LONG, UNREADABLE } from './contract.js'
 
 // Longer than any recipe, shorter than a model window: a whole blog post with
 // its comments still fits, a pasted cookbook does not.

@@ -14,8 +14,9 @@ const EMPTY = []
 const newestFirst = (rows) => [...rows].sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')))
 
 function importErrorMessage(response, errBody) {
-  if (errBody?.error) return errBody.error
   if (response.status === 429) return "You've imported a lot recently. Give it a few minutes and try again."
+  if (response.status === 401) return 'Please sign in again and retry.'
+  if (errBody?.error) return errBody.error
   if (response.status === 413) return 'Those photos are too big. Try fewer at once.'
   if (response.status === 504 || response.status === 502) {
     return 'That site took too long to read. Try again, or add it with Type it.'
@@ -51,8 +52,10 @@ export async function parseRecipeText(text) {
   return { parsed: await response.json() }
 }
 
+// Whole numbers only; "4.5" or "4-6" is unknown rather than silently rounded.
 const toInt = (v) => {
-  const n = typeof v === 'string' ? parseInt(v, 10) : v
+  if (v === '' || v == null) return null
+  const n = typeof v === 'string' ? Number(v.trim()) : v
   return Number.isInteger(n) && n > 0 ? n : null
 }
 
@@ -80,8 +83,11 @@ function buildIngredientRows(recipeId, ingredients) {
 // be whole numbers; a yield like "4-6 servings" is kept in the notes.
 function toRecipeRow(parsed, { url } = {}) {
   const servings = toInt(parsed.servings)
+  // Only a yield that says more than the number is worth a note ("4-6
+  // servings", "makes 12 muffins"); "4 servings" is already the servings field.
   const yieldText = parsed.yield_text && String(parsed.yield_text).trim()
-  const yieldNote = yieldText && yieldText !== String(servings ?? '') ? `Yield: ${yieldText}` : null
+  const plainCount = yieldText && /^\d+\s*(servings?|serves|portions?|people)?$/i.test(yieldText)
+  const yieldNote = yieldText && !plainCount ? `Yield: ${yieldText}` : null
   return {
     name: parsed.name,
     description: parsed.description || null,
@@ -175,9 +181,9 @@ export function useRecipes(householdId) {
         description: recipe.description || null,
         image_url: recipe.image_url || null,
         source_image_url: recipe.source_image_url || null,
-        servings: recipe.servings || null,
-        prep_time: recipe.prep_time || null,
-        cook_time: recipe.cook_time || null,
+        servings: toInt(recipe.servings),
+        prep_time: toInt(recipe.prep_time),
+        cook_time: toInt(recipe.cook_time),
         instructions: recipe.instructions || null,
         tags: recipe.tags || [],
         notes: recipe.notes || null,
@@ -222,8 +228,8 @@ export function useRecipes(householdId) {
       const { parsed, error: parseError } = await parseRecipeUrl(sourceUrl)
       if (parseError) return { error: parseError }
 
-      const { notes: yieldNote, ...fields } = toRecipeRow(parsed)
-      if (yieldNote) fields.notes = yieldNote
+      // Never touch notes on a re-import: that field belongs to the cook.
+      const { notes: _ignored, ...fields } = toRecipeRow(parsed)
       const { error: recipeError } = await supabase.from('recipes').update(fields).eq('id', id)
       if (recipeError) return { error: recipeError }
 
@@ -244,9 +250,9 @@ export function useRecipes(householdId) {
       name: updates.name,
       description: updates.description || null,
       image_url: updates.image_url || null,
-      servings: updates.servings || null,
-      prep_time: updates.prep_time || null,
-      cook_time: updates.cook_time || null,
+      servings: toInt(updates.servings),
+      prep_time: toInt(updates.prep_time),
+      cook_time: toInt(updates.cook_time),
       instructions: updates.instructions || null,
       tags: updates.tags || [],
       notes: updates.notes || null,

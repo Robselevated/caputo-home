@@ -205,4 +205,46 @@ describe('parseRecipeText', () => {
     authFetch.mockResolvedValue({ ok: false, status: 504, json: async () => null })
     expect((await parseRecipeText('hello')).error).toMatch(/too long/)
   })
+
+  const importFixture = (over) => ({ name: 'Chili', servings: 4, yield_text: '4-6 servings', prep_time: 10, cook_time: null, tags: [], instructions: '1. Cook.', image_url: null, source_url: 'https://blog.test/chili', via: 'jsonld', ingredients: [{ section: null, name: 'beans', qty: 1, qty_text: '1', unit: 'can', notes: null }], ...over })
+  const chili = { id: 'r9', household_id: 'hh', name: 'Chili', created_at: '2026-03-01T00:00:00Z' }
+  const mockParse = (body) => authFetch.mockResolvedValue({ ok: true, status: 200, json: async () => body })
+
+  it('a yield that is just the serving count adds no note', async () => {
+    mockParse(importFixture({ servings: 4, yield_text: '4 servings' }))
+    supabase.setResult('recipes', 'insert', { data: chili, error: null })
+    supabase.setResult('recipe_ingredients', 'insert', { data: null, error: null })
+    const { result } = await renderLoaded()
+    await act(async () => { await result.current.importRecipe('https://blog.test/chili', 'u1') })
+    expect(supabase.callsFor('recipes', 'insert')[0].chain[0][1]).toMatchObject({ servings: 4, notes: null })
+  })
+
+  it('re-importing never touches the notes the cook wrote', async () => {
+    mockParse(importFixture({ yield_text: '4-6 servings' }))
+    supabase.setResult('recipes', 'update', { data: null, error: null })
+    supabase.setResult('rpc', 'replace_recipe_ingredients', { data: [], error: null })
+    const { result } = await renderLoaded()
+    await act(async () => { await result.current.reimportRecipe('r1', 'https://blog.test/chili') })
+    const payload = supabase.callsFor('recipes', 'update')[0].chain[0][1]
+    expect(payload).not.toHaveProperty('notes')
+    expect(payload).toMatchObject({ name: 'Chili', servings: 4 })
+  })
 })
+
+describe('createRecipe coercion', () => {
+  it('turns servings and times into whole numbers or null', async () => {
+    supabase.setResult('recipes', 'insert', { data: { id: 'r4', household_id: 'hh', name: 'Pie', created_at: '2026-02-01T00:00:00Z' }, error: null })
+    const { result } = await renderLoaded()
+    await act(async () => { await result.current.createRecipe({ name: 'Pie', servings: '4.5', prep_time: '20', cook_time: 'later', ingredients: [] }, 'u1') })
+    expect(supabase.callsFor('recipes', 'insert')[0].chain[0][1]).toMatchObject({ servings: null, prep_time: 20, cook_time: null })
+  })
+})
+
+describe('parseRecipeText error copy', () => {
+  it('shows the friendly line for a rate limit even when the server sends its own', async () => {
+    const { parseRecipeText } = await import('./useRecipes')
+    authFetch.mockResolvedValue({ ok: false, status: 429, json: async () => ({ error: 'Rate limit exceeded. Try again later.' }) })
+    expect(await parseRecipeText('x')).toEqual({ error: "You've imported a lot recently. Give it a few minutes and try again." })
+  })
+})
+

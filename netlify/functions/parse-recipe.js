@@ -24,6 +24,6 @@ export async function handler(event) {
   if (!url) return json(400, { error: 'Missing url parameter' })
 
   const { status, body } = await parseRecipeFromUrl(url, { client: makeClient(), deadline })
-  if (status === 200) recordUsage(user.id, 'parse-recipe').catch(() => {})
+  if (status === 200) await recordUsage(user.id, 'parse-recipe').catch(() => {})
   return json(status, body)
 }

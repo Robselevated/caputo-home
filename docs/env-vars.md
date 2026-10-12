@@ -57,6 +57,9 @@ This document lists all required environment variables for deploying the Caputo 
 
 ### Claude AI API
 
+**FIRECRAWL_API_KEY**
+Server only (Netlify). Second fetch path for recipe links when a site refuses the direct request. Without it, blocked sites return the paste hint straight away.
+
 **CLAUDE_API_KEY**
 - **Value**: Anthropic Claude API key
 - **Source**: Anthropic Console → API Keys

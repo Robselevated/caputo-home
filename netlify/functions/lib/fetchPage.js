@@ -1,7 +1,7 @@
 import { withTimeout, TimeoutError } from './budget.js'
 
 export const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
-export const BLOCK_STATUSES = new Set([401, 402, 403, 406, 429, 451, 460, 503])
+export const BLOCK_STATUSES = new Set([401, 402, 403, 406, 451, 460])
 
 export class FetchError extends Error {
   constructor(message, code, status) {

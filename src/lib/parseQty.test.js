@@ -23,7 +23,8 @@ describe('parseQty', () => {
   it('keeps non-numeric quantities as leftover text', () => {
     expect(parseQty('to taste')).toEqual({ qty: null, leftover: 'to taste' })
     expect(parseQty('a pinch')).toEqual({ qty: null, leftover: 'a pinch' })
-    expect(parseQty('1-2')).toEqual({ qty: null, leftover: '1-2' })
+    expect(parseQty('1-2')).toEqual({ qty: 1, leftover: '1-2' })
+    expect(parseQty('1 to 2')).toEqual({ qty: 1, leftover: '1 to 2' })
   })
 
   it('splits a leading number from trailing text', () => {
@@ -73,6 +74,11 @@ describe('normalizeIngredientQty', () => {
   it('stores non-numeric quantities verbatim with qty null', () => {
     expect(normalizeIngredientQty({ name: 'salt', qty: 'to taste', notes: null }))
       .toEqual({ name: 'salt', qty: null, qty_text: 'to taste', notes: null })
+  })
+
+  it('keeps the low number of a typed range', () => {
+    expect(normalizeIngredientQty({ name: 'jalapeños', qty: '1-2', notes: null }))
+      .toEqual({ name: 'jalapeños', qty: 1, qty_text: '1-2', notes: null })
   })
 
   it('maps an empty qty to null/null', () => {

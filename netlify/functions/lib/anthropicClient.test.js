@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest'
-import { extractJson, callModel, MODEL } from './anthropicClient.js'
+import { extractJson, callModel, makeClient, MODEL } from './anthropicClient.js'
 import { createDeadline } from './budget.js'
 
 describe('extractJson', () => {
@@ -40,4 +40,9 @@ describe('callModel', () => {
     await expect(callModel({ messages: { create } }, { messages: [] }, d)).rejects.toMatchObject({ name: 'TimeoutError' })
     expect(create).not.toHaveBeenCalled()
   })
+
+  it('builds the client with retries off', () => {
+    expect(makeClient('test-key').maxRetries).toBe(0)
+  })
 })
+
