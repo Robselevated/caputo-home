@@ -64,10 +64,10 @@ describe('RecipeEditPage', () => {
     const updates = supabase.callsFor('recipes', 'update')
     expect(updates).toHaveLength(1)
     expect(updates[0].chain[0][1]).toMatchObject({ name: 'Street tacos', servings: 4, tags: ['Mexican'] })
-    expect(supabase.callsFor('recipe_ingredients', 'delete')).toHaveLength(1)
-    const rows = supabase.callsFor('recipe_ingredients', 'insert')[0].chain[0][1]
-    expect(rows.map(r => r.qty_text)).toEqual(['2', '1/2'])
-    expect(rows[1]).toMatchObject({ qty: 0.5, section: 'Filling' })
+    const replaceCall = supabase.callsFor('rpc', 'replace_recipe_ingredients')[0]
+    expect(replaceCall.args.p_recipe_id).toBe('r1')
+    expect(replaceCall.args.p_rows.map(r => r.qty_text)).toEqual(['2', '1/2'])
+    expect(replaceCall.args.p_rows[1]).toMatchObject({ qty: 0.5, section: 'Filling' })
     expect(await screen.findByText('detail page')).toBeInTheDocument()
   })
 

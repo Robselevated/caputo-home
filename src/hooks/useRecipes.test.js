@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase'
 import { createWrapper } from '../test/queryWrapper'
 import { keys } from '../queries/keys'
 import { useRecipes, useRecipe } from './useRecipes'
+import { authFetch } from '../lib/authFetch'
 
 const tacos = { id: 'r1', household_id: 'hh', name: 'Tacos', image_url: null, tags: [], created_at: '2026-01-02T00:00:00Z' }
 const soup = { id: 'r2', household_id: 'hh', name: 'Soup', image_url: null, tags: [], created_at: '2026-01-01T00:00:00Z' }
@@ -101,3 +102,83 @@ describe('useRecipe', () => {
     expect(result.current.error).toBeTruthy()
   })
 })
+
+describe('importRecipe', () => {
+  const parsed = {
+    name: 'Chili', description: null, servings: 4, yield_text: '4-6 servings', prep_time: 10, cook_time: null, total_time: null, tags: ['dinner'],
+    instructions: '1. Cook.', image_url: 'https://x/i.jpg', source_url: 'https://blog.test/chili', via: 'jsonld',
+    ingredients: [
+      { section: null, name: 'beans', qty: 1, qty_text: '1-2', unit: 'can', notes: '15 oz' },
+      { section: 'Toppings', name: 'cheese', qty: null, qty_text: 'to taste', unit: null, notes: null },
+    ],
+  }
+  const chili = { id: 'r9', household_id: 'hh', name: 'Chili', created_at: '2026-03-01T00:00:00Z' }
+  const mockParse = (body) => authFetch.mockResolvedValue({ ok: true, status: 200, json: async () => body })
+
+  it('writes the resolved source, a whole-number serving with the yield in notes, and qty_text on every row', async () => {
+    mockParse(parsed)
+    supabase.setResult('recipes', 'insert', { data: chili, error: null })
+    supabase.setResult('recipe_ingredients', 'insert', { data: null, error: null })
+    const { result } = await renderLoaded()
+    let res
+    await act(async () => { res = await result.current.importRecipe('https://www.pinterest.com/pin/1/', 'u1') })
+    expect(res.data.id).toBe('r9')
+    expect(supabase.callsFor('recipes', 'insert')[0].chain[0][1]).toMatchObject({ servings: 4, source_url: 'https://blog.test/chili', notes: 'Yield: 4-6 servings', prep_time: 10, cook_time: null })
+    const rows = supabase.callsFor('recipe_ingredients', 'insert')[0].chain[0][1]
+    expect(rows).toEqual([
+      expect.objectContaining({ recipe_id: 'r9', name: 'beans', qty: 1, qty_text: '1-2', unit: 'can', notes: '15 oz', section: null, position: 0 }),
+      expect.objectContaining({ recipe_id: 'r9', name: 'cheese', qty: null, qty_text: 'to taste', unit: null, section: 'Toppings', position: 1 }),
+    ])
+  })
+
+  it('treats a servings value that is not a whole number as unknown', async () => {
+    mockParse({ ...parsed, servings: 'four', yield_text: null })
+    supabase.setResult('recipes', 'insert', { data: chili, error: null })
+    supabase.setResult('recipe_ingredients', 'insert', { data: null, error: null })
+    const { result } = await renderLoaded()
+    await act(async () => { await result.current.importRecipe('https://blog.test/chili', 'u1') })
+    expect(supabase.callsFor('recipes', 'insert')[0].chain[0][1]).toMatchObject({ servings: null, notes: null })
+  })
+
+  it('rolls the recipe back when the ingredients cannot be saved and explains it plainly', async () => {
+    mockParse(parsed)
+    supabase.setResult('recipes', 'insert', { data: chili, error: null })
+    supabase.setResult('recipe_ingredients', 'insert', { data: null, error: { code: '22P02', message: 'invalid input syntax for type numeric: "1-2"' } })
+    supabase.setResult('recipes', 'delete', { data: null, error: null })
+    const { result } = await renderLoaded()
+    let res
+    await act(async () => { res = await result.current.importRecipe('https://blog.test/chili', 'u1') })
+    expect(res.error).toBe('One of the amounts is not a number we can save. Check the quantities and try again.')
+    expect(supabase.callsFor('recipes', 'delete')[0].chain).toEqual(expect.arrayContaining([['eq', 'id', 'r9']]))
+    expect(result.current.recipes.map(r => r.id)).toEqual(['r1', 'r2'])
+  })
+})
+
+describe('replacing ingredients on edit', () => {
+  it('uses the replace function when it exists', async () => {
+    supabase.setResult('recipes', 'update', { data: null, error: null })
+    supabase.setResult('rpc', 'replace_recipe_ingredients', { data: [], error: null })
+    const { result } = await renderLoaded()
+    await act(async () => { await result.current.updateRecipe('r1', { name: 'Tacos' }, [{ name: 'shells', qty: '12' }, { name: 'salt', qty: 'to taste', unit: 'Tbsp.' }]) })
+    const call = supabase.callsFor('rpc', 'replace_recipe_ingredients')[0]
+    expect(call.args.p_recipe_id).toBe('r1')
+    expect(call.args.p_rows).toEqual([
+      expect.objectContaining({ name: 'shells', qty: 12, qty_text: '12', position: 0 }),
+      expect.objectContaining({ name: 'salt', qty: null, qty_text: 'to taste', unit: 'tbsp', position: 1 }),
+    ])
+    expect(supabase.callsFor('recipe_ingredients', 'delete')).toHaveLength(0)
+  })
+
+  it('falls back to insert-then-delete while the function is missing, never the reverse', async () => {
+    supabase.setResult('recipes', 'update', { data: null, error: null })
+    supabase.setResult('rpc', 'replace_recipe_ingredients', { data: null, error: { code: 'PGRST202', message: 'Could not find the function' } })
+    supabase.setResult('recipe_ingredients', 'insert', { data: [{ id: 'n1' }, { id: 'n2' }], error: null })
+    supabase.setResult('recipe_ingredients', 'delete', { data: null, error: null })
+    const { result } = await renderLoaded()
+    await act(async () => { await result.current.updateRecipe('r1', { name: 'Tacos' }, [{ name: 'shells', qty: '12' }, { name: 'beef', qty: '1' }]) })
+    expect(supabase.calls.filter(c => c.table === 'recipe_ingredients').map(c => c.verb)).toEqual(['insert', 'delete'])
+    const del = supabase.callsFor('recipe_ingredients', 'delete')[0].chain
+    expect(del).toEqual(expect.arrayContaining([['eq', 'recipe_id', 'r1'], ['not', 'id', 'in', '(n1,n2)']]))
+  })
+})
+

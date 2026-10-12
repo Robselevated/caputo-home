@@ -58,8 +58,26 @@ export function plural(n, word) {
   return `${n} ${word}${n === 1 ? '' : 's'}`
 }
 
+// Postgres and PostgREST codes the cookbook can hit, in plain words. Raw
+// database text ("invalid input syntax for type numeric") never reaches the
+// screen.
+const DB_MESSAGES = {
+  '22P02': 'One of the amounts is not a number we can save. Check the quantities and try again.',
+  '22003': 'One of the amounts is too large to save.',
+  '23502': 'The recipe needs a name.',
+  '23503': 'That recipe no longer exists.',
+  '42501': 'You do not have access to this recipe.',
+  'PGRST301': 'You do not have access to this recipe.',
+  'P0002': 'That recipe no longer exists.',
+}
+
+export function friendlyDbError(error) {
+  return DB_MESSAGES[error?.code] || 'Could not save the recipe. Try again.'
+}
+
 export function errorText(error, fallback) {
   if (!error) return fallback
   if (typeof error === 'string') return error
+  if (error.code) return friendlyDbError(error)
   return error.message || fallback
 }
