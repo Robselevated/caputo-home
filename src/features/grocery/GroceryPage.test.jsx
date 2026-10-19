@@ -116,7 +116,7 @@ describe('GroceryPage', () => {
     await screen.findByText('Avocados')
     await act(async () => { fireEvent.click(await screen.findByRole('button', { name: 'Add Eggs back to the list' })) })
     const insert = supabase.callsFor('grocery_items', 'insert')[0]
-    expect(insert.chain[0][1]).toMatchObject({ name: 'Eggs', store: 'Costco' })
+    expect(insert.chain[0][1]).toMatchObject([{ name: 'Eggs', store: 'Costco' }])
   })
 
   it('add-bar suggestions are plain buttons in a labelled list, not a fake listbox', async () => {

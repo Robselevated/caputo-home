@@ -10,7 +10,8 @@ import { sortInventory } from '../lib/inventoryRealtime'
 import { upsertById, removeById } from '../lib/realtimeCache'
 import { keys, STALE } from '../queries/keys'
 import { fetchInventory } from '../queries/fetchers'
-import { mergeInventoryItem, updateInventoryItem, deleteInventoryItem, insertGroceryItem } from '../queries/writes'
+import { mergeInventoryItem, updateInventoryItem, deleteInventoryItem } from '../queries/writes'
+import { addGroceryRows } from '../queries/groceryAdd'
 
 const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
 const EMPTY = []
@@ -146,10 +147,7 @@ export function useInventory(householdId, location) {
   }
 
   const addToGroceryList = async (item, userId) => {
-    if (!householdId) return { error: 'No household' }
-    const groceryKey = keys.grocery(householdId)
-    const row = {
-      id: crypto.randomUUID(),
+    const { error } = await addGroceryRows(qc, supabase, householdId, [{
       household_id: householdId,
       name: item.name,
       qty: item.qty || 1,
@@ -159,19 +157,10 @@ export function useInventory(householdId, location) {
       checked: false,
       added_by: userId,
       updated_by: userId,
-      created_at: new Date().toISOString(),
-    }
-    qc.setQueryData(groceryKey, prev => (prev ? [...prev, row] : prev))
-    try {
-      const saved = await insertGroceryItem(supabase, row)
-      if (saved) qc.setQueryData(groceryKey, prev => (prev ? upsertById(prev, saved) : prev))
-      toast({ message: `${item.name} added to grocery list` })
-      return { error: null }
-    } catch (error) {
-      qc.setQueryData(groceryKey, prev => (prev ? removeById(prev, row.id) : prev))
-      toast({ message: `Couldn't add ${item.name} to the grocery list`, tone: 'error' })
-      return { error }
-    }
+    }])
+    if (error) toast({ message: `Couldn't add ${item.name} to the grocery list`, tone: 'error' })
+    else toast({ message: `${item.name} added to grocery list` })
+    return { error }
   }
 
   return { items, allItems, loading: isPending, addItem, updateQty, updateItem, deleteItem, addToGroceryList }

@@ -14,16 +14,15 @@ import { useRecipeMatch } from './useRecipeMatch'
 beforeEach(() => { supabase.reset(); vi.clearAllMocks() })
 
 describe('useRecipeMatch keeps the shared cache honest', () => {
-  it('addMissingToGroceryList and addDepletedToGroceryList refresh the grocery cache', async () => {
+  it('addMissingToGroceryList and addDepletedToGroceryList put the rows on the cached list, at the end', async () => {
     supabase.setResult('grocery_items', 'insert', { data: null, error: null })
-    const spy = vi.spyOn(queryClient, 'invalidateQueries')
+    queryClient.setQueryData(keys.grocery('hh'), [{ id: 'x', name: 'eggs', store: null, sort_order: 4 }])
     const { result } = renderHook(() => useRecipeMatch('hh'))
     await act(async () => { await result.current.addMissingToGroceryList([{ name: 'limes', qty: 2, unit: null }], 'Tacos', 'u1', 'hh') })
-    expect(spy).toHaveBeenCalledWith({ queryKey: keys.grocery('hh') })
-    spy.mockClear()
     await act(async () => { await result.current.addDepletedToGroceryList([{ name: 'rice', inventoryItem: { qty: 0, unit: 'bags' } }], 'Tacos', 'u1') })
-    expect(spy).toHaveBeenCalledWith({ queryKey: keys.grocery('hh') })
-    spy.mockRestore()
+    const list = queryClient.getQueryData(keys.grocery('hh'))
+    expect(list.map(i => [i.name, i.sort_order])).toEqual([['eggs', 4], ['limes', 5], ['rice', 6]])
+    queryClient.removeQueries({ queryKey: keys.grocery('hh') })
   })
 
   it('"I made this" decrements refresh the kitchen cache', async () => {

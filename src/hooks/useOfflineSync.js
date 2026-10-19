@@ -4,6 +4,7 @@ import { getPendingWrites, clearWrite, getPendingCount, incrementWriteAttempts, 
 import { checkOffGroceryItem } from '../lib/checkOff'
 import { queryClient } from '../lib/queryClient'
 import { keys } from '../queries/keys'
+import { mergeInventoryItem } from '../queries/writes'
 import { toastWriteDropped } from '../lib/offlineToasts'
 
 const MAX_SYNC_ATTEMPTS = 5
@@ -21,23 +22,8 @@ function ok(res) {
   return res
 }
 
-async function mergeInventory(data) {
-  const res = await supabase.rpc('merge_inventory_item', {
-    p_household_id: data.household_id,
-    p_name: data.name,
-    p_qty: data.qty ?? 1,
-    p_unit: data.unit ?? null,
-    p_location: data.location,
-    p_category: data.category,
-    p_subcategory: data.subcategory ?? null,
-    p_notes: data.notes ?? null,
-  })
-  if (res?.error?.code === 'PGRST202') {
-    // function not deployed yet: plain insert
-    return ok(await supabase.from('inventory_items').insert(data))
-  }
-  return ok(res)
-}
+// Same merge (and not-deployed fallback) as the online path.
+const mergeInventory = (data) => mergeInventoryItem(supabase, data)
 
 async function replay(write) {
   switch (write.type) {
