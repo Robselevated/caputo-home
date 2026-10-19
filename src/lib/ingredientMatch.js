@@ -215,13 +215,52 @@ export function findMatch(ingredientName, inventoryItems) {
   return best
 }
 
-// Does a recipe ingredient name match any name in a Set of inventory names?
+// The last token of a list, or undefined.
+const last = (list) => list[list.length - 1]
+
+// Every head noun a token set can be compared on: its own core and full
+// heads, plus its alias's. compare() only scores pairs whose heads agree, so
+// an index keyed on these finds every candidate scoreTokens could accept.
+function heads(t) {
+  const out = new Set([last(t.core), last(t.full)])
+  const alias = ALIAS_TOKENS.get(t.key)
+  if (alias) { out.add(last(alias.core)); out.add(last(alias.full)) }
+  out.delete(undefined)
+  return out
+}
+
+// Indirection so tests can count tokenize calls.
+export const internals = { tokenize }
+
+// Inventory names tokenized once and indexed by head noun. Build it when the
+// inventory changes and pass it to hasMatch instead of a Set of names, so a
+// coverage pass tokenizes each inventory item once rather than once per
+// recipe ingredient.
+export function buildInventoryIndex(names) {
+  const byHead = new Map()
+  for (const name of names ?? []) {
+    const t = internals.tokenize(name)
+    if (!t.core.length) continue
+    for (const h of heads(t)) {
+      let bucket = byHead.get(h)
+      if (!bucket) byHead.set(h, (bucket = []))
+      if (!bucket.includes(t)) bucket.push(t)
+    }
+  }
+  return { byHead }
+}
+
+// Does a recipe ingredient name match any inventory name? Takes an index from
+// buildInventoryIndex, or any iterable of lowercased names.
 // Used by useIngredientCoverage for bulk coverage.
-export function hasMatch(ingredientName, inventoryNameSet) {
-  const a = tokenize(ingredientName)
+export function hasMatch(ingredientName, inventory) {
+  const a = internals.tokenize(ingredientName)
   if (!a.core.length) return false
-  for (const invName of inventoryNameSet) {
-    if (scoreTokens(a, tokenize(invName)) > 0) return true
+  const index = inventory?.byHead instanceof Map ? inventory : buildInventoryIndex(inventory)
+  for (const h of heads(a)) {
+    for (const b of index.byHead.get(h) ?? []) {
+      if (scoreTokens(a, b) > 0) return true
+    }
   }
   return false
 }
