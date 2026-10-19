@@ -4,7 +4,8 @@ import { toast } from '../components/ui/Toast'
 import { upsertById, removeById } from '../lib/realtimeCache'
 import { keys, STALE } from '../queries/keys'
 import { fetchMealPicks } from '../queries/fetchers'
-import { insertMealPick, deleteMealPick, clearMealPickSection } from '../queries/writes'
+import { insertMealPick, deleteMealPick, deleteMealPicks } from '../queries/writes'
+import { resolveSection } from '../lib/mealSections'
 
 const EMPTY = []
 const oldestFirst = (rows) => [...rows].sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))
@@ -64,10 +65,13 @@ export function useMealPicks(householdId) {
 
   const clearSection = async (sectionName) => {
     await qc.cancelQueries({ queryKey: key })
-    const removed = (snapshot() ?? []).filter(p => p.section === sectionName)
-    setAll(prev => prev.filter(p => p.section !== sectionName))
+    // Same grouping the page renders with, so null and legacy section names
+    // (which display under a default section) are cleared too.
+    const removed = (snapshot() ?? []).filter(p => resolveSection(p.section) === sectionName)
+    const ids = new Set(removed.map(p => p.id))
+    setAll(prev => prev.filter(p => !ids.has(p.id)))
     try {
-      await clearMealPickSection(supabase, householdId, sectionName)
+      await deleteMealPicks(supabase, householdId, [...ids])
       return { error: null }
     } catch (error) {
       setAll(prev => oldestFirst(removed.reduce((acc, row) => upsertById(acc, row), prev)))

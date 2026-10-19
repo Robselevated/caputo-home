@@ -77,17 +77,22 @@ export async function getCachedGroceryItems() {
   }
 }
 
+// Resolves true when the write is safely queued, false when it is not (no
+// IndexedDB, e.g. private browsing, or the add failed). Callers report
+// `queued: false` so a change that will never sync is not shown as pending.
 export async function queueWrite(operation) {
   const db = await getDB()
-  if (!db) return
+  if (!db) return false
   try {
     await db.add('write_queue', {
       ...operation,
       timestamp: Date.now(),
     })
     await notifyQueueChange()
+    return true
   } catch (err) {
     console.warn('Queue write failed:', err.message)
+    return false
   }
 }
 

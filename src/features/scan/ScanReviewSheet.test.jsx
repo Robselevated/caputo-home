@@ -64,4 +64,13 @@ describe('ScanReviewSheet', () => {
     expect(onCancel).toHaveBeenCalledTimes(2)
     expect(onConfirm).not.toHaveBeenCalled()
   })
+
+  it('after a partial failure only the failed rows remain, so Add retries just those', async () => {
+    const onConfirm = vi.fn(async (rows) => ({ saved: rows.slice(1), failed: rows.slice(0, 1) }))
+    renderSheet({ onConfirm })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add 2 to Pantry' })) })
+    expect(screen.getByRole('alert')).toHaveTextContent('Rice')
+    expect(screen.queryByText('Black beans')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add 1 to Pantry' })).toBeInTheDocument()
+  })
 })

@@ -73,6 +73,29 @@ describe('fetchers', () => {
     expect(chainHas(call, 'eq', 'recipes.household_id', 'hh')).toBe(true)
   })
 
+  it('fetchRecipeIngredients and fetchItemHistory page past the 1000-row cap in a stable order', async () => {
+    const pageOf = (n, offset) => Array.from({ length: n }, (_, i) => ({ recipe_id: 'r', name: `ing${offset + i}` }))
+    client.setResult('recipe_ingredients', 'select', (record) => {
+      const [, from] = record.chain.find(([m]) => m === 'range')
+      return { data: from === 0 ? pageOf(1000, 0) : pageOf(5, 1000), error: null }
+    })
+    const rows = await fetchRecipeIngredients(client, 'hh')
+    expect(rows).toHaveLength(1005)
+    const calls = client.callsFor('recipe_ingredients', 'select')
+    expect(calls).toHaveLength(2)
+    expect(chainHas(calls[0], 'range', 0, 999)).toBe(true)
+    expect(chainHas(calls[1], 'range', 1000, 1999)).toBe(true)
+    expect(chainHas(calls[0], 'order', 'recipe_id')).toBe(true)
+    expect(chainHas(calls[0], 'order', 'id')).toBe(true)
+
+    client.setResult('item_history', 'select', (record) => {
+      const [, from] = record.chain.find(([m]) => m === 'range')
+      return { data: from === 0 ? pageOf(1000, 0) : [], error: null }
+    })
+    expect(await fetchItemHistory(client, 'hh')).toHaveLength(1000)
+    expect(client.callsFor('item_history', 'select')).toHaveLength(2)
+  })
+
   it('fetchMealPicks and fetchMembers scope by household', async () => {
     client.setResult('meal_picks', 'select', { data: [], error: null })
     client.setResult('users', 'select', { data: [], error: null })

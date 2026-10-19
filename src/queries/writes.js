@@ -76,6 +76,9 @@ export async function deleteMealPick(client, id) {
   await run(client.from('meal_picks').delete().eq('id', id))
 }
 
-export async function clearMealPickSection(client, householdId, section) {
-  await run(client.from('meal_picks').delete().eq('household_id', householdId).eq('section', section))
+// Delete exactly the picks the user saw in a section. Matching on the stored
+// `section` text missed null and legacy-named picks that render there.
+export async function deleteMealPicks(client, householdId, ids) {
+  if (!ids?.length) return
+  await run(client.from('meal_picks').delete().eq('household_id', householdId).in('id', ids))
 }

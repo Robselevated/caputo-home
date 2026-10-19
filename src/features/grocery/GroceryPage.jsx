@@ -183,7 +183,7 @@ export default function GroceryPage() {
       {results && (
         <ReceiptReview
           items={results.items}
-          onConfirm={(confirmed, loc) => confirmItems(confirmed, loc, userId)}
+          onConfirm={(confirmed, loc, opts) => confirmItems(confirmed, loc, userId, opts)}
           onCancel={cancelScan}
           householdId={householdId}
         />

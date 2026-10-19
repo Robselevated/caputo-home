@@ -6,7 +6,7 @@ import { vi } from 'vitest'
 // - rpc(name) resolves to the result configured for `rpc.${name}`.
 // - channel() records handlers so tests can emit() realtime payloads.
 const VERBS = ['select', 'insert', 'update', 'upsert', 'delete']
-const CHAIN = [...VERBS, 'eq', 'neq', 'in', 'ilike', 'order', 'limit', 'single', 'maybeSingle', 'gte', 'lte', 'gt', 'lt', 'is', 'not']
+const CHAIN = [...VERBS, 'eq', 'neq', 'in', 'ilike', 'order', 'limit', 'range', 'single', 'maybeSingle', 'gte', 'lte', 'gt', 'lt', 'is', 'not']
 
 export function createFakeSupabase() {
   const results = new Map()

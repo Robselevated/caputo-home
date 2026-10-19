@@ -81,6 +81,19 @@ describe('PlanningPage', () => {
     expect(sent).toMatchObject({ recipe_id: null, name: 'Taco Tuesday', notes: 'use leftover chicken', section: "Rob's Picks" })
   })
 
+  it('a quick idea that fails to save keeps the sheet open with the typed text', async () => {
+    supabase.setResult('meal_picks', 'insert', { data: null, error: { message: 'offline' } })
+    renderPage()
+    await screen.findByText('Chili')
+    fireEvent.click(screen.getByRole('button', { name: 'Add a pick' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Add a pick' })
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Quick idea' }))
+    fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Taco Tuesday' } })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: "Add to Rob's Picks" })) })
+    const still = screen.getByRole('dialog', { name: 'Add a pick' })
+    expect(within(still).getByLabelText('Name')).toHaveValue('Taco Tuesday')
+  })
+
   it('removing a pick hides it behind an undo toast without deleting yet', async () => {
     renderPage()
     await screen.findByText('Soup')

@@ -8,7 +8,7 @@ vi.mock('../lib/supabase', async () => {
 const dbState = { writes: [], listeners: [] }
 vi.mock('../lib/db', () => ({
   onQueueChange: vi.fn((listener) => { dbState.listeners.push(listener); return () => { dbState.listeners = dbState.listeners.filter(l => l !== listener) } }),
-  queueWrite: vi.fn(async () => {}),
+  queueWrite: vi.fn(async () => true),
   cacheGroceryItems: vi.fn(async () => {}),
   getCachedGroceryItems: vi.fn(async () => []),
   getPendingWrites: vi.fn(async () => dbState.writes),
@@ -22,7 +22,10 @@ vi.mock('../lib/db', () => ({
   }),
 }))
 
+vi.mock('../lib/offlineToasts', () => ({ toastNotQueued: vi.fn(), toastWriteDropped: vi.fn() }))
+
 import { supabase } from '../lib/supabase'
+import { toastWriteDropped } from '../lib/offlineToasts'
 import { chainHas } from '../test/fakeSupabase'
 import { clearWrite, incrementWriteAttempts } from '../lib/db'
 import { useOfflineSync } from './useOfflineSync'
@@ -130,5 +133,39 @@ describe('useOfflineSync vs reconnect refetch', () => {
     expect(order.slice(0, 3).sort()).toEqual(['cancel:grocery_items', 'cancel:inventory', 'cancel:recently_bought'])
     expect(order[3]).toBe('replay')
     cancelSpy.mockRestore()
+  })
+})
+
+describe('useOfflineSync retry and drop', () => {
+  it('retries a failed pass on a backoff without waiting for another online event', async () => {
+    vi.useFakeTimers()
+    try {
+      dbState.writes = [{ id: 1, type: 'delete', itemId: 'g1' }]
+      let calls = 0
+      supabase.setResult('grocery_items', 'delete', () => {
+        calls += 1
+        return calls === 1 ? { data: null, error: { message: '503' } } : { data: null, error: null }
+      })
+      // Mount auto-syncs because a write is pending; that pass fails.
+      renderHook(() => useOfflineSync('hh'))
+      await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+      expect(calls).toBe(1)
+      expect(dbState.writes).toHaveLength(1)
+      await act(async () => { await vi.advanceTimersByTimeAsync(2500) })
+      expect(calls).toBeGreaterThanOrEqual(2)
+      expect(dbState.writes).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('tells the user when a write is dropped after the last attempt', async () => {
+    const write = { id: 1, type: 'insert', data: { id: 'g9', name: 'Eggs' }, attempts: 4 }
+    dbState.writes = [write]
+    supabase.setResult('grocery_items', 'insert', { data: null, error: { message: '500' } })
+    const hook = await sync()
+    expect(clearWrite).toHaveBeenCalledWith(1)
+    expect(toastWriteDropped).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }))
+    hook.unmount()
   })
 })

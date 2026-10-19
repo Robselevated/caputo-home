@@ -6,13 +6,16 @@ vi.mock('../lib/supabase', async () => {
   return { supabase: createFakeSupabase() }
 })
 vi.mock('../lib/db', () => ({
-  queueWrite: vi.fn(async () => {}),
+  queueWrite: vi.fn(async () => true),
   cacheGroceryItems: vi.fn(async () => {}),
   getCachedGroceryItems: vi.fn(async () => []),
 }))
 
+vi.mock('../lib/offlineToasts', () => ({ toastNotQueued: vi.fn(), toastWriteDropped: vi.fn() }))
+
 import { supabase } from '../lib/supabase'
 import { queueWrite } from '../lib/db'
+import { toastNotQueued } from '../lib/offlineToasts'
 import { useGroceryList } from './useGroceryList'
 import { createWrapper } from '../test/queryWrapper'
 
@@ -152,5 +155,26 @@ describe('useGroceryList rollback is row-level (never a stale snapshot)', () => 
     expect(result.current.items.map(i => i.id)).toEqual(['g1'])
     await act(async () => { resolveDelete({ data: [{ id: 'g2' }], error: null }); await del })
     expect(result.current.items.map(i => i.id)).toEqual(['g1'])
+  })
+})
+
+describe('useGroceryList offline without IndexedDB', () => {
+  it('reports queued:false and warns when the write could not be queued', async () => {
+    const { result } = await renderLoaded()
+    setOnline(false)
+    queueWrite.mockResolvedValueOnce(false)
+    let res
+    await act(async () => { res = await result.current.deleteItem('g1') })
+    expect(res).toEqual({ error: null, queued: false })
+    expect(toastNotQueued).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports queued:true without a warning when the write was queued', async () => {
+    const { result } = await renderLoaded()
+    setOnline(false)
+    let res
+    await act(async () => { res = await result.current.deleteItem('g1') })
+    expect(res).toEqual({ error: null, queued: true })
+    expect(toastNotQueued).not.toHaveBeenCalled()
   })
 })

@@ -109,10 +109,12 @@ export function useRecipeMatch(householdId) {
   // row's unit is skipped and says why; everything else subtracts the amount
   // converted into the row's unit.
   const useRecipe = async (matchResult, recipeName, userId) => {
-    const decremented = []
-    const nowOut = []
+    const lines = []
     const skipped = []
-    const updates = []
+    // Running quantity per inventory row: two recipe lines that match the same
+    // pantry row ("1 cup flour" + "2 tbsp flour") both subtract, and the row
+    // is written once with the total instead of last-write-wins.
+    const rows = new Map() // inv.id -> { inv, startQty, qty }
 
     for (const item of matchResult.inInventory) {
       const inv = item.inventoryItem
@@ -129,33 +131,49 @@ export function useRecipeMatch(householdId) {
         continue
       }
 
-      const oldQty = Number(inv.qty) || 0
+      if (!rows.has(inv.id)) {
+        const startQty = Number(inv.qty) || 0
+        rows.set(inv.id, { inv, startQty, qty: startQty })
+      }
+      const row = rows.get(inv.id)
+      const oldQty = row.qty
       const newQty = Math.max(0, round3(oldQty - used))
-      updates.push(
-        supabase.from('inventory_items').update({
-          qty: newQty,
-          updated_by: userId,
-          updated_at: new Date().toISOString(),
-        }).eq('id', inv.id)
-      )
-      decremented.push({ ...item, oldQty, newQty, used })
-      if (newQty === 0) nowOut.push(item)
+      row.qty = newQty
+      lines.push({ ...item, oldQty, newQty, used })
     }
 
+    const ids = [...rows.keys()]
     // Supabase query builders resolve to { error } instead of rejecting, so a
     // plain Promise.all "success" can still hide failed updates. Inspect each
-    // result and report how many didn't persist.
-    const results = await Promise.all(updates)
-    const failed = results.filter((r) => r?.error)
-    if (failed.length > 0) {
+    // result and report which rows didn't persist.
+    const results = await Promise.all(ids.map((id) => supabase.from('inventory_items').update({
+      qty: rows.get(id).qty,
+      updated_by: userId,
+      updated_at: new Date().toISOString(),
+    }).eq('id', id)))
+    const failedIds = new Set(ids.filter((id, i) => results[i]?.error))
+    if (failedIds.size > 0) {
       console.error(
-        `useRecipe: ${failed.length} inventory update(s) failed`,
-        failed.map((f) => f.error?.message)
+        `useRecipe: ${failedIds.size} inventory update(s) failed`,
+        results.filter((r) => r?.error).map((r) => r.error?.message)
       )
     }
-    if (updates.length > 0) queryClient.invalidateQueries({ queryKey: keys.inventory(householdId) })
+    if (ids.length > 0) queryClient.invalidateQueries({ queryKey: keys.inventory(householdId) })
 
-    return { decremented, nowOut, skipped, failedCount: failed.length }
+    const decremented = lines.filter((l) => !failedIds.has(l.inventoryItem.id))
+    const failed = lines.filter((l) => failedIds.has(l.inventoryItem.id))
+    // One "now out" entry per row that actually reached zero and saved.
+    const nowOut = []
+    const outSeen = new Set()
+    for (const l of decremented) {
+      const id = l.inventoryItem.id
+      if (rows.get(id).qty === 0 && !outSeen.has(id)) {
+        outSeen.add(id)
+        nowOut.push(l)
+      }
+    }
+
+    return { decremented, nowOut, skipped, failed, failedCount: failedIds.size }
   }
 
   const addDepletedToGroceryList = async (depletedItems, recipeName, userId) => {
