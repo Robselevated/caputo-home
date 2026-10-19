@@ -55,15 +55,19 @@ function AddPickForm({ initialSection, sections, recipes, onAdd, onClose }) {
     return q ? recipes.filter(r => r.name.toLowerCase().includes(q)) : recipes
   }, [recipes, search])
 
-  // The hook toasts on failure, so the sheet closes either way.
+  // The hook toasts on failure; the sheet stays open so a typed idea survives
+  // and Add can be tapped again.
   const submit = async (values) => {
     setAdding(true)
+    let res
     try {
-      await onAdd({ ...values, section })
+      res = await onAdd({ ...values, section })
+    } catch (error) {
+      res = { error }
     } finally {
       setAdding(false)
     }
-    onClose()
+    if (!res?.error) onClose()
   }
 
   const submitQuick = (e) => {

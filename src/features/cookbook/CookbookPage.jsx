@@ -89,12 +89,29 @@ export default function CookbookPage() {
   const runBulk = async () => {
     setConfirmBulk(false)
     const list = linked
+    const failed = []
     for (let i = 0; i < list.length; i++) {
       setBulk({ current: i + 1, total: list.length })
-      await reimportRecipe(list[i].id, list[i].source_url)
+      let res
+      try {
+        res = await reimportRecipe(list[i].id, list[i].source_url)
+      } catch (error) {
+        res = { error }
+      }
+      if (res?.error) failed.push(list[i].name)
     }
     setBulk(null)
-    toast({ message: `Refreshed ${plural(list.length, 'recipe')} from their links` })
+    const done = list.length - failed.length
+    if (failed.length === 0) {
+      toast({ message: `Refreshed ${plural(list.length, 'recipe')} from their links` })
+    } else {
+      const names = failed.length <= 3 ? `: ${failed.join(', ')}` : ''
+      toast({
+        message: `Refreshed ${plural(done, 'recipe')}. ${plural(failed.length, 'recipe')} could not be refreshed${names}`,
+        tone: 'error',
+        durationMs: 8000,
+      })
+    }
   }
 
   return (
