@@ -8,7 +8,8 @@ export const CHECK_OFF_DELAY_MS = 3000
 // offers Undo, and the real check-off (the RPC that moves the item to the
 // kitchen) runs when the window closes or the page is left. Tapping the
 // checked row again also undoes. Rows that were already checked on the server
-// (legacy data) are unchecked for real instead.
+// (legacy data) are unchecked for real instead. `onCheck` (the "checked off"
+// push) runs only after the real check-off succeeds, never for an undone tap.
 export function usePendingCheckOff({ checkItem, uncheckItem, markChecked, markUnchecked, userId, onCheck, delayMs = CHECK_OFF_DELAY_MS }) {
   const fns = useRef({})
   fns.current = { checkItem, uncheckItem, markChecked, markUnchecked, userId, onCheck }
@@ -24,7 +25,10 @@ export function usePendingCheckOff({ checkItem, uncheckItem, markChecked, markUn
 
   const pending = usePendingAction((entry) => {
     dismissToast(entry.item.id)
-    fns.current.checkItem(entry.item, entry.userId)
+    const { checkItem: commit, onCheck: after } = fns.current
+    Promise.resolve(commit(entry.item, entry.userId))
+      .then((res) => { if (!res?.error) after?.(entry.item) })
+      .catch(() => {})
   }, { delayMs })
 
   const undo = useCallback((item) => {
@@ -34,7 +38,7 @@ export function usePendingCheckOff({ checkItem, uncheckItem, markChecked, markUn
   }, [pending])
 
   const check = useCallback((item) => {
-    const { markChecked: mark, uncheckItem: uncheck, userId: uid, onCheck: after } = fns.current
+    const { markChecked: mark, uncheckItem: uncheck, userId: uid } = fns.current
     if (item.checked) {
       if (pending.isPending(item.id)) undo(item)
       else uncheck(item, uid)
@@ -48,7 +52,6 @@ export function usePendingCheckOff({ checkItem, uncheckItem, markChecked, markUn
       action: { label: 'Undo', onClick: () => undo(item) },
     })
     toastIds.current.set(item.id, tid)
-    after?.(item)
   }, [pending, undo, delayMs])
 
   return { check, undo, isPending: pending.isPending }
