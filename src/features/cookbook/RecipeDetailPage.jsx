@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router'
 import { BookOpen, CalendarPlus, CookingPot, Ellipsis, ExternalLink } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useRecipes, useRecipe } from '../../hooks/useRecipes'

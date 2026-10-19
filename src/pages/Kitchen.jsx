@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router'
 import KitchenPage from '../features/kitchen/KitchenPage'
 import { isLocation, writeLastLocation } from '../features/kitchen/locationTheme'
 

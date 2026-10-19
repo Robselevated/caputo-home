@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router'
 import { ShoppingCart, Refrigerator, CalendarDays, BookOpen } from 'lucide-react'
 import { locationFromPath, locationTheme } from '../features/kitchen/locationTheme'
 

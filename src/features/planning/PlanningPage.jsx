@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { Plus } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useMealPicks } from '../../hooks/useMealPicks'

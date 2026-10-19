@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { BookOpen, Plus, RefreshCw, Search } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useRecipes } from '../../hooks/useRecipes'

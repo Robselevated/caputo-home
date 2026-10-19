@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router'
 import { BookOpen } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useRecipes, useRecipe } from '../../hooks/useRecipes'
