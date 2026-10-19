@@ -1,5 +1,9 @@
-// One time budget per request. Netlify gives a synchronous function 60s; we
-// plan for 50 and hand each stage whatever is left.
+// One time budget per request. Netlify's docs say 60s for a synchronous
+// function, but this site's edge cuts the connection at 30s with a bare HTML
+// 504 (measured 2026-10-19: a 28s sleep returned, a 40s sleep did not). Plan
+// for 26 so our own friendly timeout always answers first.
+export const BUDGET_MS = 26000
+
 export class TimeoutError extends Error {
   constructor(label = 'operation') {
     super(`${label} timed out`)
@@ -8,7 +12,7 @@ export class TimeoutError extends Error {
   }
 }
 
-export function createDeadline(totalMs = 50000, now = Date.now) {
+export function createDeadline(totalMs = BUDGET_MS, now = Date.now) {
   const start = now()
   const remaining = () => Math.max(0, totalMs - (now() - start))
   return {

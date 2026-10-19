@@ -11,7 +11,7 @@ export async function handler(event) {
   if (!process.env.CLAUDE_API_KEY) {
     return json(500, { error: 'Server configuration error', details: 'CLAUDE_API_KEY env var is not set in Netlify' })
   }
-  const deadline = createDeadline(50000)
+  const deadline = createDeadline()
 
   const user = await verifyAuth(event)
   if (!user) return json(401, { error: 'Unauthorized' })

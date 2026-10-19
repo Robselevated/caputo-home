@@ -133,4 +133,11 @@ describe('scanPhotos', () => {
     authFetch.mockResolvedValue(badResponse(422, { error: 'We could not read a recipe in those photos.' }))
     await expect(scanPhotos([file('a.png')], { prepare: simplePrepare })).rejects.toThrow('We could not read a recipe in those photos.')
   })
+
+  it('reads a bare gateway 504 as too slow, but keeps our own 504 message', async () => {
+    authFetch.mockResolvedValue(badResponse(504))
+    await expect(scanPhotos([file('a.png')], { prepare: simplePrepare })).rejects.toThrow('Reading those photos took too long. Try again, or send fewer at once.')
+    authFetch.mockResolvedValue(badResponse(504, { error: 'Reading those photos took too long. Try again with fewer at once.' }))
+    await expect(scanPhotos([file('a.png')], { prepare: simplePrepare })).rejects.toThrow('Reading those photos took too long. Try again with fewer at once.')
+  })
 })

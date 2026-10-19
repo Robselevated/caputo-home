@@ -6,9 +6,9 @@ import { plural } from './recipeFormat'
 
 const canPreview = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'
 
-// Rough wall time for one scan: a few seconds of model time plus a couple
-// per photo for resizing, upload and reading.
-const estimateSeconds = (count) => 4 + 2 * count
+// Rough wall time for one scan, measured against the live model: about 8s
+// for one screenshot, 12s for three, plus upload and a cold start.
+const estimateSeconds = (count) => 6 + 3 * count
 
 function skippedMessage(skipped) {
   const reasons = [...new Set(skipped.map(s => s.reason))]
@@ -22,6 +22,7 @@ function skippedMessage(skipped) {
 export function ScanRecipeForm({ scan, onParsed, hint }) {
   const [files, setFiles] = useState([])
   const [scanning, setScanning] = useState(false)
+  const [stage, setStage] = useState(null)
   const inputRef = useRef(null)
   const controllerRef = useRef(null)
 
@@ -40,7 +41,7 @@ export function ScanRecipeForm({ scan, onParsed, hint }) {
     controllerRef.current = controller
     setScanning(true)
     try {
-      const result = await scan(files, { signal: controller.signal })
+      const result = await scan(files, { signal: controller.signal, onProgress: (p) => setStage(p?.stage || null) })
       if (result.skipped?.length) toast({ message: skippedMessage(result.skipped), tone: 'error', durationMs: 7000 })
       setFiles([])
       onParsed(result)
@@ -49,6 +50,7 @@ export function ScanRecipeForm({ scan, onParsed, hint }) {
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null
       setScanning(false)
+      setStage(null)
     }
   }
 
@@ -59,7 +61,9 @@ export function ScanRecipeForm({ scan, onParsed, hint }) {
     setScanning(false)
   }
 
-  const statusLine = `Reading ${plural(files.length, 'photo')}, about ${estimateSeconds(files.length)} seconds`
+  const statusLine = stage === 'preparing'
+    ? `Getting ${plural(files.length, 'photo')} ready`
+    : `Reading ${plural(files.length, 'photo')}, about ${estimateSeconds(files.length)} seconds`
 
   return (
     <div className="flex flex-col gap-3">

@@ -31,7 +31,7 @@ describe('ScanRecipeForm', () => {
     const [sent, opts] = scan.mock.calls[0]
     expect(sent).toHaveLength(3)
     expect(opts.signal).toBeInstanceOf(AbortSignal)
-    expect(screen.getByRole('status')).toHaveTextContent('Reading 3 photos, about 10 seconds')
+    expect(screen.getByRole('status')).toHaveTextContent('Reading 3 photos, about 15 seconds')
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
 
     const result = { parsed: { name: 'Soup', ingredients: [] }, skipped: [], tileCount: 3 }

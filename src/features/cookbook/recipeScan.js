@@ -13,6 +13,7 @@ const HARD_TILE_BYTES = 2 * MAX_TILE_BYTES
 
 export const UNSUPPORTED_FORMAT = 'That photo format is not supported. Take a screenshot of it instead.'
 export const TOO_BIG = 'Those photos are too big. Try fewer at once.'
+export const TOO_SLOW = 'Reading those photos took too long. Try again, or send fewer at once.'
 export const OVER_TILE_LIMIT = `over the ${MAX_TILES}-photo limit`
 export const OVER_SIZE_LIMIT = 'over the size limit for one scan'
 
@@ -181,7 +182,10 @@ export async function scanPhotos(files, { signal, onProgress, prepare = prepareI
   if (!response.ok) {
     if (response.status === 413) throw new Error(TOO_BIG)
     const errBody = await response.json().catch(() => ({}))
-    throw new Error(errBody.error || `Could not read those photos (HTTP ${response.status}).`)
+    if (errBody.error) throw new Error(errBody.error)
+    // A gateway timeout comes back as an HTML page with no message of ours.
+    if (response.status === 502 || response.status === 504) throw new Error(TOO_SLOW)
+    throw new Error(`Could not read those photos (HTTP ${response.status}).`)
   }
   const parsed = await response.json()
   return { parsed, skipped, tileCount: tiles.length }
