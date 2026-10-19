@@ -67,3 +67,9 @@ export function createIdbStorage({ dbName = DEFAULT_DB, open } = {}) {
 export function createQueryPersister({ storage = createIdbStorage(), throttleTime = 1000, key = PERSIST_KEY } = {}) {
   return createAsyncStoragePersister({ storage, key, throttleTime })
 }
+
+// Sign-out: drop the persisted snapshot so the previous account's lists are
+// not left on disk for a week (or painted for the next account).
+export async function clearPersistedQueryCache({ storage = createIdbStorage(), key = PERSIST_KEY } = {}) {
+  await storage.removeItem(key)
+}

@@ -27,7 +27,13 @@ vi.mock('../lib/supabase', async () => {
   }
 })
 
+vi.mock('../lib/db', () => ({ clearAllWrites: vi.fn(async () => {}) }))
+vi.mock('../lib/persister', async (orig) => ({ ...(await orig()), clearPersistedQueryCache: vi.fn(async () => {}) }))
+
 import { supabase } from '../lib/supabase'
+import { clearAllWrites } from '../lib/db'
+import { clearPersistedQueryCache } from '../lib/persister'
+import { queryClient } from '../lib/queryClient'
 import { AuthProvider, useAuth } from './useAuth'
 import { onRevalidate } from '../lib/sessionManager'
 
@@ -105,5 +111,24 @@ describe('AuthProvider SIGNED_IN re-emits', () => {
       off()
       nowSpy.mockRestore()
     }
+  })
+})
+
+describe('AuthProvider signOut', () => {
+  it('clears the query cache, the persisted snapshot and the offline write queue', async () => {
+    authState.persistedUser = user
+    authState.persistedProfile = { id: 'u1', household_id: 'hh', name: 'Rob', email: 'r@x' }
+    authState.session = { user }
+    queryClient.setQueryData(['grocery_items', 'hh'], [{ id: 'g1' }])
+    let api
+    function Grab() { api = useAuth(); return null }
+    render(<AuthProvider><Grab /></AuthProvider>)
+    await act(async () => {})
+    await act(async () => { await api.signOut() })
+    expect(supabase.auth.signOut).toHaveBeenCalled()
+    expect(queryClient.getQueryData(['grocery_items', 'hh'])).toBeUndefined()
+    expect(clearPersistedQueryCache).toHaveBeenCalledTimes(1)
+    expect(clearAllWrites).toHaveBeenCalledTimes(1)
+    expect(api.user).toBeNull()
   })
 })

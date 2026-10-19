@@ -7,6 +7,9 @@ import {
   clearPersistedProfile,
 } from '../lib/supabase'
 import { raceTimeout, resolveInitialSession, emitRevalidate } from '../lib/sessionManager'
+import { queryClient } from '../lib/queryClient'
+import { clearPersistedQueryCache } from '../lib/persister'
+import { clearAllWrites } from '../lib/db'
 
 const AuthContext = createContext(null)
 
@@ -179,6 +182,11 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
+    // Nothing of this account may outlive the session: not the in-memory
+    // cache, not the persisted snapshot, and not queued offline writes, which
+    // would otherwise replay under whoever signs in next.
+    queryClient.clear()
+    await Promise.all([clearPersistedQueryCache(), clearAllWrites()]).catch(() => {})
     setUser(null)
     setProfile(null)
     clearPersistedProfile()

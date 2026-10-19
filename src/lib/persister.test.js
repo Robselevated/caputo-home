@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createIdbStorage, createQueryPersister } from './persister'
 
 describe('createIdbStorage', () => {
@@ -38,5 +38,14 @@ describe('createQueryPersister', () => {
     expect(await storage.getItem('caputo-rq-v1')).toContain('"queryHash"')
     await persister.removeClient()
     expect(await persister.restoreClient()).toBeUndefined()
+  })
+})
+
+describe('clearPersistedQueryCache', () => {
+  it('removes the persisted snapshot key', async () => {
+    const { clearPersistedQueryCache, PERSIST_KEY } = await import('./persister')
+    const storage = { removeItem: vi.fn(async () => {}) }
+    await clearPersistedQueryCache({ storage })
+    expect(storage.removeItem).toHaveBeenCalledWith(PERSIST_KEY)
   })
 })
