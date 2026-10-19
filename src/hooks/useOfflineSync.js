@@ -4,8 +4,14 @@ import { getPendingWrites, clearWrite, getPendingCount, incrementWriteAttempts, 
 import { checkOffGroceryItem } from '../lib/checkOff'
 import { queryClient } from '../lib/queryClient'
 import { keys } from '../queries/keys'
+import { toastWriteDropped } from '../lib/offlineToasts'
 
 const MAX_SYNC_ATTEMPTS = 5
+// After a pass leaves writes behind (a transient 5xx, a cold radio), try again
+// on a backoff instead of waiting for the next online event or queue change,
+// which may never come while the phone stays connected.
+const RETRY_BASE_MS = 2000
+const RETRY_MAX_MS = 60000
 
 // supabase-js resolves with { error } instead of throwing. Turn that into a
 // throw so a failed replay is retried (and eventually dropped) instead of being
@@ -76,6 +82,12 @@ export function useOfflineSync(householdId) {
   const [pendingCount, setPendingCount] = useState(0)
   const [syncing, setSyncing] = useState(false)
   const syncingRef = useRef(false)
+  const retryRef = useRef({ timer: null, backoff: 0 })
+  const syncNowRef = useRef(null)
+
+  useEffect(() => () => {
+    if (retryRef.current.timer) clearTimeout(retryRef.current.timer)
+  }, [])
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
@@ -124,10 +136,25 @@ export function useOfflineSync(householdId) {
           if (attempts >= MAX_SYNC_ATTEMPTS) {
             console.error(`Dropping write after ${MAX_SYNC_ATTEMPTS} failed attempts:`, write)
             await clearWrite(write.id)
+            toastWriteDropped(write)
           }
         }
       }
-      setPendingCount(await getPendingCount())
+      const remaining = await getPendingCount()
+      setPendingCount(remaining)
+      const retry = retryRef.current
+      if (retry.timer) clearTimeout(retry.timer)
+      retry.timer = null
+      if (remaining > 0) {
+        const delay = Math.min(RETRY_BASE_MS * 2 ** retry.backoff, RETRY_MAX_MS)
+        retry.backoff += 1
+        retry.timer = setTimeout(() => {
+          retry.timer = null
+          syncNowRef.current?.()
+        }, delay)
+      } else {
+        retry.backoff = 0
+      }
       if (householdId) {
         queryClient.invalidateQueries({ queryKey: keys.grocery(householdId) })
         queryClient.invalidateQueries({ queryKey: keys.inventory(householdId) })
@@ -138,6 +165,7 @@ export function useOfflineSync(householdId) {
       setSyncing(false)
     }
   }, [householdId])
+  syncNowRef.current = syncNow
 
   // Auto-sync when back online with work queued.
   useEffect(() => {

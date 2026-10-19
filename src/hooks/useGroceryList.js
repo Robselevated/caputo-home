@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { queueWrite } from '../lib/db'
+import { toastNotQueued } from '../lib/offlineToasts'
 import { toast } from '../components/ui/Toast'
 import { checkOffGroceryItem, checkOffParams } from '../lib/checkOff'
 import { upsertById, removeById } from '../lib/realtimeCache'
@@ -63,8 +64,9 @@ export function useGroceryList(householdId) {
     setAll(prev => byOrder([...prev, { ...row, created_at: new Date().toISOString() }]))
 
     if (isOffline()) {
-      await queueWrite({ type: 'insert', data: row })
-      return { error: null, queued: true }
+      const queued = await queueWrite({ type: 'insert', data: row })
+      if (!queued) toastNotQueued()
+      return { error: null, queued }
     }
 
     try {
@@ -91,8 +93,9 @@ export function useGroceryList(householdId) {
 
     if (isOffline()) {
       const { location, category, unit } = checkOffParams(item)
-      await queueWrite({ type: 'check', item: { ...item }, householdId, userId, location, category, unit })
-      return { error: null, queued: true }
+      const queued = await queueWrite({ type: 'check', item: { ...item }, householdId, userId, location, category, unit })
+      if (!queued) toastNotQueued()
+      return { error: null, queued }
     }
 
     const { error } = await checkOffGroceryItem(supabase, { item, householdId, userId })
@@ -117,8 +120,9 @@ export function useGroceryList(householdId) {
     setAll(prev => byOrder(prev.map(i => (i.id === id ? { ...i, ...fullChanges } : i))))
 
     if (isOffline()) {
-      await queueWrite({ type: 'update', itemId: id, changes: fullChanges })
-      return { error: null, queued: true }
+      const queued = await queueWrite({ type: 'update', itemId: id, changes: fullChanges })
+      if (!queued) toastNotQueued()
+      return { error: null, queued }
     }
 
     try {
@@ -147,8 +151,9 @@ export function useGroceryList(householdId) {
     takeOut(id)
 
     if (isOffline()) {
-      await queueWrite({ type: 'delete', itemId: id })
-      return { error: null, queued: true }
+      const queued = await queueWrite({ type: 'delete', itemId: id })
+      if (!queued) toastNotQueued()
+      return { error: null, queued }
     }
 
     try {
@@ -182,8 +187,9 @@ export function useGroceryList(householdId) {
     setAll(prev => byOrder(prev.map(i => (positions.has(i.id) ? { ...i, sort_order: positions.get(i.id) } : i))))
 
     if (isOffline()) {
-      await queueWrite({ type: 'reorder', orderedIds, userId })
-      return { error: null, queued: true }
+      const queued = await queueWrite({ type: 'reorder', orderedIds, userId })
+      if (!queued) toastNotQueued()
+      return { error: null, queued }
     }
 
     try {

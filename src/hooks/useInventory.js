@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { queueWrite } from '../lib/db'
+import { toastNotQueued } from '../lib/offlineToasts'
 import { toast } from '../components/ui/Toast'
 import { DEFAULT_UNITS } from '../lib/constants'
 import { normalizeName } from '../lib/normalizeName'
@@ -61,8 +62,9 @@ export function useInventory(householdId, location) {
       : sortInventory([...prev, { ...row, id: tempId, created_at: new Date().toISOString() }]))
 
     if (isOffline()) {
-      await queueWrite({ type: 'inventory_merge', data: row })
-      return { error: null, queued: true, merged: !!existing }
+      const queued = await queueWrite({ type: 'inventory_merge', data: row })
+      if (!queued) toastNotQueued()
+      return { error: null, queued, merged: !!existing }
     }
 
     try {
@@ -88,8 +90,9 @@ export function useInventory(householdId, location) {
     setAll(prev => prev.map(i => (i.id === id ? { ...i, ...fullChanges } : i)))
 
     if (isOffline()) {
-      await queueWrite({ type: 'inventory_update', itemId: id, changes: fullChanges })
-      return { error: null, queued: true }
+      const queued = await queueWrite({ type: 'inventory_update', itemId: id, changes: fullChanges })
+      if (!queued) toastNotQueued()
+      return { error: null, queued }
     }
 
     try {
@@ -119,8 +122,9 @@ export function useInventory(householdId, location) {
     setAll(prev => removeById(prev, id))
 
     if (isOffline()) {
-      await queueWrite({ type: 'inventory_delete', itemId: id })
-      return { error: null, queued: true }
+      const queued = await queueWrite({ type: 'inventory_delete', itemId: id })
+      if (!queued) toastNotQueued()
+      return { error: null, queued }
     }
 
     try {

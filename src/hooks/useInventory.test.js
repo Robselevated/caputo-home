@@ -5,7 +5,7 @@ vi.mock('../lib/supabase', async () => {
   const { createFakeSupabase } = await import('../test/fakeSupabase')
   return { supabase: createFakeSupabase() }
 })
-vi.mock('../lib/db', () => ({ queueWrite: vi.fn(async () => {}) }))
+vi.mock('../lib/db', () => ({ queueWrite: vi.fn(async () => true) }))
 vi.mock('../components/ui/Toast', () => {
   const toast = vi.fn(() => 1)
   toast.dismiss = vi.fn()
