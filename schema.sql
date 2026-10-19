@@ -350,7 +350,7 @@ alter publication supabase_realtime add table meal_picks;
 -- API USAGE (rate limiting for Netlify Functions)
 -- Tracks per-user API calls per action per hour
 -- ============================================================
-create table api_usage (
+create table if not exists api_usage (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references users(id) on delete cascade,
   action text not null,
