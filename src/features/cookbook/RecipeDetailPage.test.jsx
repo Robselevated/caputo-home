@@ -107,4 +107,22 @@ describe('RecipeDetailPage', () => {
     expect(confirmSpy).not.toHaveBeenCalled()
     confirmSpy.mockRestore()
   })
+
+  it('a recipe that could not load (offline, timeout) says so and offers a retry, not "deleted"', async () => {
+    supabase.setResult('recipes', 'select', { data: null, error: { message: 'Request timed out' } })
+    renderAt()
+    expect(await screen.findByText("Couldn't load this recipe")).toBeInTheDocument()
+    expect(screen.queryByText('Recipe not found')).not.toBeInTheDocument()
+    supabase.setResult('recipes', 'select', (record) => (
+      record.chain.some(([m]) => m === 'single') ? { data: detail, error: null } : { data: [grid], error: null }
+    ))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Try again' })) })
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tacos' })).toBeInTheDocument()
+  })
+
+  it('a recipe that really is gone (PGRST116) shows not found', async () => {
+    supabase.setResult('recipes', 'select', { data: null, error: { code: 'PGRST116', message: 'no rows' } })
+    renderAt()
+    expect(await screen.findByText('Recipe not found')).toBeInTheDocument()
+  })
 })

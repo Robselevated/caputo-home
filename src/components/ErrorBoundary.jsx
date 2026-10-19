@@ -27,8 +27,11 @@ export default class ErrorBoundary extends Component {
     if (this.autoRecoverTimer) clearTimeout(this.autoRecoverTimer)
   }
 
+  // A plain reload, always. recoverFromChunkError is capped (3 resets per
+  // window) and fires once per page, so routing the button through it left a
+  // button that did nothing once that budget was spent.
   handleReload = () => {
-    recoverFromChunkError()
+    window.location.reload()
   }
 
   render() {

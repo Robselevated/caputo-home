@@ -46,7 +46,7 @@ export default function RecipeDetailPage() {
   const { reimportRecipe, deleteRecipe } = useRecipes(householdId)
   // Paints at once from the cached grid row; ingredients and steps fill in
   // from the detail cache or one fetch.
-  const { recipe, loading, refetch } = useRecipe(id)
+  const { recipe, loading, error, refetch } = useRecipe(id)
   const match = useRecipeMatch(householdId)
   const { addPick } = useMealPicks(householdId)
 
@@ -92,6 +92,18 @@ export default function RecipeDetailPage() {
       <div className="flex flex-col gap-4 px-5 pt-1.5">
         <BackLink to="/cookbook" label="Cookbook" />
         <ListSkeleton />
+      </div>
+    )
+  }
+
+  // PGRST116 from .single() is a real "no such row"; anything else (offline,
+  // timeout) means we just couldn't load it, which is not the same as deleted.
+  if (!recipe && error && error.code !== 'PGRST116') {
+    return (
+      <div className="flex flex-col gap-4 px-5 pt-1.5">
+        <BackLink to="/cookbook" label="Cookbook" />
+        <EmptyState icon={BookOpen} title="Couldn't load this recipe" hint="Check your connection and try again" />
+        <Button variant="secondary" onClick={() => refetch()}>Try again</Button>
       </div>
     )
   }
