@@ -1,8 +1,13 @@
-import Anthropic from '@anthropic-ai/sdk'
 import { verifyAuth } from './lib/auth.js'
 import { checkRateLimit } from './lib/rate-limit.js'
+import { makeClient } from './lib/anthropicClient.js'
+import { createDeadline } from './lib/budget.js'
 
-const anthropic = new Anthropic({ apiKey: process.env.CLAUDE_API_KEY })
+const ALLOWED_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+
+// Only a request the API rejected for its shape is worth repeating without
+// the fast-mode params; a timeout or a bad photo would just fail twice.
+const isParamRejection = (err) => err?.status === 400 && /thinking|effort|output_config/i.test(err?.message || '')
 
 const SYSTEM_PROMPTS = {
   freezer: `You are analyzing a photo of items in a freezer. Identify every food item visible. Count the exact number of each item you can see.
@@ -112,6 +117,7 @@ export async function handler(event) {
     return { statusCode: 405, body: 'Method not allowed' }
   }
 
+  const deadline = createDeadline()
   const user = await verifyAuth(event)
   if (!user) return { statusCode: 401, body: JSON.stringify({ error: 'Unauthorized' }) }
 
@@ -119,10 +125,13 @@ export async function handler(event) {
   if (!allowed) return { statusCode: 429, body: JSON.stringify({ error: 'Rate limit exceeded. Try again later.' }) }
 
   try {
-    const { image_url, image_base64, media_type, scan_type } = JSON.parse(event.body)
+    const { image_base64, media_type = 'image/jpeg', scan_type } = JSON.parse(event.body || '{}')
 
-    if ((!image_url && !image_base64) || !scan_type) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing image (image_url or image_base64) or scan_type' }) }
+    if (!image_base64 || !scan_type) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Missing image or scan_type' }) }
+    }
+    if (!ALLOWED_MEDIA_TYPES.includes(media_type)) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'That photo format is not supported. Take a screenshot of it instead.' }) }
     }
 
     const systemPrompt = SYSTEM_PROMPTS[scan_type]
@@ -130,9 +139,7 @@ export async function handler(event) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Invalid scan_type' }) }
     }
 
-    const imageSource = image_base64
-      ? { type: 'base64', media_type: media_type || 'image/jpeg', data: image_base64 }
-      : { type: 'url', url: image_url }
+    const imageSource = { type: 'base64', media_type, data: image_base64 }
 
     // Vision extraction needs no deep reasoning — run it fast (thinking off + low
     // effort) so Sonnet 4.6's high-effort default doesn't slow the scan. effort/
@@ -150,15 +157,21 @@ export async function handler(event) {
         },
       ],
     }
+    // One client with no silent retries, bounded by the request budget. The
+    // old 9s timeout, retried by the SDK and then again on the stable path,
+    // could run past the 30s edge limit and come back as a bare 504.
+    const anthropic = makeClient()
+    const timeout = () => Math.max(deadline.remaining() - 1500, 1000)
     let response
     try {
       response = await anthropic.beta.messages.create(
         { ...scanParams, thinking: { type: 'disabled' }, output_config: { effort: 'low' } },
-        { timeout: 9000 }
+        { timeout: timeout() }
       )
     } catch (modelErr) {
-      console.warn('claude-scan: beta call failed, falling back to stable:', modelErr?.message)
-      response = await anthropic.messages.create(scanParams, { timeout: 9000 })
+      if (!isParamRejection(modelErr)) throw modelErr
+      console.warn('claude-scan: fast params rejected, using the stable call:', modelErr?.message)
+      response = await anthropic.messages.create(scanParams, { timeout: timeout() })
     }
 
     const text = response.content[0].text
@@ -189,10 +202,11 @@ export async function handler(event) {
       body: JSON.stringify(items),
     }
   } catch (err) {
-    console.error('Scan error:', err)
+    console.error('Scan error:', String(err?.message || err).split('\n')[0])
+    const slow = err?.name === 'APIConnectionTimeoutError' || /timed out/i.test(err?.message || '')
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Scan processing failed' }),
+      statusCode: slow ? 504 : 500,
+      body: JSON.stringify({ error: slow ? 'That photo took too long to read. Try again.' : 'Scan processing failed' }),
     }
   }
 }

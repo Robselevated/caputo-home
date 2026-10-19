@@ -29,13 +29,24 @@ create table users (
 -- When someone signs up via magic link, auto-create a row in
 -- the users table and assign to the Caputo household.
 -- ============================================================
+-- Invite only: the email must be in allowed_signups (sql/2026-10-19-security.sql).
+create table if not exists allowed_signups (
+  email text primary key check (email = lower(email))
+);
+alter table allowed_signups enable row level security;
+
 create or replace function handle_new_user()
 returns trigger
 language plpgsql security definer
+set search_path = public
 as $$
 declare
   household uuid;
 begin
+  if not exists (select 1 from allowed_signups where email = lower(new.email)) then
+    raise exception 'Sign up is invite only';
+  end if;
+
   -- Get or create the Caputo household
   select id into household from households where name = 'Caputo Family' limit 1;
   if household is null then
@@ -227,11 +238,13 @@ alter table inventory_items enable row level security;
 alter table scan_sessions enable row level security;
 alter table recipes enable row level security;
 alter table recipe_ingredients enable row level security;
+alter table grocery_notifications enable row level security;  -- service role only, no policies
 
 -- Helper function: get household_id for current user
 create or replace function get_my_household_id()
 returns uuid
-language sql security definer
+language sql security definer stable
+set search_path = public
 as $$
   select household_id from users where id = auth.uid();
 $$;
@@ -245,7 +258,8 @@ create policy "users_select" on users
   for select using (household_id = get_my_household_id());
 
 create policy "users_update_own" on users
-  for update using (id = auth.uid());
+  for update using (id = auth.uid())
+  with check (id = auth.uid() and household_id is not distinct from get_my_household_id());
 
 -- Generic household-scoped policy helper for all other tables
 -- (applied individually below)

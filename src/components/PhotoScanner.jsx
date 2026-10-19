@@ -2,9 +2,10 @@ import { useRef } from 'react'
 import { Camera } from 'lucide-react'
 import { IconButton } from './ui/IconButton'
 import { toast } from './ui/Toast'
-import { validateImageFile } from '../lib/uploadValidation'
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+// The photo is shrunk to a small JPEG before it is sent (useScanSession), so
+// a full-size phone photo is fine here; this only stops something absurd.
+const MAX_FILE_SIZE = 25 * 1024 * 1024
 
 // Round camera button backed by a hidden file input (rear camera on phones).
 export default function PhotoScanner({ onCapture, scanning, label = 'Scan a photo', icon: Icon = Camera, variant = 'outline', size = 44, className = '' }) {
@@ -13,11 +14,10 @@ export default function PhotoScanner({ onCapture, scanning, label = 'Scan a phot
   const handleFileChange = (e) => {
     const file = e.target.files?.[0]
     if (file) {
-      const validationError = validateImageFile(file)
-      if (validationError) {
-        toast({ message: validationError, tone: 'error' })
+      if (file.type && !file.type.startsWith('image/')) {
+        toast({ message: 'Pick a photo to scan.', tone: 'error' })
       } else if (file.size > MAX_FILE_SIZE) {
-        toast({ message: 'That photo is over 10MB. Try a smaller one.', tone: 'error' })
+        toast({ message: 'That photo is too large. Try a smaller one.', tone: 'error' })
       } else {
         onCapture(file)
       }

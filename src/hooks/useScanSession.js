@@ -4,6 +4,7 @@ import { authFetch } from '../lib/authFetch'
 import { TAXONOMY } from '../lib/constants'
 import { queryClient } from '../lib/queryClient'
 import { keys } from '../queries/keys'
+import { prepareImage } from '../features/cookbook/recipeScan'
 
 // Keywords to catch items Claude miscategorizes as "Other"
 const CATEGORY_KEYWORDS = {
@@ -63,21 +64,13 @@ function fixCategory(item, location) {
   return item
 }
 
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      // result is "data:<media_type>;base64,<data>" — split off the prefix
-      const dataUrl = reader.result
-      const commaIndex = dataUrl.indexOf(',')
-      resolve({
-        base64: dataUrl.slice(commaIndex + 1),
-        media_type: file.type || 'image/jpeg',
-      })
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
+// Shrink the photo to a JPEG the model reads at full detail anyway (long
+// edge about 1568). A raw phone photo sent as base64 could pass Netlify's 6MB
+// request limit and fail with a bare "Scan failed". Never tiled: a pantry
+// shelf or a receipt is one picture.
+async function photoForScan(file) {
+  const { tiles } = await prepareImage(file, { maxRatio: Infinity })
+  return { base64: tiles[0].base64, media_type: tiles[0].media_type }
 }
 
 export function useScanSession(householdId) {
@@ -91,8 +84,7 @@ export function useScanSession(householdId) {
     setResults(null)
 
     try {
-      // Convert file to base64 (bypasses Supabase Storage entirely)
-      const { base64, media_type } = await fileToBase64(file)
+      const { base64, media_type } = await photoForScan(file)
 
       // Call Netlify function with base64 image
       const response = await authFetch('/.netlify/functions/claude-scan', {
