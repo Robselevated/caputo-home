@@ -113,6 +113,34 @@ describe('useRecipe consumes with unit awareness', () => {
     expect(r.decremented[0]).toMatchObject({ oldQty: 1, newQty: 0 })
     expect(r.nowOut).toHaveLength(1)
   })
+
+  it('two lines matching one pantry row subtract cumulatively and write the row once', async () => {
+    const flour = { id: 'a', qty: 5, unit: 'cups' }
+    const r = await consume([
+      { id: 'i1', name: 'flour', qty: 2, qty_text: '2', unit: 'cups', inventoryItem: flour },
+      { id: 'i2', name: 'flour', qty: 1, qty_text: '1', unit: 'cups', inventoryItem: flour },
+    ])
+    expect(r.decremented[0]).toMatchObject({ oldQty: 5, newQty: 3 })
+    expect(r.decremented[1]).toMatchObject({ oldQty: 3, newQty: 2 })
+    expect(updatePayloads().map(p => p.qty)).toEqual([2])
+  })
+
+  it('reports lines whose row failed to save instead of listing them as updated', async () => {
+    const { result } = renderHook(() => useRecipeMatch('hh'))
+    let n = 0
+    supabase.setResult('inventory_items', 'update', () => (++n === 1 ? { data: null, error: { message: 'x' } } : { data: null, error: null }))
+    let r
+    await act(async () => {
+      r = await result.current.useRecipe({ inInventory: [
+        { id: 'i1', name: 'eggs', qty: 12, qty_text: '12', unit: null, inventoryItem: { id: 'a', qty: 12, unit: null } },
+        { id: 'i2', name: 'milk', qty: 1, qty_text: '1', unit: null, inventoryItem: { id: 'b', qty: 2, unit: null } },
+      ] }, 'Tacos', 'u1')
+    })
+    expect(r.failedCount).toBe(1)
+    expect(r.failed.map(l => l.name)).toEqual(['eggs'])
+    expect(r.decremented.map(l => l.name)).toEqual(['milk'])
+    expect(r.nowOut).toEqual([])
+  })
 })
 
 describe('addMissingToGroceryList cleans the names it inserts', () => {

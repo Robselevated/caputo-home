@@ -32,8 +32,11 @@ function skipText(item) {
 function UpdateSummary({ result }) {
   const unit = (item) => item.inventoryItem?.unit || ''
   return (
-    <Tile tileClass="bg-control" inkClass="text-ink" heading="Inventory updated" count={result.decremented.length}>
+    <Tile tileClass="bg-control" inkClass="text-ink" heading={result.failed?.length ? 'Kitchen partly updated' : 'Inventory updated'} count={result.decremented.length}>
       <div className="flex flex-col gap-1.5">
+        {result.failed?.length > 0 && (
+          <Rows items={result.failed} detail={() => 'Did not save, still at the old amount'} />
+        )}
         {result.decremented.length > 0 && (
           <Rows items={result.decremented} detail={(it) => (it.newQty === 0 ? `${it.oldQty} to 0 ${unit(it)}, now out` : `${it.oldQty} to ${it.newQty} ${unit(it)}`)} />
         )}
