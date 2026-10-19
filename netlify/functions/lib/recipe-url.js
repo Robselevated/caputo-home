@@ -4,7 +4,7 @@ import { fetchContent, isPublicHttpUrl } from './fetchPage.js'
 import { blockedReason, blockedMessage } from './blockedSites.js'
 import { isPinterestUrl, resolvePin } from './pinterest.js'
 import { findRecipeNode, mapJsonLdRecipe } from './jsonld.js'
-import { htmlToText, recipeWindow, sectionHints, extractOgImage } from './recipeText.js'
+import { htmlToText, recipeWindow, sectionHints, extractOgImage } from './htmlText.js'
 import { RECIPE_TEXT_PROMPT } from './prompts.js'
 import { normalizeContract, reply, errorStatus, NO_RECIPE, NO_INGREDIENTS, TOO_LONG, UNREADABLE } from './contract.js'
 

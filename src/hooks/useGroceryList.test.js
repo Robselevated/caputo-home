@@ -7,8 +7,6 @@ vi.mock('../lib/supabase', async () => {
 })
 vi.mock('../lib/db', () => ({
   queueWrite: vi.fn(async () => true),
-  cacheGroceryItems: vi.fn(async () => {}),
-  getCachedGroceryItems: vi.fn(async () => []),
 }))
 
 vi.mock('../lib/offlineToasts', () => ({ toastNotQueued: vi.fn(), toastWriteDropped: vi.fn() }))

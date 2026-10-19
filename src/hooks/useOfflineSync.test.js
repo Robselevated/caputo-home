@@ -9,8 +9,6 @@ const dbState = { writes: [], listeners: [] }
 vi.mock('../lib/db', () => ({
   onQueueChange: vi.fn((listener) => { dbState.listeners.push(listener); return () => { dbState.listeners = dbState.listeners.filter(l => l !== listener) } }),
   queueWrite: vi.fn(async () => true),
-  cacheGroceryItems: vi.fn(async () => {}),
-  getCachedGroceryItems: vi.fn(async () => []),
   getPendingWrites: vi.fn(async () => dbState.writes),
   clearWrite: vi.fn(async (id) => { dbState.writes = dbState.writes.filter(w => w.id !== id) }),
   getPendingCount: vi.fn(async () => dbState.writes.length),

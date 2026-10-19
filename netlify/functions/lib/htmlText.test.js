@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { htmlToText, recipeWindow, sectionHints, extractOgImage } from './recipeText.js'
+import { htmlToText, recipeWindow, sectionHints, extractOgImage } from './htmlText.js'
 
 describe('htmlToText', () => {
   it('drops scripts and tags, keeps line structure and decodes entities', () => {

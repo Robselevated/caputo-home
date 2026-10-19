@@ -34,6 +34,7 @@ async function getDB() {
   try {
     dbInstance = await openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
+        // Unused since the query cache took over; kept so the schema never needs a version bump.
         if (!db.objectStoreNames.contains('grocery_items')) {
           db.createObjectStore('grocery_items', { keyPath: 'id' })
         }
@@ -48,32 +49,6 @@ async function getDB() {
     console.warn('IndexedDB unavailable:', err.message)
     dbFailed = true
     return null
-  }
-}
-
-export async function cacheGroceryItems(items) {
-  const db = await getDB()
-  if (!db) return
-  try {
-    const tx = db.transaction('grocery_items', 'readwrite')
-    const store = tx.objectStore('grocery_items')
-    await store.clear()
-    for (const item of items) {
-      await store.put(item)
-    }
-    await tx.done
-  } catch (err) {
-    console.warn('Cache write failed:', err.message)
-  }
-}
-
-export async function getCachedGroceryItems() {
-  const db = await getDB()
-  if (!db) return []
-  try {
-    return await db.getAll('grocery_items')
-  } catch {
-    return []
   }
 }
 
