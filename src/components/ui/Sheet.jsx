@@ -3,6 +3,10 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { IconButton } from './IconButton'
 
+const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]'
+const tabbable = (root) => [...root.querySelectorAll(FOCUSABLE)]
+  .filter(el => !el.disabled && el.tabIndex >= 0 && el.getAttribute('aria-hidden') !== 'true')
+
 // Bottom sheet: portal, slide-up, backdrop and Escape close it, body scroll is
 // locked while open, and focus goes back to whatever opened it. The panel
 // itself takes focus (not its first field) so opening a sheet never pops the
@@ -19,7 +23,19 @@ export function Sheet({ open, onClose, title, children, footer, size = 'sheet' }
     const opener = document.activeElement
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const onKey = (e) => { if (e.key === 'Escape') onCloseRef.current?.() }
+    // Escape closes; Tab and Shift+Tab wrap inside the panel so keyboard and
+    // switch-control users cannot land on the page behind the sheet.
+    const onKey = (e) => {
+      if (e.key === 'Escape') { onCloseRef.current?.(); return }
+      if (e.key !== 'Tab' || !panelRef.current) return
+      const focusable = tabbable(panelRef.current)
+      if (focusable.length === 0) { e.preventDefault(); panelRef.current.focus(); return }
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement
+      if (e.shiftKey && (active === first || active === panelRef.current)) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && (active === last || !panelRef.current.contains(active))) { e.preventDefault(); first.focus() }
+    }
     document.addEventListener('keydown', onKey)
     // Let a field's own autoFocus win if it already ran on mount.
     const panel = panelRef.current

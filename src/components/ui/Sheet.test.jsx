@@ -61,5 +61,24 @@ describe('Sheet', () => {
     expect(dialog.className).toMatch(/h-\[100dvh\]/)
     expect(dialog.className).not.toMatch(/rounded-t/)
   })
-})
 
+  it('wraps Tab inside the sheet and skips hidden inputs', () => {
+    render(
+      <>
+        <button>Behind</button>
+        <Sheet open onClose={() => {}} title="Edit">
+          <input aria-label="Name" />
+          <input type="file" tabIndex={-1} aria-hidden="true" />
+          <button>Save</button>
+        </Sheet>
+      </>
+    )
+    const close = screen.getByRole('button', { name: 'Close' })
+    const save = screen.getByRole('button', { name: 'Save' })
+    save.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(close)
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(save)
+  })
+})

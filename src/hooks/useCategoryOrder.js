@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { arrayMove } from '@dnd-kit/sortable'
 import { TAXONOMY } from '../lib/constants'
 
@@ -12,7 +12,8 @@ function mergeSavedWithTaxonomy(savedOrder, taxonomyKeys) {
 
 export function useCategoryOrder(location) {
   const STORAGE_KEY = `category-order-${location}`
-  const taxonomyKeys = Object.keys(TAXONOMY[location] || {})
+  // Stable per location, so the memo below does not recompute every render.
+  const taxonomyKeys = useMemo(() => Object.keys(TAXONOMY[location] || {}), [location])
 
   const [order, setOrder] = useState(() => {
     try {
@@ -30,11 +31,19 @@ export function useCategoryOrder(location) {
       const oldIndex = prev.indexOf(activeId)
       const newIndex = prev.indexOf(overId)
       if (oldIndex === -1 || newIndex === -1) return prev
-      const next = arrayMove(prev, oldIndex, newIndex)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-      return next
+      return arrayMove(prev, oldIndex, newIndex)
     })
-  }, [STORAGE_KEY])
+  }, [])
+
+  // Persist after the change, not inside the state updater: StrictMode runs
+  // updaters twice, and a blocked storage would throw during render. Only a
+  // real change is written, so the loaded order never overwrites itself.
+  const saved = useRef(order)
+  useEffect(() => {
+    if (saved.current === order) return
+    saved.current = order
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(order)) } catch { /* storage blocked: order lasts this session */ }
+  }, [order, STORAGE_KEY])
 
   const orderedCategories = useMemo(
     () => mergeSavedWithTaxonomy(order, taxonomyKeys),
