@@ -631,3 +631,33 @@ revoke execute on function reserve_api_usage(uuid, text, integer) from public, a
 grant  execute on function reserve_api_usage(uuid, text, integer) to service_role;
 
 notify pgrst, 'reload schema';
+
+-- ------------------------------------------------------------
+-- 2026-10-19: composite indexes and server-side updated_at (see sql/2026-10-19-indexes-updated-at.sql)
+-- ------------------------------------------------------------
+create index if not exists idx_recipes_household_created
+  on recipes (household_id, created_at);
+create index if not exists idx_recently_bought_household_bought
+  on recently_bought (household_id, bought_at);
+
+create or replace function set_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end $$;
+
+drop trigger if exists grocery_items_updated_at on grocery_items;
+create trigger grocery_items_updated_at
+  before update on grocery_items
+  for each row execute function set_updated_at();
+
+drop trigger if exists inventory_items_updated_at on inventory_items;
+create trigger inventory_items_updated_at
+  before update on inventory_items
+  for each row execute function set_updated_at();
+
+notify pgrst, 'reload schema';
