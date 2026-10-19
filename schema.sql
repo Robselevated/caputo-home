@@ -144,25 +144,6 @@ create table inventory_items (
 );
 
 -- ============================================================
--- SCAN SESSIONS
--- Stores photo scan attempts so user can review before confirming
--- scan_type: 'pantry' | 'freezer' | 'receipt'
--- status: 'pending_review' -> 'confirmed' | 'cancelled'
--- ============================================================
-create table scan_sessions (
-  id uuid primary key default gen_random_uuid(),
-  household_id uuid references households(id) on delete cascade,
-  scan_type text not null check (scan_type in ('pantry', 'freezer', 'receipt')),
-  image_url text,                  -- stored in Supabase Storage bucket
-  raw_result jsonb,                -- full Claude Vision structured response
-  confirmed_items jsonb,           -- items user approved after review
-  status text not null default 'pending_review'
-    check (status in ('pending_review', 'confirmed', 'cancelled')),
-  created_by uuid references users(id) on delete set null,
-  created_at timestamptz default now()
-);
-
--- ============================================================
 -- GROCERY NOTIFICATION QUEUE (batched push notifications)
 -- ============================================================
 create table grocery_notifications (
@@ -223,7 +204,6 @@ create index idx_inventory_items_category on inventory_items(category);
 create index idx_item_history_household on item_history(household_id);
 create index idx_recipes_household on recipes(household_id);
 create index idx_recipe_ingredients_recipe on recipe_ingredients(recipe_id);
-create index idx_scan_sessions_household on scan_sessions(household_id);
 
 -- ============================================================
 -- ROW LEVEL SECURITY (RLS)
@@ -235,7 +215,6 @@ alter table item_history enable row level security;
 alter table grocery_items enable row level security;
 alter table recently_bought enable row level security;
 alter table inventory_items enable row level security;
-alter table scan_sessions enable row level security;
 alter table recipes enable row level security;
 alter table recipe_ingredients enable row level security;
 alter table grocery_notifications enable row level security;  -- service role only, no policies
@@ -277,10 +256,6 @@ create policy "item_history_all" on item_history
   with check (household_id = get_my_household_id());
 
 create policy "inventory_items_all" on inventory_items
-  using (household_id = get_my_household_id())
-  with check (household_id = get_my_household_id());
-
-create policy "scan_sessions_all" on scan_sessions
   using (household_id = get_my_household_id())
   with check (household_id = get_my_household_id());
 

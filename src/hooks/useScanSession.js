@@ -4,6 +4,7 @@ import { authFetch } from '../lib/authFetch'
 import { TAXONOMY } from '../lib/constants'
 import { queryClient } from '../lib/queryClient'
 import { keys } from '../queries/keys'
+import { mergeInventoryItem } from '../queries/writes'
 import { prepareImage } from '../features/cookbook/recipeScan'
 
 // Keywords to catch items Claude miscategorizes as "Other"
@@ -138,19 +139,8 @@ export function useScanSession(householdId) {
       } else {
         // One merge per item: increments the existing row for this
         // household + location + normalized name, or inserts it.
-        const { error: mergeErr } = await supabase.rpc('merge_inventory_item', {
-          p_household_id: householdId,
-          p_name: item.name,
-          p_qty: item.qty || 1,
-          p_unit: item.unit || 'count',
-          p_location: location,
-          p_category: item.category || 'Other',
-          p_subcategory: item.subcategory || null,
-          p_notes: item.notes || null,
-        })
-        if (mergeErr?.code === 'PGRST202') {
-          // function not deployed yet: plain insert
-          const { error: insertErr } = await supabase.from('inventory_items').insert({
+        try {
+          await mergeInventoryItem(supabase, {
             household_id: householdId,
             name: item.name,
             qty: item.qty || 1,
@@ -161,8 +151,7 @@ export function useScanSession(householdId) {
             notes: item.notes || null,
             updated_by: userId,
           })
-          if (insertErr) { errors.push(`${item.name}: ${insertErr.message}`); failed.add(rawItem) }
-        } else if (mergeErr) {
+        } catch (mergeErr) {
           errors.push(`${item.name}: ${mergeErr.message}`)
           failed.add(rawItem)
         }

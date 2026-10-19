@@ -3,7 +3,7 @@
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
 
 # Asset rule must come first so missing /assets/* files return a real 404
 # instead of being caught by the SPA fallback (which would serve index.html

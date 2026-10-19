@@ -32,7 +32,7 @@ describe('useRecentlyBought', () => {
     expect(result.current.items[0].name).toBe('Milk')
     await act(async () => { await result.current.addBackToList(result.current.items[0], 'u1') })
     expect(qc.getQueryData(keys.grocery('hh')).map(i => i.name)).toEqual(['Milk'])
-    const sent = supabase.callsFor('grocery_items', 'insert')[0].chain.find(([m]) => m === 'insert')[1]
+    const [sent] = supabase.callsFor('grocery_items', 'insert')[0].chain.find(([m]) => m === 'insert')[1]
     expect(sent.id).toMatch(/^[0-9a-f-]{36}$/)
     expect(sent).toMatchObject({ name: 'Milk', store: 'Costco', checked: false })
   })

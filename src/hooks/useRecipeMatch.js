@@ -5,6 +5,7 @@ import { convertQty } from '../lib/units'
 import { normalizeUnit, formatQty } from '../lib/ingredientParse'
 import { queryClient } from '../lib/queryClient'
 import { keys } from '../queries/keys'
+import { addGroceryRows } from '../queries/groceryAdd'
 
 const isBlank = (unit) => unit == null || String(unit).trim() === ''
 const round3 = (n) => Math.round(n * 1000) / 1000
@@ -91,13 +92,8 @@ export function useRecipeMatch(householdId) {
       }))
       if (groceryItems.length === 0) return { success: true, added: 0 }
 
-      const { error } = await supabase
-        .from('grocery_items')
-        .insert(groceryItems)
-
+      const { error } = await addGroceryRows(queryClient, supabase, householdId, groceryItems)
       if (error) return { error }
-
-      queryClient.invalidateQueries({ queryKey: keys.grocery(householdId) })
       return { success: true, added: groceryItems.length }
     } catch (err) {
       return { error: err.message }
@@ -190,11 +186,7 @@ export function useRecipeMatch(householdId) {
     }))
     if (groceryItems.length === 0) return { error: null }
 
-    const { error } = await supabase
-      .from('grocery_items')
-      .insert(groceryItems)
-
-    if (!error) queryClient.invalidateQueries({ queryKey: keys.grocery(householdId) })
+    const { error } = await addGroceryRows(queryClient, supabase, householdId, groceryItems)
     return { error }
   }
 

@@ -6,6 +6,18 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 const listeners = new Set()
 let nextId = 1
 const MAX_VISIBLE = 2
+// Undo toasts are only pushed out once this many are showing: deleting three
+// things in a row must not hide the first one's Undo while it still counts.
+const MAX_WITH_ACTIONS = 3
+
+// Which toast to drop when there are too many: the oldest plain message first,
+// an Undo only when nothing else is left to drop.
+export function evictionIndex(list) {
+  if (list.length <= MAX_VISIBLE) return -1
+  const plain = list.findIndex(t => !t.action)
+  if (plain !== -1) return plain
+  return list.length > MAX_WITH_ACTIONS ? 0 : -1
+}
 
 export function toast({ message, action = null, durationMs = 4000, tone = 'default' }) {
   const id = nextId++
@@ -44,7 +56,7 @@ export function ToastProvider({ children }) {
       if (evt.type === 'add') {
         setToasts(prev => {
           const next = [...prev, evt.toast]
-          while (next.length > MAX_VISIBLE) clearTimer(next.shift().id)
+          for (let i = evictionIndex(next); i !== -1; i = evictionIndex(next)) clearTimer(next.splice(i, 1)[0].id)
           return next
         })
         if (evt.toast.durationMs > 0) {

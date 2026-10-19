@@ -15,7 +15,6 @@ const loadCookbook = () => import('./pages/Cookbook')
 const loadMealPlanning = () => import('./pages/MealPlanning')
 
 const Login = lazy(() => import('./pages/Login'))
-const AuthCallback = lazy(() => import('./pages/AuthCallback'))
 const Cookbook = lazy(loadCookbook)
 const MealPlanning = lazy(loadMealPlanning)
 
@@ -57,7 +56,6 @@ export default function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route
             path="/*"
             element={
