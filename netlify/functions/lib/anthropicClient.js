@@ -11,12 +11,13 @@ export function makeClient(apiKey = process.env.CLAUDE_API_KEY) {
   return new Anthropic({ apiKey, maxRetries: 0 })
 }
 
-export async function callModel(client, { system, messages, max_tokens = 4096 }, deadline) {
+// `model` is for the probe script's before/after comparisons; handlers use MODEL.
+export async function callModel(client, { system, messages, max_tokens = 4096, model = MODEL }, deadline) {
   const left = deadline.remaining()
   if (left < 3000) throw new TimeoutError('model')
   const timeout = Math.min(Math.max(left - 1500, 1000), 40000)
   const res = await client.messages.create(
-    { model: MODEL, max_tokens, ...(system ? { system } : {}), messages },
+    { model, max_tokens, ...(system ? { system } : {}), messages },
     { timeout }
   )
   const text = (res.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')

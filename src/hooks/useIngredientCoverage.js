@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { hasMatch } from '../lib/ingredientMatch'
+import { hasMatch, buildInventoryIndex } from '../lib/ingredientMatch'
 import { keys, STALE } from '../queries/keys'
 import { fetchRecipeIngredients, fetchInventory } from '../queries/fetchers'
 
@@ -28,14 +28,21 @@ export function useIngredientCoverage(householdId, recipes) {
     staleTime: STALE.inventory,
   })
 
-  const inventoryNames = useMemo(
-    () => new Set(inventory.map(i => String(i.name ?? '').toLowerCase())),
+  // Tokenized once per inventory change, not once per ingredient comparison.
+  const inventoryIndex = useMemo(
+    () => buildInventoryIndex(new Set(inventory.map(i => String(i.name ?? '').toLowerCase()))),
     [inventory]
   )
 
   return useMemo(() => {
     const result = {}
     const byRecipe = {}
+    // Pantry staples (salt, oil) repeat across recipes; match each name once.
+    const seen = new Map()
+    const matches = (name) => {
+      if (!seen.has(name)) seen.set(name, hasMatch(name, inventoryIndex))
+      return seen.get(name)
+    }
     for (const ing of allIngredients) {
       if (!byRecipe[ing.recipe_id]) byRecipe[ing.recipe_id] = []
       byRecipe[ing.recipe_id].push(String(ing.name ?? '').toLowerCase())
@@ -47,9 +54,9 @@ export function useIngredientCoverage(householdId, recipes) {
         result[recipeId] = { total: 0, matched: 0, percentage: 0 }
         continue
       }
-      const matched = ingredients.filter(name => hasMatch(name, inventoryNames)).length
+      const matched = ingredients.filter(matches).length
       result[recipeId] = { total, matched, percentage: Math.round((matched / total) * 100) }
     }
     return result
-  }, [allIngredients, inventoryNames, recipeIds])
+  }, [allIngredients, inventoryIndex, recipeIds])
 }

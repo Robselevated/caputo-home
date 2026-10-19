@@ -1,5 +1,5 @@
 import { verifyAuth } from './lib/auth.js'
-import { checkRateLimit, recordUsage } from './lib/rate-limit.js'
+import { checkRateLimit } from './lib/rate-limit.js'
 import { makeClient } from './lib/anthropicClient.js'
 import { createDeadline } from './lib/budget.js'
 import { parseRecipeFromText, EMPTY_TEXT } from './lib/recipe-text.js'
@@ -18,14 +18,14 @@ export async function handler(event) {
   const user = await verifyAuth(event)
   if (!user) return json(401, { error: 'Unauthorized' })
 
-  const { allowed } = await checkRateLimit(user.id, 'parse-recipe', 20, { reserve: false })
-  if (!allowed) return json(429, { error: 'Rate limit exceeded. Try again later.' })
-
   let text
   try { ({ text } = JSON.parse(event.body || '{}')) } catch { return json(400, { error: 'Bad request' }) }
   if (typeof text !== 'string') return json(400, { error: EMPTY_TEXT })
 
+  const { allowed, settle } = await checkRateLimit(user.id, 'parse-recipe', 20, { reserve: false })
+  if (!allowed) return json(429, { error: 'Rate limit exceeded. Try again later.' })
+
   const { status, body } = await parseRecipeFromText(text, { client: makeClient(), deadline })
-  if (status === 200) await recordUsage(user.id, 'parse-recipe').catch(() => {})
+  await settle(status === 200).catch(() => {})
   return json(status, body)
 }

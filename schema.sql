@@ -590,3 +590,74 @@ create trigger inventory_items_stock_clock
   for each row execute function inventory_items_stock_clock();
 
 notify pgrst, 'reload schema';
+
+-- ------------------------------------------------------------
+-- 2026-10-19: atomic rate-limit reservation (see sql/2026-10-19-rate-limit.sql)
+-- ------------------------------------------------------------
+create or replace function reserve_api_usage(p_user uuid, p_action text, p_max integer)
+returns table (allowed boolean, used integer, usage_id uuid)
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_used integer;
+  v_id uuid;
+begin
+  if p_user is null or p_action is null or p_max is null then
+    raise exception 'reserve_api_usage: user, action and max are required';
+  end if;
+
+  -- Held until the calling statement's transaction ends, so a second request
+  -- for the same user and action waits here and then sees this row.
+  perform pg_advisory_xact_lock(hashtextextended('api_usage:' || p_user::text || ':' || p_action, 0));
+
+  select count(*) into v_used
+    from api_usage
+   where user_id = p_user
+     and action = p_action
+     and created_at >= now() - interval '1 hour';
+
+  if v_used >= p_max then
+    return query select false, v_used, null::uuid;
+    return;
+  end if;
+
+  insert into api_usage (user_id, action) values (p_user, p_action) returning id into v_id;
+  return query select true, v_used, v_id;
+end $$;
+
+-- Netlify functions call this with the service role only.
+revoke execute on function reserve_api_usage(uuid, text, integer) from public, anon, authenticated;
+grant  execute on function reserve_api_usage(uuid, text, integer) to service_role;
+
+notify pgrst, 'reload schema';
+
+-- ------------------------------------------------------------
+-- 2026-10-19: composite indexes and server-side updated_at (see sql/2026-10-19-indexes-updated-at.sql)
+-- ------------------------------------------------------------
+create index if not exists idx_recipes_household_created
+  on recipes (household_id, created_at);
+create index if not exists idx_recently_bought_household_bought
+  on recently_bought (household_id, bought_at);
+
+create or replace function set_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.updated_at := now();
+  return new;
+end $$;
+
+drop trigger if exists grocery_items_updated_at on grocery_items;
+create trigger grocery_items_updated_at
+  before update on grocery_items
+  for each row execute function set_updated_at();
+
+drop trigger if exists inventory_items_updated_at on inventory_items;
+create trigger inventory_items_updated_at
+  before update on inventory_items
+  for each row execute function set_updated_at();
+
+notify pgrst, 'reload schema';
