@@ -91,4 +91,29 @@ describe('ReceiptReviewSheet', () => {
     expect(onConfirm).not.toHaveBeenCalled()
     expect(supabase.callsFor('grocery_items', 'delete')).toHaveLength(0)
   })
+
+  it('a failed kitchen add keeps its list row and stays on screen for a retry', async () => {
+    const onCancel = vi.fn()
+    // Milk (fridge) fails, Rice (pantry) saves.
+    const onConfirm = vi.fn(async (rows, loc) => (loc === 'fridge' ? { saved: [], failed: rows } : { saved: rows, failed: [] }))
+    const { wrapper } = createWrapper()
+    const both = [...items, { name: 'Bread', qty: 1, location: 'pantry', category: 'Dry Goods' }]
+    render(<ReceiptReview items={both} onConfirm={onConfirm} onCancel={onCancel} householdId="hh" />, { wrapper })
+    await screen.findByText('milk')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add 3 to the kitchen' })) })
+    // Bread saved, so its list row comes off; milk failed, so it stays.
+    const deletes = supabase.callsFor('grocery_items', 'delete')
+    expect(deletes).toHaveLength(1)
+    expect(chainHas(deletes[0], 'in', 'id', ['g2'])).toBe(true)
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Milk')
+    expect(screen.getByRole('button', { name: 'Add 1 to the kitchen' })).toBeInTheDocument()
+  })
+
+  it('closes after everything saved', async () => {
+    const { onCancel } = renderSheet()
+    await screen.findByText('milk')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add 2 to the kitchen' })) })
+    expect(onCancel).toHaveBeenCalledTimes(1)
+  })
 })

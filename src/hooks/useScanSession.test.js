@@ -68,4 +68,17 @@ describe('useScanSession cache refresh', () => {
     expect(spy).toHaveBeenCalledWith({ queryKey: keys.inventory('hh') })
     spy.mockRestore()
   })
+
+  it('reports saved and failed items and keeps the scan open when one failed', async () => {
+    let n = 0
+    supabase.setResult('rpc', 'merge_inventory_item', () => (++n === 1 ? { data: null, error: { message: 'boom' } } : { data: { merged: false, item: {} }, error: null }))
+    const { result } = renderHook(() => useScanSession('hh'))
+    const rice = { name: 'Rice', qty: 1, category: 'Pasta' }
+    const beans = { name: 'Beans', qty: 1, category: 'Other' }
+    let out
+    await act(async () => { out = await result.current.confirmItems([rice, beans], 'pantry', 'u1') })
+    expect(out.failed).toEqual([rice])
+    expect(out.saved).toEqual([beans])
+    expect(result.current.error).toContain('Rice')
+  })
 })

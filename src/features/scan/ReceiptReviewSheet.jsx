@@ -40,6 +40,7 @@ export default function ReceiptReview({ items, onConfirm, onCancel, householdId 
   const [expandedId, setExpandedId] = useState(null)
   const [kept, setKept] = useState(() => new Set())
   const [saving, setSaving] = useState(false)
+  const [failedNames, setFailedNames] = useState([])
 
   // Same cache entry the Grocery page reads, so this is free when it is warm.
   const { data: grocery = EMPTY } = useQuery({
@@ -66,25 +67,50 @@ export default function ReceiptReview({ items, onConfirm, onCancel, householdId 
 
   const confirm = async () => {
     setSaving(true)
+    setFailedNames([])
     try {
       const byLocation = new Map()
-      for (const item of included) {
-        const loc = item.location || 'pantry'
+      for (const row of included) {
+        const loc = row.location || 'pantry'
         if (!byLocation.has(loc)) byLocation.set(loc, [])
-        byLocation.get(loc).push(toConfirmed(item))
+        byLocation.get(loc).push([row, toConfirmed(row)])
       }
-      for (const [loc, locItems] of byLocation) await onConfirm(locItems, loc)
+      const savedNames = new Set()
+      const failedIds = new Set()
+      for (const [loc, pairs] of byLocation) {
+        let result
+        try {
+          result = await onConfirm(pairs.map(([, c]) => c), loc, { close: false })
+        } catch {
+          result = { saved: [], failed: pairs.map(([, c]) => c) }
+        }
+        // An onConfirm that reports nothing is treated as all saved.
+        const failed = result?.failed ?? []
+        for (const [row, c] of pairs) {
+          if (failed.includes(c)) failedIds.add(row._id)
+          else savedNames.add(norm(row.name))
+        }
+      }
 
-      // Re-read the list rather than trusting the cache, so a row the other
-      // phone added mid-review still comes off. `kept` is what was unchecked.
-      if (wanted.size > 0 && householdId) {
+      // Only what actually reached the kitchen comes off the list. Re-read the
+      // list rather than trusting the cache, so a row the other phone added
+      // mid-review still comes off. `kept` is what was unchecked.
+      if (savedNames.size > 0 && householdId) {
         const { data } = await supabase.from('grocery_items').select('id, name').eq('household_id', householdId)
-        const ids = (data ?? []).filter(g => wanted.has(norm(g.name)) && !kept.has(g.id)).map(g => g.id)
+        const ids = (data ?? []).filter(g => savedNames.has(norm(g.name)) && !kept.has(g.id)).map(g => g.id)
         if (ids.length > 0) {
           await supabase.from('grocery_items').delete().in('id', ids)
           queryClient.invalidateQueries({ queryKey: keys.grocery(householdId) })
         }
       }
+
+      if (failedIds.size === 0) {
+        onCancel()
+        return
+      }
+      // Keep the sheet open with just the failures so Add retries them.
+      setFailedNames(rows.filter(r => failedIds.has(r._id)).map(r => r.name))
+      setRows(prev => prev.filter(r => failedIds.has(r._id)))
     } finally {
       setSaving(false)
     }
@@ -105,6 +131,11 @@ export default function ReceiptReview({ items, onConfirm, onCancel, householdId 
       }
     >
       <p className="pb-3 text-sm text-ink-2">Tap a name to fix it or move it. Anything you bought comes off the list.</p>
+      {failedNames.length > 0 && (
+        <p role="alert" className="mb-3 rounded-row bg-danger-tile px-3 py-2 text-sm font-semibold text-danger-ink">
+          Couldn't add {failedNames.join(', ')}. They're still on the list. Tap Add to try again.
+        </p>
+      )}
       <div className="flex flex-col gap-4">
         <Tile tileClass="bg-control" inkClass="text-ink" heading="Adding to the kitchen" count={included.length}>
           <div className="flex flex-col gap-1.5">

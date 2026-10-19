@@ -111,8 +111,13 @@ export function useScanSession(householdId) {
     }
   }
 
-  const confirmItems = async (confirmedItems, location, userId) => {
+  // Resolves { saved, failed } (the passed-in item objects) so a review sheet
+  // can act only on what saved and keep the failures on screen for a retry.
+  // The scan closes only when everything saved, unless `close: false` (the
+  // receipt sheet confirms one location at a time and closes itself).
+  const confirmItems = async (confirmedItems, location, userId, { close = true } = {}) => {
     const errors = []
+    const failed = new Set()
 
     const processItem = async (rawItem) => {
       const item = location !== 'receipt' ? fixCategory(rawItem, location) : rawItem
@@ -125,7 +130,7 @@ export function useScanSession(householdId) {
           store: item.store || null,
           bought_by: userId,
         })
-        if (insertErr) { errors.push(`${item.name}: ${insertErr.message}`); return }
+        if (insertErr) { errors.push(`${item.name}: ${insertErr.message}`); failed.add(rawItem); return }
         await supabase.from('item_history').upsert(
           { household_id: householdId, name: item.name },
           { onConflict: 'household_id,name' }
@@ -156,9 +161,10 @@ export function useScanSession(householdId) {
             notes: item.notes || null,
             updated_by: userId,
           })
-          if (insertErr) errors.push(`${item.name}: ${insertErr.message}`)
+          if (insertErr) { errors.push(`${item.name}: ${insertErr.message}`); failed.add(rawItem) }
         } else if (mergeErr) {
           errors.push(`${item.name}: ${mergeErr.message}`)
+          failed.add(rawItem)
         }
       }
     }
@@ -167,13 +173,20 @@ export function useScanSession(householdId) {
       // Process in batches of 5 for speed without overwhelming DB
       for (let i = 0; i < confirmedItems.length; i += 5) {
         const batch = confirmedItems.slice(i, i + 5)
-        await Promise.allSettled(batch.map(processItem))
+        const settled = await Promise.allSettled(batch.map(processItem))
+        settled.forEach((r, j) => {
+          if (r.status === 'rejected') {
+            failed.add(batch[j])
+            errors.push(`${batch[j]?.name}: ${r.reason?.message ?? 'failed'}`)
+          }
+        })
       }
 
       if (errors.length > 0) {
         setError(`Failed to add: ${errors.join(', ')}`)
+      } else if (close) {
+        setResults(null)
       }
-      setResults(null)
       // Realtime usually patches these; invalidating guarantees the list is
       // right even if the socket is down.
       if (householdId) {
@@ -182,6 +195,11 @@ export function useScanSession(householdId) {
       }
     } catch (err) {
       setError(err.message)
+      return { saved: [], failed: [...confirmedItems] }
+    }
+    return {
+      saved: confirmedItems.filter(i => !failed.has(i)),
+      failed: confirmedItems.filter(i => failed.has(i)),
     }
   }
 

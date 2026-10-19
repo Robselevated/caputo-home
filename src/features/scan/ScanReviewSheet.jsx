@@ -16,14 +16,25 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
   const [rows, setRows] = useState(() => prepareItems(items, () => location))
   const [expandedId, setExpandedId] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [failedNames, setFailedNames] = useState([])
 
   const patch = (id, changes) => setRows(prev => prev.map(r => (r._id === id ? { ...r, ...changes } : r)))
   const included = rows.filter(r => r.included)
 
   const confirm = async () => {
     setSaving(true)
+    setFailedNames([])
     try {
-      await onConfirm(included.map(toConfirmed), location)
+      const pairs = included.map(row => [row, toConfirmed(row)])
+      const result = await onConfirm(pairs.map(([, c]) => c), location)
+      // The hook keeps the sheet open when something failed: show only those
+      // rows so Add retries them instead of duplicating the ones that saved.
+      const failed = result?.failed
+      if (failed?.length) {
+        const failedIds = new Set(pairs.filter(([, c]) => failed.includes(c)).map(([row]) => row._id))
+        setFailedNames(included.filter(r => failedIds.has(r._id)).map(r => r.name))
+        setRows(prev => prev.filter(r => failedIds.has(r._id)))
+      }
     } finally {
       setSaving(false)
     }
@@ -44,6 +55,11 @@ export default function ScanReview({ items, onConfirm, onCancel, location }) {
       }
     >
       <p className="pb-3 text-sm text-ink-2">Tap a name to fix it, or uncheck what does not belong.</p>
+      {failedNames.length > 0 && (
+        <p role="alert" className="mb-3 rounded-row bg-danger-tile px-3 py-2 text-sm font-semibold text-danger-ink">
+          Couldn't add {failedNames.join(', ')}. Tap Add to try again.
+        </p>
+      )}
       <Tile tileClass={theme.tile} inkClass={theme.ink} heading={label} count={included.length}>
         <div className="flex flex-col gap-1.5">
           {rows.map(row => (
