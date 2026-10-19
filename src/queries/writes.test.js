@@ -3,7 +3,7 @@ import { createFakeSupabase, chainHas } from '../test/fakeSupabase'
 import {
   insertGroceryItem, updateGroceryItem, deleteGroceryItem, setGrocerySortOrder,
   mergeInventoryItem, updateInventoryItem, deleteInventoryItem,
-  insertMealPick, deleteMealPick, clearMealPickSection,
+  insertMealPick, deleteMealPick, deleteMealPicks,
 } from './writes'
 
 let client
@@ -83,11 +83,11 @@ describe('inventory writes', () => {
 })
 
 describe('meal pick writes', () => {
-  it('insertMealPick returns the row; deleteMealPick and clearMealPickSection throw on error', async () => {
+  it('insertMealPick returns the row; deleteMealPick and deleteMealPicks throw on error', async () => {
     client.setResult('meal_picks', 'insert', { data: { id: 'p1' }, error: null })
     expect(await insertMealPick(client, { id: 'p1', name: 'Tacos' })).toEqual({ id: 'p1' })
     client.setResult('meal_picks', 'delete', { data: null, error: { message: 'x' } })
     await expect(deleteMealPick(client, 'p1')).rejects.toThrow('x')
-    await expect(clearMealPickSection(client, 'hh', 'Dinner')).rejects.toThrow('x')
+    await expect(deleteMealPicks(client, 'hh', ['p1'])).rejects.toThrow('x')
   })
 })
