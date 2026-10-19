@@ -133,15 +133,21 @@ export function AuthProvider({ children }) {
       (event, session) => {
         if (!mounted) return
         const nextUser = session?.user ?? null
-        setUser(nextUser)
+        const prevUserId = currentUserIdRef.current
+        currentUserIdRef.current = nextUser?.id ?? null
+        const sameUser = !!nextUser && nextUser.id === prevUserId
+        // GoTrue re-emits SIGNED_IN (with a fresh user object) on every
+        // foreground. Keep the existing object for the same account so every
+        // useAuth consumer doesn't re-render; USER_UPDATED carries real changes.
+        setUser((prev) => (sameUser && prev && event !== 'USER_UPDATED' ? prev : nextUser))
         if (nextUser) {
           // Defer Supabase work out of the auth callback: calling getSession/
           // queries synchronously here re-enters GoTrue's auth lock and can
           // deadlock (the documented "don't await inside onAuthStateChange").
           setTimeout(() => fetchProfile(nextUser.id), 0)
-          // A fresh token after sign-in or refresh: tell data hooks to refetch
-          // so they pick up the new session instead of holding stale results.
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          // A real login (new account) or a fresh token: tell data hooks to
+          // refetch. A re-emitted SIGNED_IN for the same user is not a login.
+          if ((event === 'SIGNED_IN' && !sameUser) || event === 'TOKEN_REFRESHED') {
             emitRevalidate(event)
           }
         } else {

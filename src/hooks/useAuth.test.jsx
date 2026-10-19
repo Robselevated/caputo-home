@@ -29,6 +29,7 @@ vi.mock('../lib/supabase', async () => {
 
 import { supabase } from '../lib/supabase'
 import { AuthProvider, useAuth } from './useAuth'
+import { onRevalidate } from '../lib/sessionManager'
 
 function Probe() {
   const { loading, user, profile } = useAuth()
@@ -72,5 +73,37 @@ describe('AuthProvider boot', () => {
     await act(async () => { authState.listeners.forEach(cb => cb('TOKEN_REFRESHED', { user })); await new Promise(r => setTimeout(r, 5)) })
     await act(async () => { authState.listeners.forEach(cb => cb('TOKEN_REFRESHED', { user })); await new Promise(r => setTimeout(r, 5)) })
     expect(supabase.from.mock.calls.length).toBe(before)
+  })
+})
+
+describe('AuthProvider SIGNED_IN re-emits', () => {
+  it('treats a re-emitted SIGNED_IN for the same user as a no-op (no revalidate, same user object)', async () => {
+    authState.persistedUser = user
+    authState.persistedProfile = { id: 'u1', household_id: 'hh', name: 'Rob', email: 'r@x' }
+    authState.session = { user }
+    const seen = []
+    function UserProbe() { const { user: u } = useAuth(); seen.push(u); return null }
+    let now = 1_000_000_000
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => (now += 10_000))
+    const reasons = []
+    const off = onRevalidate((r) => reasons.push(r))
+    try {
+      render(<AuthProvider><UserProbe /></AuthProvider>)
+      await act(async () => {})
+      const settled = seen[seen.length - 1]
+      const renders = seen.length
+      await act(async () => { authState.listeners.forEach(cb => cb('SIGNED_IN', { user: { ...user } })) })
+      expect(reasons).not.toContain('SIGNED_IN')
+      expect(seen[seen.length - 1]).toBe(settled)
+      expect(seen.length).toBe(renders)
+
+      // A different account signing in IS a login.
+      await act(async () => { authState.listeners.forEach(cb => cb('SIGNED_IN', { user: { id: 'u2', email: 'c@x' } })) })
+      expect(reasons).toContain('SIGNED_IN')
+      expect(seen[seen.length - 1].id).toBe('u2')
+    } finally {
+      off()
+      nowSpy.mockRestore()
+    }
   })
 })
