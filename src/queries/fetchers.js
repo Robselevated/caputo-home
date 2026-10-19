@@ -17,6 +17,20 @@ async function run(builder) {
   return data
 }
 
+// PostgREST caps every response at 1000 rows without saying so. For tables
+// that can outgrow that, page with .range() over a stable order until a short
+// page comes back. `build` makes a fresh builder per page.
+export const PAGE_SIZE = 1000
+
+async function runAllPages(build) {
+  const all = []
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const page = (await run(build().range(from, from + PAGE_SIZE - 1))) || []
+    all.push(...page)
+    if (page.length < PAGE_SIZE) return all
+  }
+}
+
 export const RECIPE_GRID_COLUMNS =
   'id, household_id, name, description, image_url, source_image_url, servings, prep_time, cook_time, tags, source_url, created_by, created_at'
 
@@ -48,10 +62,10 @@ export async function fetchRecentlyBought(client, householdId) {
 }
 
 export async function fetchItemHistory(client, householdId) {
-  const rows = await run(
+  const rows = await runAllPages(() =>
     client.from('item_history').select('name').eq('household_id', householdId).order('name')
   )
-  return (rows || []).map(r => r.name)
+  return rows.map(r => r.name)
 }
 
 export async function fetchRecipes(client, householdId) {
@@ -73,12 +87,13 @@ export async function fetchRecipe(client, id) {
 }
 
 export async function fetchRecipeIngredients(client, householdId) {
-  const rows = await run(
+  const rows = await runAllPages(() =>
     client.from('recipe_ingredients')
       .select('recipe_id, name, recipes!inner(household_id)')
       .eq('recipes.household_id', householdId)
+      .order('recipe_id').order('id')
   )
-  return (rows || []).map(({ recipe_id, name }) => ({ recipe_id, name }))
+  return rows.map(({ recipe_id, name }) => ({ recipe_id, name }))
 }
 
 export async function fetchMealPicks(client, householdId) {
