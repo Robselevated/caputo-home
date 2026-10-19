@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 // Slim back control above a sub-page header. Labelled with where it goes,
 // not "Back", so the name reads right in a screen reader's button list.

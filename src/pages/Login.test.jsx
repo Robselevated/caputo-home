@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 
 const signIn = vi.fn(async () => ({ error: null }))
 vi.mock('../hooks/useAuth', () => ({ useAuth: () => ({ user: null, signIn }) }))

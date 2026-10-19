@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router'
 import { BookOpen, Lightbulb, ShoppingCart } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useRecipes } from '../../hooks/useRecipes'

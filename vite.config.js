@@ -11,11 +11,16 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'supabase-vendor': ['@supabase/supabase-js'],
-          'query-vendor': ['@tanstack/react-query', '@tanstack/react-query-persist-client', '@tanstack/query-async-storage-persister', 'idb'],
-          'dnd-vendor': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+        // A function, not a name list: with a list, React DOM and the scheduler
+        // drifted into whichever chunk imported them first (the drag library),
+        // so a dnd update would have re-downloaded React too.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (/node_modules\/(react|react-dom|scheduler|react-router)\//.test(id)) return 'react-vendor'
+          if (/node_modules\/@supabase\//.test(id)) return 'supabase-vendor'
+          if (/node_modules\/(@tanstack|idb)\//.test(id)) return 'query-vendor'
+          if (/node_modules\/@dnd-kit\//.test(id)) return 'dnd-vendor'
+          return undefined
         },
       },
     },

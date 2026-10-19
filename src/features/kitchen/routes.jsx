@@ -1,4 +1,4 @@
-import { Route, Navigate } from 'react-router-dom'
+import { Route, Navigate } from 'react-router'
 import Kitchen from '../../pages/Kitchen'
 import { readLastLocation } from './locationTheme'
 

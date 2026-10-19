@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react'
-import { MemoryRouter, Routes } from 'react-router-dom'
+import { MemoryRouter, Routes } from 'react-router'
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' }, profile: { household_id: 'hh' } }) }))
 vi.mock('../../lib/supabase', async () => {
