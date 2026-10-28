@@ -89,7 +89,7 @@ describe('DateNightPage map', () => {
     renderAt('/date-night')
     const map = await screen.findByTestId('map')
     expect(map).toHaveAttribute('data-names', 'Clover')
-    expect(map).toHaveAttribute('data-color', '#A3214A')
+    expect(map).toHaveAttribute('data-color', '#EA4335')
   })
 
   it('looks up a location once for a place saved before the map existed', async () => {
@@ -138,6 +138,18 @@ describe('RestaurantDetailPage', () => {
     renderAt('/date-night/z')
     expect(await screen.findByLabelText('Rob')).toHaveValue('')
     expect(screen.getByLabelText('Cheyene')).toHaveValue('')
+  })
+
+  it('edits a note in place by tapping it', async () => {
+    supabase.setResult('restaurant_notes', 'update', { data: null, error: null })
+    renderAt('/date-night/z')
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit note: Rob got the steak' }))
+    const box = screen.getByRole('textbox', { name: 'Edit note' })
+    fireEvent.change(box, { target: { value: 'Rob got the ribeye. Amazing.' } })
+    await act(async () => { fireEvent.blur(box) })
+    expect(screen.getByText('Rob got the ribeye. Amazing.')).toBeInTheDocument()
+    const changes = supabase.callsFor('restaurant_notes', 'update')[0].chain.find(([m]) => m === 'update')[1]
+    expect(changes).toEqual({ body: 'Rob got the ribeye. Amazing.' })
   })
 
   it('We went moves a list place into Been there and shows the scores', async () => {

@@ -95,17 +95,10 @@ describe('CookbookPage', () => {
     expect(screen.queryByText('Tacos')).not.toBeInTheDocument()
   })
 
-  it('fetched ideas survive typing in the search box', async () => {
-    const { authFetch } = await import('../../lib/authFetch')
-    authFetch.mockResolvedValue({ ok: true, json: async () => [{ name: 'Beef tacos', description: 'Fast weeknight', ingredients: ['shells', 'beef'] }] })
+  it('has no paid "What can I make?" ideas panel', async () => {
     renderPage()
     await screen.findByText('Tacos')
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Get ideas' })) })
-    expect(await screen.findByText('Beef tacos')).toBeInTheDocument()
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search recipes' }), { target: { value: 'sou' } })
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search recipes' }), { target: { value: '' } })
-    expect(screen.getByText('Beef tacos')).toBeInTheDocument()
-    expect(authFetch).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Get ideas' })).not.toBeInTheDocument()
   })
 
   it('a pasted ingredient list is added after rows already typed', async () => {

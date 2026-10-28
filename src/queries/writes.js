@@ -113,6 +113,10 @@ export async function insertRestaurantNote(client, row) {
   return run(client.from('restaurant_notes').insert(row).select().single())
 }
 
+export async function updateRestaurantNote(client, id, body) {
+  await run(client.from('restaurant_notes').update({ body }).eq('id', id).select('id'))
+}
+
 export async function deleteRestaurantNote(client, id) {
   await run(client.from('restaurant_notes').delete().eq('id', id).select('id'))
 }

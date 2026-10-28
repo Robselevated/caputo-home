@@ -36,7 +36,6 @@ function usePreloadTabs() {
 }
 const RecipeDetail = lazy(() => import('./pages/RecipeDetail'))
 const RecipeEdit = lazy(() => import('./pages/RecipeEdit'))
-const SuggestionDetail = lazy(() => import('./pages/SuggestionDetail'))
 const RestaurantDetail = lazy(() => import('./pages/RestaurantDetail'))
 
 // Route-level fallback while a page chunk loads: quiet placeholder tiles in
@@ -70,7 +69,6 @@ export default function App() {
                       {kitchenRoutes()}
                       <Route path="/planning" element={<MealPlanning />} />
                       <Route path="/cookbook" element={<Cookbook />} />
-                      <Route path="/cookbook/suggestion" element={<SuggestionDetail />} />
                       <Route path="/cookbook/:id/edit" element={<RecipeEdit />} />
                       <Route path="/cookbook/:id" element={<RecipeDetail />} />
                       <Route path="/date-night" element={<DateNight />} />

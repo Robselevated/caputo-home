@@ -2,17 +2,20 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// Free OpenStreetMap tiles; attribution is required by their terms.
-const TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+// CARTO Voyager: free OpenStreetMap-based tiles styled close to Google Maps
+// (soft land, white roads, colored highways). {r} serves sharp tiles on
+// retina phones. Both attributions are required by their terms.
+const TILES = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
 
-// A plain colored dot: Leaflet's default marker images don't survive bundling.
+// A Google-style teardrop pin with a white dot, drawn inline because
+// Leaflet's default marker images don't survive bundling.
 const pin = (color) => L.divIcon({
   className: '',
-  html: `<span style="display:block;width:18px;height:18px;border-radius:9999px;background:${color};border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)"></span>`,
-  iconSize: [18, 18],
-  iconAnchor: [9, 9],
-  popupAnchor: [0, -10],
+  html: `<svg width="28" height="40" viewBox="0 0 28 40" style="display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))"><path d="M14 0C6.3 0 0 6.2 0 13.9 0 24.3 14 40 14 40s14-15.7 14-26.1C28 6.2 21.7 0 14 0z" fill="${color}" stroke="rgba(0,0,0,.25)" stroke-width="1"/><circle cx="14" cy="14" r="5" fill="#fff"/></svg>`,
+  iconSize: [28, 40],
+  iconAnchor: [14, 40],
+  popupAnchor: [0, -36],
 })
 
 // `isolate` keeps Leaflet's own z-indexes (up to 1000) under the tab bar and sheets.
@@ -27,7 +30,7 @@ export function RestaurantMap({ restaurants, color, onOpen }) {
 
   useEffect(() => {
     map.current = L.map(el.current, { zoomControl: false, attributionControl: true, scrollWheelZoom: false })
-    L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map.current)
+    L.tileLayer(TILES, { maxZoom: 20, subdomains: 'abcd', attribution: ATTRIBUTION }).addTo(map.current)
     layer.current = L.layerGroup().addTo(map.current)
     return () => { map.current.remove(); map.current = null }
   }, [])

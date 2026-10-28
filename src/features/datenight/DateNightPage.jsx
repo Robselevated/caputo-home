@@ -24,8 +24,8 @@ const VIEWS = [
   { value: 'archived', label: 'Been there' },
 ]
 
-// Pin colors: the Date Night accent for places to try, grey for places we've been.
-const PIN = { list: '#A3214A', archived: '#5E6464' }
+// Pin colors: Google's red for places to try, grey for places we've been.
+const PIN = { list: '#EA4335', archived: '#5E6464' }
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 const newestVisit = (a, b) => String(b.visited_at ?? '').localeCompare(String(a.visited_at ?? ''))
