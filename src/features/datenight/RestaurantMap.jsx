@@ -2,11 +2,11 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
-// CARTO Voyager: free OpenStreetMap-based tiles styled close to Google Maps
-// (soft land, white roads, colored highways). {r} serves sharp tiles on
-// retina phones. Both attributions are required by their terms.
-const TILES = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+// Esri World Street Map: free without a key and styled close to Google Maps
+// (warm land, colored highways). CARTO started requiring a key in Oct 2026.
+// Esri tiles are {z}/{y}/{x}, row before column. Attribution is required.
+const TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'
+const ATTRIBUTION = 'Tiles &copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, &copy; OpenStreetMap contributors'
 
 // A Google-style teardrop pin with a white dot, drawn inline because
 // Leaflet's default marker images don't survive bundling.
@@ -30,7 +30,7 @@ export function RestaurantMap({ restaurants, color, onOpen }) {
 
   useEffect(() => {
     map.current = L.map(el.current, { zoomControl: false, attributionControl: true, scrollWheelZoom: false })
-    L.tileLayer(TILES, { maxZoom: 20, subdomains: 'abcd', attribution: ATTRIBUTION }).addTo(map.current)
+    L.tileLayer(TILES, { maxZoom: 19, attribution: ATTRIBUTION }).addTo(map.current)
     layer.current = L.layerGroup().addTo(map.current)
     return () => { map.current.remove(); map.current = null }
   }, [])
