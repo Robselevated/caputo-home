@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import { render, screen, fireEvent } from '@testing-library/react'
+import { MemoryRouter, Link } from 'react-router'
 
 const syncState = { isOnline: false, pendingCount: 2, syncing: false, syncNow: vi.fn() }
 vi.mock('../hooks/useOfflineSync', () => ({ useOfflineSync: vi.fn(() => syncState) }))
@@ -31,5 +31,15 @@ describe('Layout', () => {
     render(<MemoryRouter initialEntries={['/grocery']}><Layout><div>page</div></Layout></MemoryRouter>, { wrapper })
     expect(supabase.channel).toHaveBeenCalledTimes(1)
     expect(supabase.channel).toHaveBeenCalledWith(expect.stringMatching(/^household:hh/))
+  })
+
+  it('opens a newly tapped page at the top, so the back link is never under the clock', () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    const { wrapper } = createWrapper()
+    render(<MemoryRouter initialEntries={['/date-night']}><Layout><Link to="/date-night/a">open</Link></Layout></MemoryRouter>, { wrapper })
+    expect(scrollTo).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('open'))
+    expect(scrollTo).toHaveBeenCalledWith(0, 0)
+    scrollTo.mockRestore()
   })
 })

@@ -42,9 +42,8 @@ beforeEach(() => {
   supabase.reset()
   vi.clearAllMocks()
   supabase.setResult('restaurants', 'select', { data: restaurants, error: null })
-  supabase.setResult('restaurant_ratings', 'select', { data: [{ restaurant_id: 'z', user_id: 'u1', household_id: 'hh', score: 9.7 }, { restaurant_id: 'z', user_id: 'u2', household_id: 'hh', score: 8.5 }], error: null })
+  supabase.setResult('restaurant_ratings', 'select', { data: [{ restaurant_id: 'z', person: 'rob', user_id: 'u1', household_id: 'hh', score: 9.7 }, { restaurant_id: 'z', person: 'cheyene', user_id: 'u1', household_id: 'hh', score: 8.5 }], error: null })
   supabase.setResult('restaurant_notes', 'select', { data: [{ id: 'n1', restaurant_id: 'z', household_id: 'hh', body: 'Rob got the steak', created_at: '2026-10-20T00:00:00Z' }], error: null })
-  supabase.setResult('users', 'select', { data: [{ id: 'u2', name: 'Cheyenne Caputo' }, { id: 'u1', name: 'Rob Caputo' }], error: null })
   supabase.setResult('restaurants', 'insert', (record) => ({ data: { ...record.chain.find(([m]) => m === 'insert')[1], created_at: '2026-10-27T00:00:00Z' }, error: null }))
   supabase.setResult('restaurants', 'update', { data: null, error: null })
 })
@@ -86,24 +85,33 @@ describe('RestaurantDetailPage', () => {
     renderAt('/date-night/z')
     expect(await screen.findByRole('heading', { name: 'Inland Pacific Kitchen' })).toBeInTheDocument()
     expect(await screen.findByLabelText('Rob')).toHaveValue('9.7')
-    expect(screen.getByLabelText('Cheyenne')).toHaveValue('8.5')
+    expect(screen.getByLabelText('Cheyene')).toHaveValue('8.5')
     expect(screen.getByText('9.1')).toBeInTheDocument()
     expect(screen.getByText('Rob got the steak')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Back to list/ })).toBeInTheDocument()
+    const buttons = screen.getAllByRole('button').concat(screen.getAllByRole('link')).map(el => el.textContent)
+    expect(buttons).toContain("Let's go back")
+    expect(screen.queryByText(/Back to list/)).not.toBeInTheDocument()
   })
 
-  it('saves a decimal score on blur and refuses one over 10', async () => {
-    renderAt('/date-night/z')
-    const rob = await screen.findByLabelText('Rob')
-    fireEvent.change(rob, { target: { value: '10.5' } })
-    fireEvent.blur(rob)
-    expect(rob).toHaveAttribute('aria-invalid', 'true')
-    expect(supabase.callsFor('restaurant_ratings', 'upsert')).toHaveLength(0)
-
-    fireEvent.change(rob, { target: { value: '9.9' } })
-    await act(async () => { fireEvent.blur(rob) })
+  it('types 97 as 9.7 without a dot and saves it on blur for that person', async () => {
+    renderAt('/date-night/a')
+    fireEvent.click(await screen.findByRole('button', { name: /We went/ }))
+    const chey = await screen.findByLabelText('Cheyene')
+    fireEvent.change(chey, { target: { value: '9' } })
+    fireEvent.change(chey, { target: { value: '97' } })
+    expect(chey).toHaveValue('9.7')
+    fireEvent.change(chey, { target: { value: '9.75' } })
+    expect(chey).toHaveValue('9.7')
+    await act(async () => { fireEvent.blur(chey) })
     const sent = supabase.callsFor('restaurant_ratings', 'upsert')[0].chain.find(([m]) => m === 'upsert')[1]
-    expect(sent).toMatchObject({ restaurant_id: 'z', user_id: 'u1', score: 9.9 })
+    expect(sent).toMatchObject({ restaurant_id: 'a', person: 'cheyene', user_id: 'u1', score: 9.7 })
+  })
+
+  it('shows both people even before anyone scores', async () => {
+    supabase.setResult('restaurant_ratings', 'select', { data: [], error: null })
+    renderAt('/date-night/z')
+    expect(await screen.findByLabelText('Rob')).toHaveValue('')
+    expect(screen.getByLabelText('Cheyene')).toHaveValue('')
   })
 
   it('We went moves a list place into Been there and shows the scores', async () => {

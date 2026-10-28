@@ -15,6 +15,31 @@ export const byOrder = (rows) => [...rows].sort((a, b) =>
   (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))
 const oldestFirst = (rows) => [...rows].sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))
 
+// The two people who score a date. Ratings are keyed by these, not by login,
+// so either of us can fill in both.
+export const PEOPLE = [
+  { key: 'rob', label: 'Rob' },
+  { key: 'cheyene', label: 'Cheyene' },
+]
+
+// Score entry without a decimal key: the last digit is the tenths, so 97
+// reads 9.7 and 100 reads 10.0. Anything that isn't a digit is ignored.
+// Returns the digits to keep, or null when the keystroke should be refused.
+export function scoreDigits(input) {
+  const digits = String(input ?? '').replace(/\D/g, '')
+  if (digits.length <= 2) return digits
+  return digits === '100' ? digits : null
+}
+
+export function formatScoreDigits(digits) {
+  if (!digits) return ''
+  if (digits.length === 1) return digits
+  return `${digits.slice(0, -1)}.${digits.slice(-1)}`
+}
+
+// A saved score back to entry digits: 9.7 -> '97', 9 -> '90', 10 -> '100'.
+export const scoreToDigits = (score) => (score == null ? '' : String(Math.round(Number(score) * 10)))
+
 // Scores are 0 to 10 in tenths. Returns null for anything else.
 export function parseScore(input) {
   const text = String(input ?? '').trim().replace(',', '.')
@@ -140,19 +165,19 @@ export function useRestaurants(householdId) {
     }
   }
 
-  // score null clears that person's score.
-  const setRating = async (restaurantId, userId, score) => {
+  // score null clears that person's score. userId records who typed it.
+  const setRating = async (restaurantId, person, score, userId) => {
     if (!householdId) return { error: 'No household' }
-    const same = (r) => r.restaurant_id === restaurantId && r.user_id === userId
+    const same = (r) => r.restaurant_id === restaurantId && r.person === person
     const snap = qc.getQueryData(sKey)
     await qc.cancelQueries({ queryKey: sKey })
     setList(sKey, prev => {
       const rest = prev.filter(r => !same(r))
-      return score == null ? rest : [...rest, { restaurant_id: restaurantId, user_id: userId, household_id: householdId, score }]
+      return score == null ? rest : [...rest, { restaurant_id: restaurantId, person, user_id: userId ?? null, household_id: householdId, score }]
     })
     try {
-      if (score == null) await deleteRestaurantRating(supabase, restaurantId, userId)
-      else await upsertRestaurantRating(supabase, { restaurant_id: restaurantId, user_id: userId, household_id: householdId, score })
+      if (score == null) await deleteRestaurantRating(supabase, restaurantId, person)
+      else await upsertRestaurantRating(supabase, { restaurant_id: restaurantId, person, user_id: userId ?? null, household_id: householdId, score })
       return { error: null }
     } catch (error) {
       if (snap) qc.setQueryData(sKey, snap)

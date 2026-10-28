@@ -10,7 +10,7 @@ vi.mock('../components/ui/Toast', () => { const toast = vi.fn(() => 1); toast.di
 import { supabase } from '../lib/supabase'
 import { toast } from '../components/ui/Toast'
 import { createWrapper } from '../test/queryWrapper'
-import { useRestaurants, parseScore, averageScore } from './useRestaurants'
+import { useRestaurants, parseScore, averageScore, scoreDigits, formatScoreDigits, scoreToDigits } from './useRestaurants'
 
 const row = (id, extra = {}) => ({ id, place_id: `place-${id}`, name: id.toUpperCase(), status: 'list', sort_order: 0, created_at: '2026-01-01T00:00:00Z', ...extra })
 const PLACE = { placeId: 'place-new', name: 'Wild Sage', cuisine: 'American Restaurant', address: 'Spokane', mapsUrl: 'https://maps.google.com/?cid=1' }
@@ -42,6 +42,25 @@ describe('parseScore and averageScore', () => {
   it('averages to one decimal', () => {
     expect(averageScore([{ score: 9.7 }, { score: '8.5' }])).toBe(9.1)
     expect(averageScore([])).toBeNull()
+  })
+})
+
+describe('score entry digits', () => {
+  it('makes the last digit the tenths and ignores a typed dot', () => {
+    expect(formatScoreDigits(scoreDigits('9'))).toBe('9')
+    expect(formatScoreDigits(scoreDigits('97'))).toBe('9.7')
+    expect(formatScoreDigits(scoreDigits('9.7'))).toBe('9.7')
+    expect(formatScoreDigits(scoreDigits('9.'))).toBe('9')
+    expect(formatScoreDigits(scoreDigits('100'))).toBe('10.0')
+    expect(scoreDigits('975')).toBeNull()
+    expect(scoreDigits('')).toBe('')
+  })
+
+  it('turns a saved score back into digits', () => {
+    expect(scoreToDigits(9.7)).toBe('97')
+    expect(scoreToDigits('8.5')).toBe('85')
+    expect(scoreToDigits(10)).toBe('100')
+    expect(scoreToDigits(null)).toBe('')
   })
 })
 
@@ -87,12 +106,12 @@ describe('useRestaurants', () => {
     expect(back).toMatchObject({ status: 'list', sort_order: 2 })
   })
 
-  it('saves and clears a per-person score', async () => {
+  it('saves and clears a per-person score, whoever types it', async () => {
     const { result } = await renderLoaded()
-    await act(async () => { await result.current.setRating('z', 'u1', 9.7) })
-    expect(result.current.ratings).toEqual([{ restaurant_id: 'z', user_id: 'u1', household_id: 'hh', score: 9.7 }])
+    await act(async () => { await result.current.setRating('z', 'cheyene', 9.7, 'u1') })
+    expect(result.current.ratings).toEqual([{ restaurant_id: 'z', person: 'cheyene', user_id: 'u1', household_id: 'hh', score: 9.7 }])
     expect(supabase.callsFor('restaurant_ratings', 'upsert')).toHaveLength(1)
-    await act(async () => { await result.current.setRating('z', 'u1', null) })
+    await act(async () => { await result.current.setRating('z', 'cheyene', null, 'u1') })
     expect(result.current.ratings).toEqual([])
     expect(supabase.callsFor('restaurant_ratings', 'delete')).toHaveLength(1)
   })
