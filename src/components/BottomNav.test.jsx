@@ -6,9 +6,14 @@ import BottomNav from './BottomNav'
 const renderAt = (path) => render(<MemoryRouter initialEntries={[path]}><BottomNav /></MemoryRouter>)
 
 describe('BottomNav', () => {
-  it('has four tabs: Grocery, Kitchen, Planning, Cookbook', () => {
+  it('has five tabs with Date Night on the far right', () => {
     renderAt('/grocery')
-    expect(screen.getAllByRole('link').map(l => l.textContent)).toEqual(['Grocery', 'Kitchen', 'Planning', 'Cookbook'])
+    expect(screen.getAllByRole('link').map(l => l.textContent)).toEqual(['Grocery', 'Kitchen', 'Planning', 'Cookbook', 'Date Night'])
+  })
+
+  it('marks Date Night current on a restaurant page', () => {
+    renderAt('/date-night/abc')
+    expect(screen.getByRole('link', { name: 'Date Night' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('marks Kitchen current on every kitchen location path', () => {

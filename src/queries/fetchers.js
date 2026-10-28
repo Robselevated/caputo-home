@@ -107,3 +107,21 @@ export async function fetchMembers(client, householdId) {
     client.from('users').select('id, name, email').eq('household_id', householdId).order('name')
   )
 }
+
+// Date Night: three small household lists, read whole.
+export async function fetchRestaurants(client, householdId) {
+  return run(
+    client.from('restaurants').select('*').eq('household_id', householdId)
+      .order('sort_order', { ascending: true }).order('created_at', { ascending: true })
+  )
+}
+
+export async function fetchRestaurantRatings(client, householdId) {
+  return run(client.from('restaurant_ratings').select('*').eq('household_id', householdId))
+}
+
+export async function fetchRestaurantNotes(client, householdId) {
+  return run(
+    client.from('restaurant_notes').select('*').eq('household_id', householdId).order('created_at', { ascending: true })
+  )
+}

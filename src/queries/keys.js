@@ -11,6 +11,9 @@ export const keys = {
   recipeIngredients: (hid) => ['recipe_ingredients', hid],
   mealPicks: (hid) => ['meal_picks', hid],
   members: (hid) => ['household_members', hid],
+  restaurants: (hid) => ['restaurants', hid],
+  restaurantRatings: (hid) => ['restaurant_ratings', hid],
+  restaurantNotes: (hid) => ['restaurant_notes', hid],
 }
 
 const MIN = 60 * 1000
@@ -24,4 +27,5 @@ export const STALE = {
   recipeIngredients: 10 * MIN,
   mealPicks: 1 * MIN,
   members: 24 * 60 * MIN,
+  restaurants: 1 * MIN,
 }

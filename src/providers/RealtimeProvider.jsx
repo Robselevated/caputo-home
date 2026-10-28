@@ -11,9 +11,11 @@ import { invalidateDebounced } from '../queries/invalidate'
 // event patches the query cache by id; nothing here refetches a whole list.
 // (Each page used to open its own channels and refetch on every event.)
 
-const TABLES = ['grocery_items', 'inventory_items', 'recently_bought', 'recipes', 'meal_picks', 'recipe_ingredients']
+const TABLES = ['grocery_items', 'inventory_items', 'recently_bought', 'recipes', 'meal_picks', 'recipe_ingredients', 'restaurants', 'restaurant_ratings', 'restaurant_notes']
 
 const newestFirst = (field) => (rows) => [...rows].sort((a, b) => new Date(b[field]) - new Date(a[field]))
+const byOrder = (rows) => [...rows].sort((a, b) =>
+  (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))
 const oldestFirst = (field) => (rows) => [...rows].sort((a, b) => new Date(a[field]) - new Date(b[field]))
 
 export function applyRealtimeEvent(qc, householdId, payload) {
@@ -36,6 +38,16 @@ export function applyRealtimeEvent(qc, householdId, payload) {
     }
     case 'meal_picks':
       qc.setQueryData(keys.mealPicks(householdId), prev => applyChange(prev, payload, { sort: oldestFirst('created_at') }))
+      break
+    case 'restaurants':
+      qc.setQueryData(keys.restaurants(householdId), prev => applyChange(prev, payload, { sort: byOrder }))
+      break
+    // Ratings key on (restaurant, user), not id, so they refetch instead.
+    case 'restaurant_ratings':
+      invalidateDebounced(qc, keys.restaurantRatings(householdId))
+      break
+    case 'restaurant_notes':
+      qc.setQueryData(keys.restaurantNotes(householdId), prev => applyChange(prev, payload, { sort: oldestFirst('created_at') }))
       break
     case 'recipe_ingredients': {
       invalidateDebounced(qc, keys.recipeIngredients(householdId))
