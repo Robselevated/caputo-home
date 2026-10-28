@@ -13,7 +13,6 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { toast } from '../../components/ui/Toast'
 import { RecipeGrid, GridSkeleton } from './RecipeGrid'
 import { AddRecipeSheet } from './AddRecipeSheet'
-import { SuggestionsPanel } from './SuggestionsPanel'
 import { COOKBOOK_CATEGORIES, errorText, plural } from './recipeFormat'
 
 export default function CookbookPage() {
@@ -156,9 +155,6 @@ export default function CookbookPage() {
           ))}
         </div>
       )}
-
-      {/* Stays mounted while filtering: the ideas came from a paid, slow call. */}
-      <div className={filtering || booting ? 'hidden' : ''}><SuggestionsPanel householdId={householdId} /></div>
 
       {booting ? (
         <GridSkeleton />

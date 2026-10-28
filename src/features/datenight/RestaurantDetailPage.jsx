@@ -14,6 +14,45 @@ import { mapsLink } from './placesSearch'
 
 const visitDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
+// One bullet. Tap the text to edit it in place; Enter or leaving the box
+// saves, Escape puts it back, and clearing it deletes the note.
+function NoteItem({ note, onEdit, onRemove }) {
+  const [editing, setEditing] = useState(false)
+  const [text, setText] = useState(note.body)
+
+  const start = () => { setText(note.body); setEditing(true) }
+  const save = () => { setEditing(false); if (text.trim() !== note.body) onEdit(note.id, text) }
+
+  return (
+    <li className="flex items-start gap-2">
+      <span aria-hidden="true" className="mt-[15px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent-datenight" />
+      {editing ? (
+        <Input
+          value={text}
+          autoFocus
+          aria-label="Edit note"
+          maxLength={500}
+          enterKeyHint="done"
+          onChange={(e) => setText(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+            if (e.key === 'Escape') { setText(note.body); setEditing(false) }
+          }}
+          className="!h-10 min-w-0 flex-1"
+        />
+      ) : (
+        <button type="button" aria-label={`Edit note: ${note.body}`} onClick={start} className="min-w-0 flex-1 py-1.5 text-left text-base text-ink">
+          {note.body}
+        </button>
+      )}
+      <IconButton label={`Delete note: ${note.body}`} size={32} onClick={() => onRemove(note.id)} className="mt-1">
+        <X size={16} aria-hidden="true" />
+      </IconButton>
+    </li>
+  )
+}
+
 function Card({ heading, aside, children }) {
   return (
     <section className="flex flex-col gap-2.5 rounded-tile bg-surface p-4 shadow-soft">
@@ -71,7 +110,7 @@ export default function RestaurantDetailPage() {
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
   const userId = user?.id
-  const { restaurants, ratings, notes, loading, markVisited, moveToList, removeRestaurant, setRating, addNote, removeNote } = useRestaurants(householdId)
+  const { restaurants, ratings, notes, loading, markVisited, moveToList, removeRestaurant, setRating, addNote, editNote, removeNote } = useRestaurants(householdId)
   const [draft, setDraft] = useState('')
   const [confirmRemove, setConfirmRemove] = useState(false)
 
@@ -158,22 +197,13 @@ export default function RestaurantDetailPage() {
               />
             )
           })}
-          <p className="text-[13px] text-ink-2">Out of 10. Type 97 for 9.7, 100 for a perfect 10.</p>
         </Card>
       )}
 
       <Card heading="Notes">
         {placeNotes.length > 0 && (
           <ul className="flex flex-col gap-1">
-            {placeNotes.map(n => (
-              <li key={n.id} className="flex items-start gap-2">
-                <span aria-hidden="true" className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent-datenight" />
-                <span className="min-w-0 flex-1 py-0.5 text-base text-ink">{n.body}</span>
-                <IconButton label={`Delete note: ${n.body}`} size={32} onClick={() => removeNote(n.id)}>
-                  <X size={16} aria-hidden="true" />
-                </IconButton>
-              </li>
-            ))}
+            {placeNotes.map(n => <NoteItem key={n.id} note={n} onEdit={editNote} onRemove={removeNote} />)}
           </ul>
         )}
         <form onSubmit={submitNote} className="flex gap-2">

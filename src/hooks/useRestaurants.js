@@ -6,7 +6,7 @@ import { keys, STALE } from '../queries/keys'
 import { fetchRestaurants, fetchRestaurantRatings, fetchRestaurantNotes } from '../queries/fetchers'
 import {
   insertRestaurant, updateRestaurant, deleteRestaurant, setRestaurantSortOrder,
-  upsertRestaurantRating, deleteRestaurantRating, insertRestaurantNote, deleteRestaurantNote,
+  upsertRestaurantRating, deleteRestaurantRating, insertRestaurantNote, updateRestaurantNote, deleteRestaurantNote,
 } from '../queries/writes'
 
 const EMPTY = []
@@ -218,6 +218,24 @@ export function useRestaurants(householdId) {
     }
   }
 
+  // An emptied note is deleted rather than saved blank.
+  const editNote = async (id, body) => {
+    const text = body.trim()
+    if (!text) return removeNote(id)
+    const prevRow = (qc.getQueryData(nKey) ?? []).find(n => n.id === id)
+    if (!prevRow || prevRow.body === text) return { error: null }
+    await qc.cancelQueries({ queryKey: nKey })
+    setList(nKey, prev => upsertById(prev, { ...prevRow, body: text }))
+    try {
+      await updateRestaurantNote(supabase, id, text)
+      return { error: null }
+    } catch (error) {
+      setList(nKey, prev => upsertById(prev, prevRow))
+      toast({ message: "Couldn't save that note", tone: 'error' })
+      return { error }
+    }
+  }
+
   const removeNote = async (id) => {
     const prevRow = (qc.getQueryData(nKey) ?? []).find(n => n.id === id)
     await qc.cancelQueries({ queryKey: nKey })
@@ -234,6 +252,6 @@ export function useRestaurants(householdId) {
 
   return {
     restaurants, ratings, notes, loading: isPending,
-    addRestaurant, markVisited, moveToList, reorder, setLocation, removeRestaurant, setRating, addNote, removeNote,
+    addRestaurant, markVisited, moveToList, reorder, setLocation, removeRestaurant, setRating, addNote, editNote, removeNote,
   }
 }
