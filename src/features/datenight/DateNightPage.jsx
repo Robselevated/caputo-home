@@ -16,11 +16,16 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { ListSkeleton } from '../../components/ui/Skeleton'
 import { RestaurantRow } from './RestaurantRow'
 import { RestaurantSearchSheet } from './RestaurantSearchSheet'
+import { RestaurantMap } from './RestaurantMap'
+import { useBackfillLocations } from './useBackfillLocations'
 
 const VIEWS = [
   { value: 'list', label: 'Up next' },
   { value: 'archived', label: 'Been there' },
 ]
+
+// Pin colors: the Date Night accent for places to try, grey for places we've been.
+const PIN = { list: '#A3214A', archived: '#5E6464' }
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 const newestVisit = (a, b) => String(b.visited_at ?? '').localeCompare(String(a.visited_at ?? ''))
@@ -41,7 +46,7 @@ export default function DateNightPage() {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
-  const { restaurants, ratings, loading, addRestaurant, reorder } = useRestaurants(householdId)
+  const { restaurants, ratings, loading, addRestaurant, reorder, setLocation } = useRestaurants(householdId)
   const sensors = useListSensors()
   const [view, setView] = useState('list')
   const [searching, setSearching] = useState(false)
@@ -53,6 +58,10 @@ export default function DateNightPage() {
     for (const r of ratings) byPlace.set(r.restaurant_id, [...(byPlace.get(r.restaurant_id) ?? []), r])
     return new Map([...byPlace].map(([id, rows]) => [id, averageScore(rows)]))
   }, [ratings])
+
+  useBackfillLocations(restaurants, setLocation)
+  const shown = view === 'list' ? upNext : beenThere
+  const hasPins = shown.some(r => r.lat != null && r.lng != null)
 
   const handleDragEnd = ({ active, over }) => {
     if (!over || active.id === over.id) return
@@ -80,6 +89,8 @@ export default function DateNightPage() {
       />
 
       <SegmentedControl label="Date Night lists" options={VIEWS} value={view} onChange={setView} activeClass="text-accent-datenight" />
+
+      {hasPins && <RestaurantMap restaurants={shown} color={PIN[view]} onOpen={(r) => open(r)} />}
 
       {loading && restaurants.length === 0 ? (
         <ListSkeleton />

@@ -72,15 +72,17 @@ describe('details', () => {
       primaryTypeDisplayName: { text: 'American Restaurant' },
       formattedAddress: '916 W 2nd Ave, Spokane, WA',
       googleMapsUri: 'https://maps.google.com/?cid=1',
+      location: { latitude: 47.6573, longitude: -117.4235 },
     }))
     const res = await details({ placeId: PLACE, sessionToken: TOKEN }, { key: 'k', fetchImpl })
     expect(res.body.place).toEqual({
       placeId: PLACE, name: 'Wild Sage', cuisine: 'American Restaurant',
       address: '916 W 2nd Ave, Spokane, WA', mapsUrl: 'https://maps.google.com/?cid=1',
+      lat: 47.6573, lng: -117.4235,
     })
     const [url, init] = fetchImpl.mock.calls[0]
     expect(url).toBe(`https://places.googleapis.com/v1/places/${PLACE}?sessionToken=${TOKEN}`)
-    expect(init.headers['X-Goog-FieldMask']).toBe('id,displayName,primaryTypeDisplayName,formattedAddress,googleMapsUri')
+    expect(init.headers['X-Goog-FieldMask']).toBe('id,displayName,primaryTypeDisplayName,formattedAddress,googleMapsUri,location')
   })
 
   it('rejects a place id that could change the URL path', async () => {

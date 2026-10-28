@@ -4,7 +4,7 @@
 // details call. Daily quotas on the Google Cloud project are the hard cap.
 
 const BASE = 'https://places.googleapis.com/v1'
-const DETAILS_FIELDS = 'id,displayName,primaryTypeDisplayName,formattedAddress,googleMapsUri'
+const DETAILS_FIELDS = 'id,displayName,primaryTypeDisplayName,formattedAddress,googleMapsUri,location'
 const BIAS_RADIUS_M = 50000 // Google's maximum for a bias circle
 const TIMEOUT_MS = 8000
 
@@ -77,6 +77,8 @@ export async function details({ placeId, sessionToken }, { key, fetchImpl = fetc
         cuisine: data?.primaryTypeDisplayName?.text ?? null,
         address: data?.formattedAddress ?? null,
         mapsUrl: data?.googleMapsUri ?? null,
+        lat: isCoord(data?.location?.latitude, 90) ? data.location.latitude : null,
+        lng: isCoord(data?.location?.longitude, 180) ? data.location.longitude : null,
       },
     },
   }

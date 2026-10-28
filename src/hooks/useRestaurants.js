@@ -94,6 +94,8 @@ export function useRestaurants(householdId) {
       cuisine: place.cuisine || null,
       address: place.address || null,
       maps_url: place.mapsUrl || null,
+      lat: place.lat ?? null,
+      lng: place.lng ?? null,
       status: 'list',
       sort_order: listed.reduce((max, r) => Math.max(max, r.sort_order ?? 0), -1) + 1,
       created_by: userId ?? null,
@@ -134,6 +136,19 @@ export function useRestaurants(householdId) {
     const listed = (qc.getQueryData(rKey) ?? []).filter(r => r.status === 'list')
     const bottom = listed.reduce((max, r) => Math.max(max, r.sort_order ?? 0), -1) + 1
     return patch(id, { status: 'list', sort_order: bottom }, "Couldn't move it back to the list")
+  }
+
+  // Quiet: fills map pins for places saved before locations were stored, and
+  // a miss just means no pin until the next try.
+  const setLocation = async (id, lat, lng) => {
+    setList(rKey, prev => prev.map(r => (r.id === id ? { ...r, lat, lng } : r)))
+    try {
+      await updateRestaurant(supabase, id, { lat, lng })
+      return { error: null }
+    } catch (error) {
+      setList(rKey, prev => prev.map(r => (r.id === id ? { ...r, lat: null, lng: null } : r)))
+      return { error }
+    }
   }
 
   const reorder = async (orderedIds) => {
@@ -219,6 +234,6 @@ export function useRestaurants(householdId) {
 
   return {
     restaurants, ratings, notes, loading: isPending,
-    addRestaurant, markVisited, moveToList, reorder, removeRestaurant, setRating, addNote, removeNote,
+    addRestaurant, markVisited, moveToList, reorder, setLocation, removeRestaurant, setRating, addNote, removeNote,
   }
 }
