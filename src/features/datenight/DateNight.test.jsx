@@ -14,15 +14,19 @@ vi.mock('./placesSearch', async (orig) => ({
   getPlace: vi.fn(async () => ({ placeId: 'place-new', name: 'Wild Sage', cuisine: 'American Restaurant', address: 'Spokane', mapsUrl: 'https://maps.google.com/?cid=9' })),
 }))
 
+vi.mock('./RestaurantMap', () => ({
+  RestaurantMap: ({ restaurants, color }) => <div data-testid="map" data-color={color} data-names={restaurants.map(r => r.name).join(',')} />,
+}))
+
 import { supabase } from '../../lib/supabase'
 import { createWrapper } from '../../test/queryWrapper'
 import { ToastProvider } from '../../components/ui/Toast'
-import { searchPlaces } from './placesSearch'
+import { searchPlaces, getPlace } from './placesSearch'
 import DateNightPage from './DateNightPage'
 import RestaurantDetailPage from './RestaurantDetailPage'
 
 const restaurants = [
-  { id: 'a', household_id: 'hh', place_id: 'pa', name: 'Clover', cuisine: 'Italian Restaurant', status: 'list', sort_order: 0, maps_url: 'https://maps.google.com/?cid=1', created_at: '2026-10-01T00:00:00Z' },
+  { id: 'a', household_id: 'hh', place_id: 'pa', name: 'Clover', cuisine: 'Italian Restaurant', status: 'list', sort_order: 0, maps_url: 'https://maps.google.com/?cid=1', lat: 47.66, lng: -117.4, created_at: '2026-10-01T00:00:00Z' },
   { id: 'z', household_id: 'hh', place_id: 'pz', name: 'Inland Pacific Kitchen', cuisine: 'Restaurant', status: 'archived', sort_order: 0, visited_at: '2026-10-20T00:00:00Z', maps_url: null, created_at: '2026-09-01T00:00:00Z' },
 ]
 
@@ -77,6 +81,28 @@ describe('DateNightPage', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('DateNightPage map', () => {
+  it('pins the places in the open tab, in that tab\'s color', async () => {
+    renderAt('/date-night')
+    const map = await screen.findByTestId('map')
+    expect(map).toHaveAttribute('data-names', 'Clover')
+    expect(map).toHaveAttribute('data-color', '#A3214A')
+  })
+
+  it('looks up a location once for a place saved before the map existed', async () => {
+    // A fresh id: the lookup is once per app session, and other tests already tried 'z'.
+    supabase.setResult('restaurants', 'select', { data: [restaurants[0], { ...restaurants[1], id: 'y', place_id: 'py' }], error: null })
+    getPlace.mockResolvedValueOnce({ placeId: 'py', name: 'Inland Pacific Kitchen', lat: 47.65, lng: -117.42 })
+    renderAt('/date-night')
+    await waitFor(() => expect(supabase.callsFor('restaurants', 'update')).toHaveLength(1))
+    expect(getPlace).toHaveBeenCalledWith('py')
+    const changes = supabase.callsFor('restaurants', 'update')[0].chain.find(([m]) => m === 'update')[1]
+    expect(changes).toEqual({ lat: 47.65, lng: -117.42 })
+    fireEvent.click(screen.getByRole('tab', { name: 'Been there' }))
+    expect(await screen.findByTestId('map')).toHaveAttribute('data-color', '#5E6464')
   })
 })
 

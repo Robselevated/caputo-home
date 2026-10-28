@@ -649,6 +649,8 @@ create table if not exists restaurants (
   cuisine text,
   address text,
   maps_url text,
+  lat double precision,  -- see sql/2026-10-28-date-night-map.sql
+  lng double precision,
   status text not null default 'list' check (status in ('list', 'archived')),
   sort_order integer not null default 0,
   visited_at timestamptz,
