@@ -16,7 +16,8 @@ export default {
         control: '#EEF1F1',
         track: '#E9EDED',
         danger: { ink: '#B42318', tile: '#FDECEA' },
-        accent: { grocery: '#176A21', planning: '#B44A1F', cookbook: '#9128AD' },
+        accent: { grocery: '#176A21', planning: '#B44A1F', cookbook: '#9128AD', datenight: '#A3214A' },
+        datenight: { tile: '#F7E4EA', ink: '#7A1636' },
         store: {
           pilgrims: { tile: '#E1F0E3', ink: '#0F4F18', accent: '#176A21' },
           costco: { tile: '#DCEAF6', ink: '#0B4A73', accent: '#005F99' },

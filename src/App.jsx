@@ -13,16 +13,18 @@ import { kitchenRoutes } from './features/kitchen/routes'
 // Lazy-load secondary routes; the grocery page is eager since it's the landing page.
 const loadCookbook = () => import('./pages/Cookbook')
 const loadMealPlanning = () => import('./pages/MealPlanning')
+const loadDateNight = () => import('./pages/DateNight')
 
 const Login = lazy(() => import('./pages/Login'))
 const Cookbook = lazy(loadCookbook)
 const MealPlanning = lazy(loadMealPlanning)
+const DateNight = lazy(loadDateNight)
 
 // Warm the other tabs' chunks once the landing page has settled, so the first
 // tap on a tab never shows the Suspense spinner.
 function usePreloadTabs() {
   useEffect(() => {
-    const run = () => { [loadCookbook, loadMealPlanning].forEach(fn => fn().catch(() => {})) }
+    const run = () => { [loadCookbook, loadMealPlanning, loadDateNight].forEach(fn => fn().catch(() => {})) }
     const idle = typeof requestIdleCallback === 'function'
       ? requestIdleCallback(run, { timeout: 6000 })
       : setTimeout(run, 3000)
@@ -35,6 +37,7 @@ function usePreloadTabs() {
 const RecipeDetail = lazy(() => import('./pages/RecipeDetail'))
 const RecipeEdit = lazy(() => import('./pages/RecipeEdit'))
 const SuggestionDetail = lazy(() => import('./pages/SuggestionDetail'))
+const RestaurantDetail = lazy(() => import('./pages/RestaurantDetail'))
 
 // Route-level fallback while a page chunk loads: quiet placeholder tiles in
 // the page gutter, never a spinner.
@@ -70,6 +73,8 @@ export default function App() {
                       <Route path="/cookbook/suggestion" element={<SuggestionDetail />} />
                       <Route path="/cookbook/:id/edit" element={<RecipeEdit />} />
                       <Route path="/cookbook/:id" element={<RecipeDetail />} />
+                      <Route path="/date-night" element={<DateNight />} />
+                      <Route path="/date-night/:id" element={<RestaurantDetail />} />
                       <Route path="*" element={<Navigate to="/grocery" replace />} />
                     </Routes>
                   </Suspense>

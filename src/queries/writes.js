@@ -82,3 +82,37 @@ export async function deleteMealPicks(client, householdId, ids) {
   if (!ids?.length) return
   await run(client.from('meal_picks').delete().eq('household_id', householdId).in('id', ids))
 }
+
+// --- date night ------------------------------------------------------------
+
+export async function insertRestaurant(client, row) {
+  return run(client.from('restaurants').insert(row).select().single())
+}
+
+export async function updateRestaurant(client, id, changes) {
+  await run(client.from('restaurants').update(changes).eq('id', id).select('id'))
+}
+
+export async function deleteRestaurant(client, id) {
+  await run(client.from('restaurants').delete().eq('id', id).select('id'))
+}
+
+export async function setRestaurantSortOrder(client, ids) {
+  await run(client.rpc('set_restaurant_sort_order', { p_ids: ids }))
+}
+
+export async function upsertRestaurantRating(client, row) {
+  await run(client.from('restaurant_ratings').upsert(row, { onConflict: 'restaurant_id,user_id' }))
+}
+
+export async function deleteRestaurantRating(client, restaurantId, userId) {
+  await run(client.from('restaurant_ratings').delete().eq('restaurant_id', restaurantId).eq('user_id', userId))
+}
+
+export async function insertRestaurantNote(client, row) {
+  return run(client.from('restaurant_notes').insert(row).select().single())
+}
+
+export async function deleteRestaurantNote(client, id) {
+  await run(client.from('restaurant_notes').delete().eq('id', id).select('id'))
+}
