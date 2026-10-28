@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router'
-import { MapPin, Heart, Undo2, X, UtensilsCrossed } from 'lucide-react'
+import { MapPin, Heart, RotateCcw, X, UtensilsCrossed } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import { useRestaurants, averageScore, parseScore } from '../../hooks/useRestaurants'
-import { useHouseholdMembers } from '../../hooks/useHouseholdMembers'
+import { useRestaurants, averageScore, parseScore, PEOPLE, scoreDigits, formatScoreDigits, scoreToDigits } from '../../hooks/useRestaurants'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { IconButton } from '../../components/ui/IconButton'
@@ -13,7 +12,6 @@ import { ListSkeleton } from '../../components/ui/Skeleton'
 import { BackLink } from '../cookbook/BackLink'
 import { mapsLink } from './placesSearch'
 
-const firstName = (member) => (member.name || member.email || 'Someone').split(/[\s@]/)[0]
 const visitDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
 function Card({ heading, aside, children }) {
@@ -28,41 +26,38 @@ function Card({ heading, aside, children }) {
   )
 }
 
-// One person's score. Saved on blur or Enter; an empty box clears it.
-function ScoreField({ member, saved, onSave }) {
-  const [text, setText] = useState(saved != null ? String(saved) : '')
-  const [invalid, setInvalid] = useState(false)
-  const id = `score-${member.id}`
+// One person's score. Digits only: the last digit is the tenths, so typing 97
+// shows 9.7 and 100 shows 10.0; a typed dot is ignored. Saved on blur or
+// Enter; an empty box clears it.
+function ScoreField({ person, saved, onSave }) {
+  const [digits, setDigits] = useState(scoreToDigits(saved))
+  const id = `score-${person.key}`
+
+  const handleChange = (e) => {
+    const next = scoreDigits(e.target.value)
+    if (next != null) setDigits(next)
+  }
 
   const commit = () => {
-    const trimmed = text.trim()
-    if (!trimmed) {
-      setInvalid(false)
-      if (saved != null) onSave(null)
-      return
-    }
-    const score = parseScore(trimmed)
-    if (score == null) { setInvalid(true); return }
-    setInvalid(false)
-    setText(String(score))
+    const score = digits ? parseScore(formatScoreDigits(digits)) : null
     if (score !== saved) onSave(score)
   }
 
   return (
     <div className="flex items-center gap-3">
-      <label htmlFor={id} className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{firstName(member)}</label>
+      <label htmlFor={id} className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{person.label}</label>
       <div className="flex items-center gap-1.5">
         <Input
           id={id}
-          inputMode="decimal"
+          inputMode="numeric"
+          pattern="[0-9]*"
           enterKeyHint="done"
-          value={text}
+          value={formatScoreDigits(digits)}
           placeholder="-"
-          aria-invalid={invalid || undefined}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleChange}
           onBlur={commit}
           onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-          className={`!h-11 !w-20 text-center font-semibold ${invalid ? '!border-danger-ink' : ''}`}
+          className="!h-11 !w-20 text-center font-semibold"
         />
         <span className="text-sm text-ink-2">/ 10</span>
       </div>
@@ -77,7 +72,6 @@ export default function RestaurantDetailPage() {
   const householdId = profile?.household_id
   const userId = user?.id
   const { restaurants, ratings, notes, loading, markVisited, moveToList, removeRestaurant, setRating, addNote, removeNote } = useRestaurants(householdId)
-  const { members } = useHouseholdMembers(householdId)
   const [draft, setDraft] = useState('')
   const [confirmRemove, setConfirmRemove] = useState(false)
 
@@ -119,6 +113,17 @@ export default function RestaurantDetailPage() {
       {restaurant.address && <p className="-mt-2 text-sm text-ink-2">{restaurant.address}</p>}
 
       <div className="flex gap-2">
+        {archived ? (
+          <Button className="flex-1 bg-accent-datenight" onClick={() => moveToList(id)}>
+            <RotateCcw size={18} aria-hidden="true" />
+            Let's go back
+          </Button>
+        ) : (
+          <Button className="flex-1 bg-accent-datenight" onClick={() => markVisited(id)}>
+            <Heart size={18} aria-hidden="true" />
+            We went
+          </Button>
+        )}
         <a
           href={mapsLink(restaurant)}
           target="_blank"
@@ -128,33 +133,32 @@ export default function RestaurantDetailPage() {
           <MapPin size={18} aria-hidden="true" />
           Google Maps
         </a>
-        {archived ? (
-          <Button variant="secondary" className="flex-1" onClick={() => moveToList(id)}>
-            <Undo2 size={18} aria-hidden="true" />
-            Back to list
-          </Button>
-        ) : (
-          <Button className="flex-1 bg-accent-datenight" onClick={() => markVisited(id)}>
-            <Heart size={18} aria-hidden="true" />
-            We went
-          </Button>
-        )}
       </div>
+      {archived && <p className="-mt-2 text-[13px] text-ink-2">Let's go back puts it on Up next again. Scores and notes stay.</p>}
 
       {archived && (
-        <Card heading="Scores" aside={average != null && <span className="font-heading text-[22px] font-extrabold text-accent-datenight">{average.toFixed(1)}</span>}>
-          {members.map(m => {
-            const saved = placeRatings.find(r => r.user_id === m.id)
+        <Card
+          heading="Scores"
+          aside={average != null && (
+            <span className="flex items-baseline gap-1.5 text-[13px] font-semibold text-ink-2">
+              Average
+              <span className="font-heading text-[22px] font-extrabold text-accent-datenight">{average.toFixed(1)}</span>
+            </span>
+          )}
+        >
+          {PEOPLE.map(p => {
+            const saved = placeRatings.find(r => r.person === p.key)
+            const score = saved != null ? Number(saved.score) : null
             return (
               <ScoreField
-                key={`${m.id}:${saved?.score ?? ''}`}
-                member={m}
-                saved={saved != null ? Number(saved.score) : null}
-                onSave={(score) => setRating(id, m.id, score)}
+                key={`${p.key}:${score ?? ''}`}
+                person={p}
+                saved={score}
+                onSave={(next) => setRating(id, p.key, next, userId)}
               />
             )
           })}
-          <p className="text-[13px] text-ink-2">Out of 10. Decimals work, like 9.7.</p>
+          <p className="text-[13px] text-ink-2">Out of 10. Type 97 for 9.7, 100 for a perfect 10.</p>
         </Card>
       )}
 

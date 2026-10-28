@@ -102,11 +102,11 @@ export async function setRestaurantSortOrder(client, ids) {
 }
 
 export async function upsertRestaurantRating(client, row) {
-  await run(client.from('restaurant_ratings').upsert(row, { onConflict: 'restaurant_id,user_id' }))
+  await run(client.from('restaurant_ratings').upsert(row, { onConflict: 'restaurant_id,person' }))
 }
 
-export async function deleteRestaurantRating(client, restaurantId, userId) {
-  await run(client.from('restaurant_ratings').delete().eq('restaurant_id', restaurantId).eq('user_id', userId))
+export async function deleteRestaurantRating(client, restaurantId, person) {
+  await run(client.from('restaurant_ratings').delete().eq('restaurant_id', restaurantId).eq('person', person))
 }
 
 export async function insertRestaurantNote(client, row) {

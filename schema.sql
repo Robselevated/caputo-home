@@ -660,11 +660,12 @@ create table if not exists restaurants (
 
 create table if not exists restaurant_ratings (
   restaurant_id uuid not null references restaurants(id) on delete cascade,
-  user_id uuid not null references users(id) on delete cascade,
+  person text not null check (person in ('rob', 'cheyene')), -- see sql/2026-10-28-date-night-people.sql
+  user_id uuid references users(id) on delete set null,     -- who typed it
   household_id uuid not null references households(id) on delete cascade,
   score numeric(3,1) not null check (score >= 0 and score <= 10),
   updated_at timestamptz not null default now(),
-  primary key (restaurant_id, user_id)
+  primary key (restaurant_id, person)
 );
 
 create table if not exists restaurant_notes (
