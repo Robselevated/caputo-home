@@ -89,6 +89,21 @@ export default defineConfig({
           // NetworkFirst used to hand back a cached pantry list on a slow
           // network, which resurrected rows that had just been deleted. Offline
           // reads come from the app-level cache instead.
+          // Resized recipe photos from Netlify's image CDN. A URL names one
+          // photo at one size and never changes, so the grid repaints from
+          // here without touching the network.
+          {
+            urlPattern: /\/\.netlify\/images\?/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'recipe-photos',
+              cacheableResponse: { statuses: [200] },
+              expiration: {
+                maxEntries: 400,
+                maxAgeSeconds: 60 * 60 * 24 * 60
+              }
+            }
+          },
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
             handler: 'CacheFirst',

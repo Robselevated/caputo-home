@@ -3,6 +3,7 @@ import { Sheet } from '../../components/ui/Sheet'
 import { Button } from '../../components/ui/Button'
 import { resolveSection } from '../../lib/mealSections'
 import { cookName } from './WeekPlan'
+import { Photo } from '../../components/ui/Photo'
 
 export const dayTitle = (date) => date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
 
@@ -26,7 +27,7 @@ function ChoosePick({ waiting, onSchedule, onSomethingElse }) {
                     className="flex w-full items-center gap-3 rounded-row bg-control py-2 pl-3 pr-2 text-left active:opacity-80"
                   >
                     {pick.image_url ? (
-                      <img src={pick.image_url} alt="" className="h-10 w-10 shrink-0 rounded-sm2 object-cover" />
+                      <Photo src={pick.image_url} size={120} alt="" className="h-10 w-10 shrink-0 rounded-sm2 object-cover" />
                     ) : (
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm2 bg-track">
                         <BookOpen size={18} aria-hidden="true" className="text-ink-3" />
@@ -53,7 +54,7 @@ function PlannedMeal({ pick, busy, onOpenRecipe, onShop, onUnschedule, onRemove 
   return (
     <div className="flex flex-col gap-4 pb-2">
       <div className="flex items-center gap-3">
-        {pick.image_url && <img src={pick.image_url} alt="" className="h-14 w-14 shrink-0 rounded-sm2 object-cover" />}
+        <Photo src={pick.image_url} size={168} alt="" className="h-14 w-14 shrink-0 rounded-sm2 object-cover" />
         <div className="flex min-w-0 flex-col gap-px">
           <p className="truncate text-lg font-bold text-ink">{pick.name}</p>
           <p className="text-[14px] text-ink-2">{cookName(pick)} is cooking</p>

@@ -1,12 +1,16 @@
 import { RecipeCard } from './RecipeCard'
 
+// Roughly the first screen and a half of cards.
+const EAGER_CARDS = 6
+
 export function RecipeGrid({ recipes, coverage, refreshingId, onOpen, onRefresh }) {
   return (
     <div className="grid grid-cols-2 gap-x-3 gap-y-5">
-      {recipes.map((recipe) => (
+      {recipes.map((recipe, i) => (
         <RecipeCard
           key={recipe.id}
           recipe={recipe}
+          eager={i < EAGER_CARDS}
           coverage={coverage[recipe.id]}
           refreshing={refreshingId === recipe.id}
           onOpen={onOpen}

@@ -17,13 +17,14 @@ import { MakeThisSheet } from './MakeThisSheet'
 import { MealPlanPickerSheet } from './MealPlanPickerSheet'
 import { RecipeOptionsSheet } from './RecipeOptionsSheet'
 import { errorText, plural, recipeMeta } from './recipeFormat'
+import { Photo } from '../../components/ui/Photo'
 
 function RecipeImage({ src, alt }) {
   const [broken, setBroken] = useState(false)
   if (broken) return null
   return (
     <div className="overflow-hidden rounded-tile bg-surface shadow-soft">
-      <img src={src} alt={alt} width="400" height="300" className="aspect-[4/3] w-full object-cover" onError={() => setBroken(true)} />
+      <Photo src={src} size={900} alt={alt} width="400" height="300" className="aspect-[4/3] w-full object-cover" onBroken={() => setBroken(true)} />
     </div>
   )
 }

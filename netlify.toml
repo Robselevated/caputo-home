@@ -46,6 +46,12 @@
   [headers.values]
     Cache-Control = "no-cache"
 
+# Recipe photos are hotlinked from whatever site the recipe came from, so the
+# image CDN (/.netlify/images, used by src/lib/imageUrl.js) may fetch any https
+# host.
+[images]
+  remote_images = ["https://.*"]
+
 # Functions import the shared ingredient parser from src/lib; esbuild follows
 # relative imports outside the functions directory.
 [functions]

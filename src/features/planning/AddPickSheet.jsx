@@ -6,6 +6,7 @@ import { Pill } from '../../components/ui/Pill'
 import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { Field, Input } from '../../components/ui/Field'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { Photo } from '../../components/ui/Photo'
 
 const MODES = [
   { value: 'cookbook', label: 'From the cookbook' },
@@ -23,7 +24,7 @@ function RecipeChoice({ recipe, disabled, onPick }) {
         className="flex w-full items-center gap-3 rounded-row bg-control py-2 pl-3 pr-2 text-left active:opacity-80 disabled:opacity-40"
       >
         {recipe.image_url ? (
-          <img src={recipe.image_url} alt="" className="h-10 w-10 shrink-0 rounded-sm2 object-cover" />
+          <Photo src={recipe.image_url} size={120} alt="" className="h-10 w-10 shrink-0 rounded-sm2 object-cover" />
         ) : (
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm2 bg-track">
             <BookOpen size={18} aria-hidden="true" className="text-ink-3" />

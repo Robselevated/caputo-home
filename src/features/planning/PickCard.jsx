@@ -1,5 +1,6 @@
 import { ShoppingCart, X } from 'lucide-react'
 import { IconButton } from '../../components/ui/IconButton'
+import { Photo } from '../../components/ui/Photo'
 
 // One pick inside a section tile. Recipe picks open the recipe and can shop
 // for whatever the kitchen is missing; quick ideas are a name and a note.
@@ -15,7 +16,7 @@ export function PickCard({ pick, busy, onOpen, onShop, onRemove }) {
 
   return (
     <div className="flex items-center gap-2 rounded-row bg-surface py-2 pl-3 pr-1">
-      {pick.image_url && <img src={pick.image_url} alt="" className="h-10 w-10 shrink-0 rounded-sm2 object-cover" />}
+      <Photo src={pick.image_url} size={120} alt="" className="h-10 w-10 shrink-0 rounded-sm2 object-cover" />
       {hasRecipe ? (
         <button type="button" aria-label={`Open ${pick.name}`} onClick={() => onOpen(pick)} className="flex min-w-0 flex-1 flex-col items-start gap-px py-1 text-left">
           {text}
