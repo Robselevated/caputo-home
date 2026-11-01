@@ -69,6 +69,34 @@ Server only (Netlify). Second fetch path for recipe links when a site refuses th
 
 ---
 
+### Google Maps Platform (Date Night)
+
+All three live in one Google Cloud project with billing enabled. Two users keep every SKU inside the monthly free allowance.
+
+**GOOGLE_PLACES_API_KEY**
+- **Value**: Server key with the Places API enabled
+- **Source**: Google Cloud Console → APIs & Services → Credentials
+- **Build/Runtime**: Runtime only (used in Netlify Functions)
+- **Security**: **SECRET** - Never expose in frontend. Restrict to the Places API.
+- **Used in**: `places.js` function (restaurant search)
+
+**VITE_GOOGLE_MAPS_BROWSER_KEY**
+- **Value**: Browser key with only the Maps JavaScript API enabled
+- **Source**: Google Cloud Console → APIs & Services → Credentials → Create credentials → API key
+- **Build/Runtime**: Build time (embedded in frontend)
+- **Security**: Public by design. Safe only because of two restrictions set in the Console: **API restriction** = Maps JavaScript API; **Application restriction** = HTTP referrers `https://caputo-home.netlify.app/*`, `https://*--caputo-home.netlify.app/*` (deploy previews), `http://localhost:5173/*`. Never reuse the Places key here.
+- **Where**: Netlify env (production + deploy previews) and `.env.local`. Not in the committed `.env`, since the repo is public and GitHub secret scanning flags Google keys.
+- **Used in**: `src/features/datenight/googleMaps.js`. Without it the Date Night map shows "Map unavailable".
+
+**VITE_GOOGLE_MAPS_MAP_ID**
+- **Value**: A Map ID (JavaScript, Vector) for Advanced Markers
+- **Source**: Google Cloud Console → Google Maps Platform → Map Management → Create Map ID
+- **Build/Runtime**: Build time (embedded in frontend)
+- **Security**: Public, not a secret
+- **Default**: `DEMO_MAP_ID` (fine for local development; set a real one for production)
+
+---
+
 ## Setting Environment Variables in Netlify
 
 1. Go to your Netlify site dashboard
