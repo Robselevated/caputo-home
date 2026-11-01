@@ -169,3 +169,15 @@ describe('addMissingToGroceryList cleans the names it inserts', () => {
     expect(supabase.callsFor('grocery_items', 'insert')).toHaveLength(0)
   })
 })
+
+describe('matchIngredients', () => {
+  it('reads the recipe lines in recipe order so the Make this sheet can list them that way', async () => {
+    supabase.setResult('recipe_ingredients', 'select', { data: [], error: null })
+    supabase.setResult('inventory_items', 'select', { data: [], error: null })
+    const { result } = renderHook(() => useRecipeMatch('hh'))
+    await act(async () => { await result.current.matchIngredients('r1') })
+    const [call] = supabase.callsFor('recipe_ingredients', 'select')
+    expect(call.chain[0][1]).toContain('position')
+    expect(call.chain.some(([m, col]) => m === 'order' && col === 'position')).toBe(true)
+  })
+})

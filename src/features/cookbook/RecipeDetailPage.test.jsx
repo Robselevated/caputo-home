@@ -47,7 +47,7 @@ describe('RecipeDetailPage', () => {
     // Coverage reads the household's ingredients; the Make this check reads one recipe's.
     supabase.setResult('recipe_ingredients', 'select', (record) => (
       record.chain.some(([m, col]) => m === 'eq' && col === 'recipe_id')
-        ? { data: detail.ingredients.map(({ id, name, qty, unit, qty_text }) => ({ id, name, qty, unit, qty_text })), error: null }
+        ? { data: detail.ingredients.map(({ id, name, qty, unit, qty_text, position }) => ({ id, name, qty, unit, qty_text, position })), error: null }
         : { data: [], error: null }
     ))
     supabase.setResult('inventory_items', 'select', { data: [{ id: 'inv1', name: 'shells', qty: 3, unit: 'count', location: 'pantry' }], error: null })
@@ -65,16 +65,53 @@ describe('RecipeDetailPage', () => {
     expect(within(steps).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Warm the shells.', 'Brown the beef.'])
   })
 
-  it('Make this opens a sheet that sorts ingredients into have and need, then consumes the kitchen', async () => {
+  // The Make this sheet is a checklist of every ingredient. What the kitchen
+  // check says you need starts checked; what it found starts unchecked. Rob
+  // fixes the kitchen's mistakes by toggling rows before adding.
+  const openMakeThis = async () => {
     renderAt()
     await screen.findByText('beef')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Make this' })) })
-    const dialog = await screen.findByRole('dialog', { name: 'Make this' })
-    const have = within(dialog).getByRole('heading', { name: 'You have' }).closest('section')
-    const need = within(dialog).getByRole('heading', { name: 'You need' }).closest('section')
-    expect(within(have).getByText('shells')).toBeInTheDocument()
-    expect(within(need).getByText('beef')).toBeInTheDocument()
+    return screen.findByRole('dialog', { name: 'Make this' })
+  }
+
+  it('Make this lists every ingredient in recipe order, missing ones checked, pantry ones not', async () => {
+    const dialog = await openMakeThis()
+    const boxes = within(dialog).getAllByRole('checkbox')
+    expect(boxes.map(b => b.getAttribute('aria-label'))).toEqual(['Add shells to grocery list', 'Add beef to grocery list'])
+    expect(within(dialog).getByRole('checkbox', { name: 'Add shells to grocery list' })).toHaveAttribute('aria-checked', 'false')
+    expect(within(dialog).getByRole('checkbox', { name: 'Add beef to grocery list' })).toHaveAttribute('aria-checked', 'true')
+    expect(within(dialog).getByText('In the pantry')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Add 1 to grocery list' })).toBeInTheDocument()
+  })
+
+  it('toggling rows changes what gets added; only checked rows reach the list', async () => {
+    supabase.setResult('grocery_items', 'insert', { data: [], error: null })
+    const dialog = await openMakeThis()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Add shells to grocery list' }))
+    expect(within(dialog).getByRole('button', { name: 'Add 2 to grocery list' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Add beef to grocery list' }))
+    expect(within(dialog).getByRole('button', { name: 'Add 1 to grocery list' })).toBeInTheDocument()
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Add 1 to grocery list' })) })
+    const inserts = supabase.callsFor('grocery_items', 'insert')
+    expect(inserts).toHaveLength(1)
+    expect(inserts[0].chain[0][1].map(r => r.name)).toEqual(['shells'])
+    expect(inserts[0].chain[0][1][0]).toMatchObject({ notes: 'For: Tacos', household_id: 'hh' })
+    expect(await screen.findByText('Added 1 item to the grocery list')).toBeInTheDocument()
+  })
+
+  it('with nothing checked the add button is disabled', async () => {
+    supabase.setResult('inventory_items', 'select', { data: [
+      { id: 'inv1', name: 'shells', qty: 3, unit: 'count', location: 'pantry' },
+      { id: 'inv2', name: 'beef', qty: 1, unit: 'lb', location: 'fridge' },
+    ], error: null })
+    const dialog = await openMakeThis()
+    expect(within(dialog).getByRole('button', { name: 'Add 0 to grocery list' })).toBeDisabled()
+    expect(within(dialog).getByText('In the fridge')).toBeInTheDocument()
+  })
+
+  it('I made this still consumes the kitchen and shows the summary', async () => {
+    const dialog = await openMakeThis()
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'I made this' })) })
     expect(supabase.callsFor('inventory_items', 'update')).toHaveLength(1)
     expect(await within(dialog).findByText('Inventory updated')).toBeInTheDocument()

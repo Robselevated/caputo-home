@@ -1,10 +1,56 @@
 import { useState } from 'react'
-import { CircleCheck, ShoppingCart } from 'lucide-react'
+import { ShoppingCart } from 'lucide-react'
 import { Sheet } from '../../components/ui/Sheet'
 import { Button } from '../../components/ui/Button'
+import { CheckCircle } from '../../components/ui/CheckCircle'
 import { Tile } from '../../components/ui/Tile'
 import { toast } from '../../components/ui/Toast'
 import { errorText, ingredientDetail, plural } from './recipeFormat'
+
+const GROCERY = { ring: 'border-accent-grocery', fill: 'bg-accent-grocery' }
+
+const LOCATION_HINT = {
+  pantry: 'In the pantry',
+  fridge: 'In the fridge',
+  freezer: 'In the freezer',
+  home_goods: 'On hand',
+}
+
+// Every ingredient in recipe order, tagged with whether the kitchen check
+// found it. Rows without a position keep the have-then-need order.
+function allRows(match) {
+  const rows = [
+    ...match.inInventory.map((item) => ({ ...item, have: true })),
+    ...match.missing.map((item) => ({ ...item, have: false })),
+  ]
+  return rows
+    .map((row, i) => ({ row, i }))
+    .sort((a, b) => (a.row.position ?? a.i) - (b.row.position ?? b.i) || a.i - b.i)
+    .map(({ row }) => row)
+}
+
+const rowKey = (row, i) => row.id ?? `row-${i}`
+
+function IngredientRow({ row, checked, onToggle }) {
+  const amount = ingredientDetail(row)
+  const hint = row.have ? LOCATION_HINT[row.inventoryItem?.location] || 'In the kitchen' : null
+  return (
+    <div className={`flex items-center gap-2.5 rounded-row py-2 pl-3 pr-3 ${checked ? 'bg-surface' : 'bg-surface/55'}`}>
+      <CheckCircle
+        checked={checked}
+        label={`Add ${row.name} to grocery list`}
+        ringClass={GROCERY.ring}
+        fillClass={GROCERY.fill}
+        onClick={onToggle}
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-px">
+        <span className={`truncate text-base font-semibold ${checked ? 'text-ink' : 'text-ink-2'}`}>{row.name}</span>
+        {amount && <span className="truncate text-[13px] text-ink-2">{amount}</span>}
+        {hint && <span className="truncate text-[13px] font-semibold text-store-pilgrims-ink">{hint}</span>}
+      </div>
+    </div>
+  )
+}
 
 function Rows({ items, detail = ingredientDetail }) {
   return (
@@ -56,15 +102,28 @@ function UpdateSummary({ result }) {
 function MakeThisBody({ recipe, match, onClose, actions, userId, householdId }) {
   // `useRecipe` on the match hook is the "we cooked this" action, not a hook.
   const { addMissingToGroceryList, useRecipe: consumeRecipe, addDepletedToGroceryList } = actions
+  const [rows] = useState(() => allRows(match))
+  // Keys of the rows that will go on the grocery list. The kitchen's "missing"
+  // rows start checked; the kitchen is often out of date, so any row can be
+  // toggled before adding.
+  const [selected, setSelected] = useState(() => new Set(rows.map((row, i) => (row.have ? null : rowKey(row, i))).filter(Boolean)))
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
 
-  const addMissing = async () => {
+  const toggle = (key) => setSelected((prev) => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
+
+  const addChecked = async () => {
+    const items = rows.filter((row, i) => selected.has(rowKey(row, i)))
     setBusy(true)
-    const res = await addMissingToGroceryList(match.missing, recipe.name, userId, householdId)
+    const res = await addMissingToGroceryList(items, recipe.name, userId, householdId)
     setBusy(false)
     if (res?.error) { toast({ message: errorText(res.error, 'Could not add those to the list'), tone: 'error' }); return }
-    toast({ message: `Added ${plural(match.missing.length, 'item')} to the grocery list` })
+    if (!res?.added) { toast({ message: 'Nothing to add from those', tone: 'error' }); return }
+    toast({ message: `Added ${plural(res.added, 'item')} to the grocery list` })
     onClose()
   }
 
@@ -89,31 +148,28 @@ function MakeThisBody({ recipe, match, onClose, actions, userId, householdId }) 
 
   return (
     <div className="flex flex-col gap-4 pb-2">
-      {match.inInventory.length > 0 && (
-        <Tile tileClass="bg-store-pilgrims-tile" inkClass="text-store-pilgrims-ink" heading="You have" count={match.inInventory.length}>
-          <Rows items={match.inInventory} />
-        </Tile>
-      )}
-      {match.missing.length > 0 ? (
-        <Tile tileClass="bg-danger-tile" inkClass="text-danger-ink" heading="You need" count={match.missing.length}>
-          <Rows items={match.missing} />
-        </Tile>
-      ) : (
-        <p className="flex items-center gap-2 rounded-row bg-store-pilgrims-tile px-4 py-3 text-[15px] font-semibold text-store-pilgrims-ink">
-          <CircleCheck size={20} aria-hidden="true" />You have everything for this one
-        </p>
+      {!result && (
+        <>
+          <p className="text-[13px] text-ink-2">Checked items go on the grocery list. Uncheck what you already have.</p>
+          <div className="flex flex-col gap-1.5">
+            {rows.map((row, i) => {
+              const key = rowKey(row, i)
+              return <IngredientRow key={key} row={row} checked={selected.has(key)} onToggle={() => toggle(key)} />
+            })}
+          </div>
+        </>
       )}
 
       {result && <UpdateSummary result={result} />}
 
       <div className="flex flex-col gap-2">
-        {!result && match.inInventory.length > 0 && (
-          <Button className="bg-accent-cookbook" onClick={makeIt} disabled={busy}>{busy ? 'Updating the kitchen' : 'I made this'}</Button>
-        )}
-        {!result && match.missing.length > 0 && (
-          <Button variant="secondary" onClick={addMissing} disabled={busy}>
-            <ShoppingCart size={18} aria-hidden="true" />Add {match.missing.length} to grocery list
+        {!result && (
+          <Button className="bg-accent-grocery" onClick={addChecked} disabled={busy || selected.size === 0}>
+            <ShoppingCart size={18} aria-hidden="true" />Add {selected.size} to grocery list
           </Button>
+        )}
+        {!result && match.inInventory.length > 0 && (
+          <Button variant="secondary" onClick={makeIt} disabled={busy}>{busy ? 'Updating the kitchen' : 'I made this'}</Button>
         )}
         {result && result.nowOut.length > 0 && (
           <Button className="bg-accent-grocery" onClick={addDepleted} disabled={busy}>
@@ -126,8 +182,9 @@ function MakeThisBody({ recipe, match, onClose, actions, userId, householdId }) 
   )
 }
 
-// "Make this": what the kitchen has and lacks for this recipe, then the
-// option to consume it (decrement inventory) and shop for what ran out.
+// "Make this": every ingredient as a checklist, with what the kitchen lacks
+// pre-checked, then the option to add the checked rows to the grocery list or
+// consume the recipe (decrement inventory) and shop for what ran out.
 export function MakeThisSheet({ recipe, match, onClose, actions, userId, householdId }) {
   return (
     <Sheet open={!!match} onClose={onClose} title="Make this">

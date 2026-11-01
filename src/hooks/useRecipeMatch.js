@@ -44,8 +44,9 @@ export function useRecipeMatch(householdId) {
     try {
       const { data: recipeIngredients, error: recipeError } = await supabase
         .from('recipe_ingredients')
-        .select('id, name, qty, unit, qty_text')
+        .select('id, name, qty, unit, qty_text, position')
         .eq('recipe_id', recipeId)
+        .order('position')
 
       if (recipeError) return { error: recipeError }
 
