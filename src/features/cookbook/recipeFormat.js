@@ -1,8 +1,6 @@
 // Display helpers shared by the cookbook pages. No React in here so the
 // hook tests and the page tests can import it freely.
 
-export const COOKBOOK_CATEGORIES = ['Italian', 'Korean', 'Mexican', 'Breakfast', 'Dessert', 'Chicken', 'Ground Beef', 'Pork']
-
 // Ingredients keep their stored order; a section header appears only where
 // the section changes, so "Sauce" rows stay together without re-sorting.
 export function groupBySection(ingredients = []) {

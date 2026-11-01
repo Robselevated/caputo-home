@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { authFetch } from '../lib/authFetch'
 import { normalizeName } from '../lib/normalizeName'
+import { keepMealType } from '../features/cookbook/mealType'
 import { normalizeIngredientQty } from '../lib/parseQty'
 import { normalizeUnit } from '../lib/ingredientParse'
 import { friendlyDbError } from '../features/cookbook/recipeFormat'
@@ -239,8 +240,11 @@ export function useRecipes(householdId) {
       const { parsed, error: parseError } = await parseRecipeUrl(sourceUrl)
       if (parseError) return { error: parseError }
 
-      // Never touch notes on a re-import: that field belongs to the cook.
+      // Never touch notes on a re-import: that field belongs to the cook, and
+      // so does the meal type they picked.
       const { notes: _ignored, ...fields } = toRecipeRow(parsed)
+      const before = (qc.getQueryData(key) ?? []).find(r => r.id === id)
+      if (before) fields.tags = keepMealType(before.tags, fields.tags)
       const { error: recipeError } = await supabase.from('recipes').update(fields).eq('id', id)
       if (recipeError) return { error: recipeError }
 

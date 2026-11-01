@@ -56,6 +56,17 @@ describe('RecipeEditPage', () => {
     expect(screen.getByLabelText('Section name')).toHaveValue('Filling')
   })
 
+  it('shows the guessed meal type and picking another rewrites the type tag', async () => {
+    renderAt()
+    await screen.findByLabelText('Name')
+    expect(screen.getByRole('button', { name: 'Dinners', pressed: true })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Sides & Apps' }))
+    expect(screen.getByLabelText('Tags')).toHaveValue('Side, Mexican')
+    fireEvent.click(screen.getByRole('button', { name: 'Desserts' }))
+    expect(screen.getByLabelText('Tags')).toHaveValue('Dessert, Mexican')
+    expect(screen.getByRole('button', { name: 'Desserts', pressed: true })).toBeInTheDocument()
+  })
+
   it('Save changes updates the recipe and rewrites its ingredients, then returns to the recipe', async () => {
     renderAt()
     const name = await screen.findByLabelText('Name')

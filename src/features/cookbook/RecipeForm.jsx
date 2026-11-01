@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Field, Input } from '../../components/ui/Field'
+import { Pill } from '../../components/ui/Pill'
 import { toast } from '../../components/ui/Toast'
 import { DishImageField } from './DishImageField'
 import { IngredientsEditor } from './IngredientsEditor'
@@ -8,6 +9,9 @@ import { ScanRecipeForm } from './ScanRecipeForm'
 import { Textarea } from './Textarea'
 import { applyParsed, draftToRecipe } from './recipeDraft'
 import { errorText } from './recipeFormat'
+import { MEAL_TYPES, mealTypeOf, withMealType } from './mealType'
+
+const splitTags = (text) => (text ? text.split(',').map(t => t.trim()).filter(Boolean) : [])
 
 // One form for "Type it" and "Edit recipe". Either uncontrolled (`initial`)
 // or controlled (`draft` + `onDraftChange`) so the add sheet can keep a
@@ -71,6 +75,22 @@ export function RecipeForm({ initial, draft: controlled, onDraftChange, submitLa
           <Input id={id('cook')} type="number" inputMode="numeric" min="0" value={draft.cookTime} onChange={set('cookTime')} className="px-3" />
         </Field>
       </div>
+
+      <fieldset>
+        <legend className="mb-1.5 block text-[13px] font-semibold text-ink-2">Meal type</legend>
+        <div className="flex flex-wrap gap-1.5">
+          {MEAL_TYPES.map(t => (
+            <Pill
+              key={t.key}
+              active={mealTypeOf({ name: draft.name, tags: splitTags(draft.tags) }) === t.key}
+              activeClass="bg-accent-cookbook text-white"
+              onClick={() => update(d => ({ ...d, tags: withMealType(splitTags(d.tags), t.key).join(', ') }))}
+            >
+              {t.label}
+            </Pill>
+          ))}
+        </div>
+      </fieldset>
 
       <Field label="Tags" htmlFor={id('tags')}>
         <Input id={id('tags')} value={draft.tags} onChange={set('tags')} placeholder="Mexican, quick, chicken" autoComplete="off" />

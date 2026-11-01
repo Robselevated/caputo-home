@@ -16,7 +16,9 @@ import { keys } from '../../queries/keys'
 import CookbookPage from './CookbookPage'
 
 const tacos = { id: 'r1', household_id: 'hh', name: 'Tacos', image_url: null, tags: ['Mexican'], prep_time: 10, cook_time: 15, servings: 4, source_url: null, created_at: '2026-01-02T00:00:00Z' }
-const soup = { id: 'r2', household_id: 'hh', name: 'Soup', image_url: null, tags: [], prep_time: null, cook_time: 30, servings: null, source_url: null, created_at: '2026-01-01T00:00:00Z' }
+const soup = { id: 'r2', household_id: 'hh', name: 'Soup', image_url: null, tags: ['Side'], prep_time: null, cook_time: 30, servings: null, source_url: null, created_at: '2026-01-01T00:00:00Z' }
+
+const allRecipes = () => screen.getByRole('region', { name: 'All recipes' })
 
 function renderPage(seed = true) {
   const { wrapper: QueryWrapper, qc } = createWrapper()
@@ -45,37 +47,54 @@ describe('CookbookPage', () => {
   it('renders the recipes from the cache with the count in the subtitle', async () => {
     renderPage()
     expect(screen.getByRole('heading', { level: 1, name: 'Cookbook' })).toBeInTheDocument()
-    expect(screen.getByText('Tacos')).toBeInTheDocument()
-    expect(screen.getByText('Soup')).toBeInTheDocument()
+    expect(within(allRecipes()).getByText('Tacos')).toBeInTheDocument()
+    expect(within(allRecipes()).getByText('Soup')).toBeInTheDocument()
     expect(await screen.findByText(/2 recipes/)).toBeInTheDocument()
-    expect(screen.getByText('25 min, 4 servings')).toBeInTheDocument()
+    expect(within(allRecipes()).getByText('25 min, 4 servings')).toBeInTheDocument()
   })
 
   it('shows ingredient coverage as a pill on each card', async () => {
     renderPage()
-    expect(await screen.findByText('Have it all')).toBeInTheDocument()
-    expect(screen.getByText('1 to buy')).toBeInTheDocument()
+    expect(await within(allRecipes()).findByText('Have it all')).toBeInTheDocument()
+    expect(within(allRecipes()).getByText('1 to buy')).toBeInTheDocument()
   })
 
-  it('search narrows the grid', async () => {
+  it('search shows one flat list of matches across every meal type, without shelves', async () => {
     renderPage()
-    await screen.findByText('Tacos')
+    await within(allRecipes()).findByText('Tacos')
+    fireEvent.click(screen.getByRole('button', { name: /^Sides & Apps/ }))
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search recipes' }), { target: { value: 'tac' } })
+    const results = screen.getByRole('region', { name: 'Search results' })
+    expect(within(results).getByText('Tacos')).toBeInTheDocument()
     expect(screen.queryByText('Soup')).not.toBeInTheDocument()
-    expect(screen.getByText('Tacos')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Ready to cook' })).not.toBeInTheDocument()
   })
 
-  it('a tag pill filters the grid to recipes carrying that tag', async () => {
+  it('shows shelves above the full grid; a recipe can sit on several', async () => {
     renderPage()
-    await screen.findByText('Tacos')
-    fireEvent.click(screen.getByRole('button', { name: 'Mexican', pressed: false }))
-    expect(screen.queryByText('Soup')).not.toBeInTheDocument()
-    expect(screen.getByText('Tacos')).toBeInTheDocument()
+    const ready = await screen.findByRole('region', { name: 'Ready to cook' })
+    expect(within(ready).getByText('Tacos')).toBeInTheDocument()
+    const quick = screen.getByRole('region', { name: 'Quick, 30 min or less' })
+    expect(within(quick).getByText('Tacos')).toBeInTheDocument()
+    expect(within(quick).getByText('Soup')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Slow cooker' })).not.toBeInTheDocument()
+  })
+
+  it('a meal type tab narrows the shelves and grid to that type', async () => {
+    renderPage()
+    await within(allRecipes()).findByText('Tacos')
+    expect(screen.getByRole('button', { name: 'Dinners 1' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Sides & Apps 1' }))
+    const sides = screen.getByRole('region', { name: 'All sides & apps' })
+    expect(within(sides).getByText('Soup')).toBeInTheDocument()
+    expect(screen.queryByText('Tacos')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Desserts 0' }))
+    expect(screen.getByText('No desserts yet')).toBeInTheDocument()
   })
 
   it('the + button opens the add sheet with Link, Type it, Photo and Paste modes', async () => {
     renderPage()
-    await screen.findByText('Tacos')
+    await within(allRecipes()).findByText('Tacos')
     fireEvent.click(screen.getByRole('button', { name: 'Add a recipe' }))
     const dialog = await screen.findByRole('dialog', { name: 'Add a recipe' })
     expect(within(dialog).getByRole('tab', { name: 'Link' })).toHaveAttribute('aria-selected', 'true')
@@ -97,13 +116,13 @@ describe('CookbookPage', () => {
 
   it('has no paid "What can I make?" ideas panel', async () => {
     renderPage()
-    await screen.findByText('Tacos')
+    await within(allRecipes()).findByText('Tacos')
     expect(screen.queryByRole('button', { name: 'Get ideas' })).not.toBeInTheDocument()
   })
 
   it('a pasted ingredient list is added after rows already typed', async () => {
     renderPage()
-    await screen.findByText('Tacos')
+    await within(allRecipes()).findByText('Tacos')
     fireEvent.click(screen.getByRole('button', { name: /add a recipe/i }))
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('tab', { name: 'Type it' }))
