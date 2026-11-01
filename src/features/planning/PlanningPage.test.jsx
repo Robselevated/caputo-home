@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase'
 import { createWrapper } from '../../test/queryWrapper'
 import { ToastProvider } from '../../components/ui/Toast'
 import PlanningPage from './PlanningPage'
+import { addDays, startOfWeek, toDateKey } from '../../lib/week'
 
 const picks = [
   { id: 'p1', household_id: 'hh', recipe_id: 'r1', name: 'Chili', notes: 'Slow cooker', image_url: null, section: "Rob's Picks", created_at: '2026-10-01T00:00:00Z' },
@@ -45,7 +46,8 @@ describe('PlanningPage', () => {
   it('renders one tile per section with the cached picks under them', async () => {
     renderPage()
     const headings = await screen.findAllByRole('heading', { level: 2 })
-    expect(headings.map(h => h.textContent)).toEqual(["Rob's Picks", "Cheyene's Picks"])
+    expect(headings.map(h => h.textContent).slice(0, 2)).toEqual(["Rob's Picks", "Cheyene's Picks"])
+    expect(headings[2]).toHaveTextContent(/^This week · /)
     expect(screen.getByText('Chili')).toBeInTheDocument()
     expect(screen.getByText('Slow cooker')).toBeInTheDocument()
     expect(screen.getByText('Soup')).toBeInTheDocument()
@@ -118,5 +120,67 @@ describe('PlanningPage', () => {
     expect(inserted).toHaveLength(1)
     expect(inserted[0]).toMatchObject({ name: 'Kidney beans', notes: 'For: Chili', household_id: 'hh' })
     expect(await screen.findByText('Added 1 item to the grocery list')).toBeInTheDocument()
+  })
+
+  describe('week plan', () => {
+    const todayKey = toDateKey(new Date())
+    const monday = startOfWeek(new Date())
+    const label = (d) => `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.toLocaleDateString('en-US', { month: 'short' })} ${d.getDate()}`
+    const echoUpdate = (record) => {
+      const changes = record.chain.find(([m]) => m === 'update')[1]
+      const id = record.chain.find(([m, col]) => m === 'eq' && col === 'id')[2]
+      return { data: { ...picks.find(p => p.id === id), ...changes }, error: null }
+    }
+
+    it('shows seven days starting Monday, and arrows move a week at a time', async () => {
+      renderPage()
+      const week = await screen.findByRole('region', { name: 'Week plan' })
+      expect(within(week).getAllByRole('button', { name: /^Plan a meal for / })).toHaveLength(7)
+      expect(within(week).getByRole('button', { name: `Plan a meal for ${label(monday)}` })).toBeInTheDocument()
+      fireEvent.click(within(week).getByRole('button', { name: 'Next week' }))
+      expect(within(week).getByRole('heading', { level: 2 })).toHaveTextContent(/^Next week · /)
+      expect(within(week).getByRole('button', { name: `Plan a meal for ${label(addDays(monday, 7))}` })).toBeInTheDocument()
+    })
+
+    it('tapping an empty day and choosing a pick moves it off the list onto that day', async () => {
+      supabase.setResult('meal_picks', 'update', echoUpdate)
+      renderPage()
+      const week = await screen.findByRole('region', { name: 'Week plan' })
+      fireEvent.click(within(week).getByRole('button', { name: `Plan a meal for ${label(monday)}` }))
+      const dialog = await screen.findByRole('dialog')
+      await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Plan Soup' })) })
+      const update = supabase.callsFor('meal_picks', 'update')[0]
+      expect(update.chain.find(([m]) => m === 'update')[1]).toEqual({ planned_for: toDateKey(monday) })
+      expect(within(week).getByRole('button', { name: `${label(monday)}: Soup, Chey cooking` })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Remove Soup' })).not.toBeInTheDocument()
+    })
+
+    it('a planned day offers Back to picks, which returns it to its list', async () => {
+      supabase.setResult('meal_picks', 'select', { data: [{ ...picks[0], planned_for: todayKey }, picks[1]], error: null })
+      supabase.setResult('meal_picks', 'update', echoUpdate)
+      renderPage()
+      const week = await screen.findByRole('region', { name: 'Week plan' })
+      const today = new Date()
+      fireEvent.click(within(week).getByRole('button', { name: `${label(today)}: Chili, Rob cooking` }))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('Rob is cooking')).toBeInTheDocument()
+      expect(screen.getByText(/1 planned this week/)).toBeInTheDocument()
+      await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: "Back to Rob's Picks" })) })
+      expect(supabase.callsFor('meal_picks', 'update')[0].chain.find(([m]) => m === 'update')[1]).toEqual({ planned_for: null })
+      expect(screen.getByRole('button', { name: 'Remove Chili' })).toBeInTheDocument()
+    })
+
+    it('Something else adds a quick idea straight onto the day', async () => {
+      renderPage()
+      const week = await screen.findByRole('region', { name: 'Week plan' })
+      fireEvent.click(within(week).getByRole('button', { name: `Plan a meal for ${label(addDays(monday, 4))}` }))
+      fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Something else' }))
+      const dialog = await screen.findByRole('dialog', { name: /^Plan / })
+      fireEvent.click(within(dialog).getByRole('tab', { name: 'Quick idea' }))
+      fireEvent.change(within(dialog).getByLabelText('Name'), { target: { value: 'Date night' } })
+      await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Plan it' })) })
+      const sent = supabase.callsFor('meal_picks', 'insert')[0].chain.find(([m]) => m === 'insert')[1]
+      expect(sent).toMatchObject({ name: 'Date night', section: "Rob's Picks", planned_for: toDateKey(addDays(monday, 4)) })
+    })
   })
 })

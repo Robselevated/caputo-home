@@ -72,6 +72,10 @@ export async function insertMealPick(client, row) {
   return run(client.from('meal_picks').insert(row).select().single())
 }
 
+export async function updateMealPick(client, id, changes) {
+  return run(client.from('meal_picks').update(changes).eq('id', id).select().single())
+}
+
 export async function deleteMealPick(client, id) {
   await run(client.from('meal_picks').delete().eq('id', id))
 }

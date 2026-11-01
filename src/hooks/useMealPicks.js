@@ -4,11 +4,14 @@ import { toast } from '../components/ui/Toast'
 import { upsertById, removeById } from '../lib/realtimeCache'
 import { keys, STALE } from '../queries/keys'
 import { fetchMealPicks } from '../queries/fetchers'
-import { insertMealPick, deleteMealPick, deleteMealPicks } from '../queries/writes'
+import { insertMealPick, updateMealPick, deleteMealPick, deleteMealPicks } from '../queries/writes'
 import { resolveSection } from '../lib/mealSections'
 
 const EMPTY = []
 const oldestFirst = (rows) => [...rows].sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')))
+// Postgres unique violation: meal_picks_one_per_day already has a pick that day.
+const DAY_TAKEN = '23505'
+const dayTakenToast = () => toast({ message: 'That day already has a meal', tone: 'error' })
 
 export function useMealPicks(householdId) {
   const qc = useQueryClient()
@@ -24,7 +27,8 @@ export function useMealPicks(householdId) {
   const setAll = (updater) => qc.setQueryData(key, (prev) => updater(prev ?? []))
   const snapshot = () => qc.getQueryData(key)
 
-  const addPick = async ({ userId, recipeId, name, notes, imageUrl, section }) => {
+  // `plannedFor` (YYYY-MM-DD) puts the new pick straight onto a calendar day.
+  const addPick = async ({ userId, recipeId, name, notes, imageUrl, section, plannedFor }) => {
     if (!householdId) return { error: 'No household' }
     const row = {
       id: crypto.randomUUID(),
@@ -35,6 +39,8 @@ export function useMealPicks(householdId) {
       notes: notes?.trim() || null,
       image_url: imageUrl || null,
       section: section || null,
+      // Only sent when set, so adding to a list never names the column.
+      ...(plannedFor ? { planned_for: plannedFor } : {}),
     }
     await qc.cancelQueries({ queryKey: key })
     setAll(prev => oldestFirst([...prev, { ...row, created_at: new Date().toISOString() }]))
@@ -44,7 +50,27 @@ export function useMealPicks(householdId) {
       return { error: null }
     } catch (error) {
       setAll(prev => removeById(prev, row.id))
-      toast({ message: `Couldn't add ${row.name} to the plan`, tone: 'error' })
+      if (error?.code === DAY_TAKEN) dayTakenToast()
+      else toast({ message: `Couldn't add ${row.name} to the plan`, tone: 'error' })
+      return { error }
+    }
+  }
+
+  // Move a pick onto a day (YYYY-MM-DD) or back to its list (null).
+  const schedulePick = async (id, plannedFor) => {
+    await qc.cancelQueries({ queryKey: key })
+    const prevRow = (snapshot() ?? []).find(p => p.id === id)
+    if (!prevRow) return { error: 'Not found' }
+    const planned_for = plannedFor || null
+    setAll(prev => prev.map(p => (p.id === id ? { ...p, planned_for } : p)))
+    try {
+      const saved = await updateMealPick(supabase, id, { planned_for })
+      if (saved) setAll(prev => oldestFirst(upsertById(prev, saved)))
+      return { error: null }
+    } catch (error) {
+      setAll(prev => prev.map(p => (p.id === id ? { ...p, planned_for: prevRow.planned_for ?? null } : p)))
+      if (error?.code === DAY_TAKEN) dayTakenToast()
+      else toast({ message: `Couldn't move ${prevRow.name}`, tone: 'error' })
       return { error }
     }
   }
@@ -66,8 +92,9 @@ export function useMealPicks(householdId) {
   const clearSection = async (sectionName) => {
     await qc.cancelQueries({ queryKey: key })
     // Same grouping the page renders with, so null and legacy section names
-    // (which display under a default section) are cleared too.
-    const removed = (snapshot() ?? []).filter(p => resolveSection(p.section) === sectionName)
+    // (which display under a default section) are cleared too. Picks already
+    // on the calendar are not in the list, so Clear leaves them alone.
+    const removed = (snapshot() ?? []).filter(p => !p.planned_for && resolveSection(p.section) === sectionName)
     const ids = new Set(removed.map(p => p.id))
     setAll(prev => prev.filter(p => !ids.has(p.id)))
     try {
@@ -80,5 +107,5 @@ export function useMealPicks(householdId) {
     }
   }
 
-  return { picks, loading: isPending, addPick, removePick, clearSection }
+  return { picks, loading: isPending, addPick, schedulePick, removePick, clearSection }
 }

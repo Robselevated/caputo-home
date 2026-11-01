@@ -41,8 +41,9 @@ function RecipeChoice({ recipe, disabled, onPick }) {
   )
 }
 
-// Keyed per open from the sheet so every field starts fresh.
-function AddPickForm({ initialSection, sections, recipes, onAdd, onClose }) {
+// Keyed per open from the sheet so every field starts fresh. With `plannedFor`
+// the pick goes straight onto that calendar day and the section is who cooks.
+function AddPickForm({ initialSection, sections, recipes, plannedFor, onAdd, onClose }) {
   const [section, setSection] = useState(initialSection)
   const [mode, setMode] = useState('cookbook')
   const [search, setSearch] = useState('')
@@ -61,7 +62,7 @@ function AddPickForm({ initialSection, sections, recipes, onAdd, onClose }) {
     setAdding(true)
     let res
     try {
-      res = await onAdd({ ...values, section })
+      res = await onAdd({ ...values, section, ...(plannedFor ? { plannedFor } : {}) })
     } catch (error) {
       res = { error }
     } finally {
@@ -80,7 +81,7 @@ function AddPickForm({ initialSection, sections, recipes, onAdd, onClose }) {
   return (
     <div className="flex flex-col gap-4 pb-2">
       <fieldset>
-        <legend className="mb-1.5 block text-[13px] font-semibold text-ink-2">Add to</legend>
+        <legend className="mb-1.5 block text-[13px] font-semibold text-ink-2">{plannedFor ? "Who's cooking" : 'Add to'}</legend>
         <div className="flex flex-wrap gap-1.5">
           {sections.map(s => (
             <Pill key={s} active={section === s} activeClass="bg-accent-planning text-white" onClick={() => setSection(s)}>{s}</Pill>
@@ -131,7 +132,7 @@ function AddPickForm({ initialSection, sections, recipes, onAdd, onClose }) {
             <Input id="pick-notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Use the leftover chicken" />
           </Field>
           <Button type="submit" className="bg-accent-planning" disabled={!name.trim() || adding}>
-            {adding ? 'Adding' : `Add to ${section}`}
+            {adding ? 'Adding' : plannedFor ? 'Plan it' : `Add to ${section}`}
           </Button>
         </form>
       )}
@@ -139,10 +140,10 @@ function AddPickForm({ initialSection, sections, recipes, onAdd, onClose }) {
   )
 }
 
-export function AddPickSheet({ open, section, sections, recipes, onClose, onAdd }) {
+export function AddPickSheet({ open, section, sections, recipes, plannedFor, title = 'Add a pick', onClose, onAdd }) {
   return (
-    <Sheet open={open} onClose={onClose} title="Add a pick">
-      {open && <AddPickForm initialSection={section} sections={sections} recipes={recipes} onAdd={onAdd} onClose={onClose} />}
+    <Sheet open={open} onClose={onClose} title={title}>
+      {open && <AddPickForm initialSection={section} sections={sections} recipes={recipes} plannedFor={plannedFor} onAdd={onAdd} onClose={onClose} />}
     </Sheet>
   )
 }

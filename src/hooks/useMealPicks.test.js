@@ -67,4 +67,38 @@ describe('useMealPicks', () => {
     expect(result.current.picks).toHaveLength(0)
     expect(chainHas(supabase.callsFor('meal_picks', 'delete')[1], 'in', 'id', ['a', 'd'])).toBe(true)
   })
+
+  it('addPick only sends planned_for when a day is given', async () => {
+    supabase.setResult('meal_picks', 'insert', { data: null, error: null })
+    const { result } = await renderLoaded()
+    await act(async () => { await result.current.addPick({ userId: 'u1', name: 'Soup', section: "Rob's Picks" }) })
+    await act(async () => { await result.current.addPick({ userId: 'u1', name: 'Stew', section: "Rob's Picks", plannedFor: '2026-11-03' }) })
+    const [first, second] = supabase.callsFor('meal_picks', 'insert').map(c => c.chain.find(([m]) => m === 'insert')[1])
+    expect(first).not.toHaveProperty('planned_for')
+    expect(second).toMatchObject({ planned_for: '2026-11-03' })
+  })
+
+  it('schedulePick moves a pick onto a day and reverts with a day-taken toast on a unique clash', async () => {
+    const { toast } = await import('../components/ui/Toast')
+    supabase.setResult('meal_picks', 'update', { data: { id: 'p1', name: 'Tacos', section: 'Dinner', planned_for: '2026-11-02', created_at: '2026-01-01T00:00:00Z' }, error: null })
+    const { result } = await renderLoaded()
+    await act(async () => { await result.current.schedulePick('p1', '2026-11-02') })
+    expect(result.current.picks[0].planned_for).toBe('2026-11-02')
+    supabase.setResult('meal_picks', 'update', { data: null, error: { message: 'duplicate key', code: '23505' } })
+    await act(async () => { await result.current.schedulePick('p1', '2026-11-03') })
+    expect(result.current.picks[0].planned_for).toBe('2026-11-02')
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: 'That day already has a meal' }))
+  })
+
+  it('clearSection leaves picks that are on the calendar', async () => {
+    supabase.setResult('meal_picks', 'select', { data: [
+      { id: 'a', name: 'Tacos', section: "Rob's Picks", planned_for: '2026-11-02', created_at: '2026-01-01T00:00:00Z' },
+      { id: 'b', name: 'Soup', section: "Rob's Picks", planned_for: null, created_at: '2026-01-02T00:00:00Z' },
+    ], error: null })
+    supabase.setResult('meal_picks', 'delete', { data: null, error: null })
+    const { result } = await renderLoaded()
+    await act(async () => { await result.current.clearSection("Rob's Picks") })
+    expect(result.current.picks.map(p => p.id)).toEqual(['a'])
+    expect(chainHas(supabase.callsFor('meal_picks', 'delete')[0], 'in', 'id', ['b'])).toBe(true)
+  })
 })

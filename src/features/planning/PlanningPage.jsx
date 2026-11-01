@@ -12,8 +12,11 @@ import { Tile } from '../../components/ui/Tile'
 import { ListSkeleton } from '../../components/ui/Skeleton'
 import { toast } from '../../components/ui/Toast'
 import { DEFAULT_SECTIONS, resolveSection } from '../../lib/mealSections'
+import { startOfWeek, weekDays } from '../../lib/week'
 import { PickCard } from './PickCard'
 import { AddPickSheet } from './AddPickSheet'
+import { WeekPlan } from './WeekPlan'
+import { PlanDaySheet, dayTitle } from './PlanDaySheet'
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 
@@ -52,7 +55,7 @@ export default function PlanningPage() {
   const { user, profile } = useAuth()
   const householdId = profile?.household_id
   const userId = user?.id
-  const { picks, loading, addPick, removePick, clearSection } = useMealPicks(householdId)
+  const { picks, loading, addPick, schedulePick, removePick, clearSection } = useMealPicks(householdId)
   const { recipes } = useRecipes(householdId)
   const { matchIngredients, addMissingToGroceryList } = useRecipeMatch(householdId)
   const { requestDelete, hiddenIds } = useDeleteWithUndo(removePick, { message: (pick) => `${pick.name} removed from the plan` })
@@ -61,26 +64,44 @@ export default function PlanningPage() {
 
   const [addingTo, setAddingTo] = useState(null)
   const [busyId, setBusyId] = useState(null)
+  // The calendar day whose sheet is open, and the day "Something else" adds to.
+  const [openDay, setOpenDay] = useState(null)
+  const [addingForDay, setAddingForDay] = useState(null)
 
-  const bySection = useMemo(() => {
-    const map = new Map(DEFAULT_SECTIONS.map(s => [s, []]))
+  // Picks without a day wait in the lists; picks with one sit on the calendar.
+  const { bySection, planned } = useMemo(() => {
+    const bySection = new Map(DEFAULT_SECTIONS.map(s => [s, []]))
+    const planned = new Map()
     for (const pick of picks) {
+      if (hiddenIds.has(pick.id)) continue
+      if (pick.planned_for) {
+        planned.set(pick.planned_for, pick)
+        continue
+      }
       const section = resolveSection(pick.section)
-      if (hiddenIds.has(pick.id) || clearing.has(section)) continue
-      map.get(section).push(pick)
+      if (clearing.has(section)) continue
+      bySection.get(section).push(pick)
     }
-    return map
+    return { bySection, planned }
   }, [picks, hiddenIds, clearing])
 
   const visible = [...bySection.values()].flat()
   const fromCookbook = visible.filter(p => p.recipe_id).length
+  const thisWeek = weekDays(startOfWeek(new Date())).filter(d => planned.has(d.key)).length
+  const plannedText = thisWeek ? `, ${thisWeek} planned this week` : ''
   const subtitle = loading && picks.length === 0
     ? 'Loading your plan'
-    : visible.length === 0
+    : visible.length === 0 && planned.size === 0
       ? 'Nothing planned yet'
-      : `${plural(visible.length, 'pick')}, ${fromCookbook} from the cookbook`
+      : `${plural(visible.length, 'pick')}, ${fromCookbook} from the cookbook${plannedText}`
 
   const handleAdd = (values) => addPick({ userId, ...values })
+  const dayPick = openDay ? planned.get(openDay.key) : null
+  const closeDay = () => setOpenDay(null)
+  const handleSchedule = (pick) => { schedulePick(pick.id, openDay.key); closeDay() }
+  const handleUnschedule = (pick) => { schedulePick(pick.id, null); closeDay() }
+  const handleRemovePlanned = (pick) => { requestDelete(pick); closeDay() }
+  const handleSomethingElse = () => { setAddingForDay(openDay); closeDay() }
   const handleOpen = (pick) => navigate(`/cookbook/${pick.recipe_id}`)
   const handleShop = async (pick) => {
     setBusyId(pick.id)
@@ -132,12 +153,39 @@ export default function PlanningPage() {
         ))
       )}
 
+      {!(loading && picks.length === 0) && <WeekPlan planned={planned} onOpenDay={setOpenDay} />}
+
       <AddPickSheet
         open={!!addingTo}
         section={addingTo ?? DEFAULT_SECTIONS[0]}
         sections={DEFAULT_SECTIONS}
         recipes={recipes}
         onClose={() => setAddingTo(null)}
+        onAdd={handleAdd}
+      />
+
+      <PlanDaySheet
+        day={openDay}
+        pick={dayPick}
+        waiting={bySection}
+        busy={!!dayPick && busyId === dayPick.id}
+        onClose={closeDay}
+        onSchedule={handleSchedule}
+        onSomethingElse={handleSomethingElse}
+        onOpenRecipe={handleOpen}
+        onShop={handleShop}
+        onUnschedule={handleUnschedule}
+        onRemove={handleRemovePlanned}
+      />
+
+      <AddPickSheet
+        open={!!addingForDay}
+        title={addingForDay ? `Plan ${dayTitle(addingForDay.date)}` : 'Add a pick'}
+        section={DEFAULT_SECTIONS[0]}
+        sections={DEFAULT_SECTIONS}
+        recipes={recipes}
+        plannedFor={addingForDay?.key}
+        onClose={() => setAddingForDay(null)}
         onAdd={handleAdd}
       />
     </div>
