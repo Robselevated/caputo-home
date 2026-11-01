@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { authFetch } from '../lib/authFetch'
+import { normalizeName } from '../lib/normalizeName'
 import { normalizeIngredientQty } from '../lib/parseQty'
 import { normalizeUnit } from '../lib/ingredientParse'
 import { friendlyDbError } from '../features/cookbook/recipeFormat'
@@ -123,6 +124,12 @@ export function useRecipes(householdId) {
   const patchGrid = (id, fields) => qc.setQueryData(key, prev => (prev ? prev.map(r => (r.id === id ? { ...r, ...fields } : r)) : prev))
   const seedDetail = (recipe, ingredients) => qc.setQueryData(keys.recipe(recipe.id), { ...recipe, ingredients })
   const touchIngredients = () => invalidateDebounced(qc, keys.recipeIngredients(householdId))
+  // A recipe already in the grid under the same name (the dedupe SQL's
+  // normalisation), so adding it again never makes a second copy.
+  const findSameName = (name) => {
+    const k = normalizeName(name)
+    return k ? (qc.getQueryData(key) ?? []).find(r => normalizeName(r.name) === k) : undefined
+  }
 
   const getRecipe = async (id) => {
     try {
@@ -148,6 +155,8 @@ export function useRecipes(householdId) {
     try {
       const { parsed, error: parseError } = await parseRecipeUrl(url)
       if (parseError) return { error: parseError }
+      const existing = findSameName(parsed.name)
+      if (existing) return { data: existing, duplicate: true }
 
       const { data: recipe, error: recipeError } = await supabase
         .from('recipes')
@@ -173,6 +182,8 @@ export function useRecipes(householdId) {
   }
 
   const createRecipe = async (recipe, userId) => {
+    const existing = findSameName(recipe.name)
+    if (existing) return { error: `${existing.name} is already in the cookbook`, existing }
     const { data: newRecipe, error: recipeError } = await supabase
       .from('recipes')
       .insert({

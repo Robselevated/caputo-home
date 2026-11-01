@@ -63,6 +63,7 @@ export default function CookbookPage() {
     const res = await importRecipe(url, userId)
     if (res.data?.id) {
       setAdding(false)
+      if (res.duplicate) toast({ message: `${res.data.name} is already in the cookbook` })
       navigate(`/cookbook/${res.data.id}`)
     }
     return res

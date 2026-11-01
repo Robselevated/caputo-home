@@ -46,6 +46,15 @@ describe('useRecipes', () => {
     expect(supabase.channel).not.toHaveBeenCalled()
   })
 
+  it('createRecipe refuses a name already in the cookbook, ignoring case and spacing', async () => {
+    const { result } = await renderLoaded()
+    let res
+    await act(async () => { res = await result.current.createRecipe({ name: '  tacos ', ingredients: [] }, 'u1') })
+    expect(res.error).toBe('Tacos is already in the cookbook')
+    expect(res.existing.id).toBe('r1')
+    expect(supabase.callsFor('recipes', 'insert')).toHaveLength(0)
+  })
+
   it('createRecipe puts the new recipe first in the grid and seeds its detail, with no refetch', async () => {
     supabase.setResult('recipes', 'insert', { data: { id: 'r3', household_id: 'hh', name: 'Pie', created_at: '2026-02-01T00:00:00Z' }, error: null })
     supabase.setResult('recipe_ingredients', 'insert', { data: null, error: null })
@@ -114,6 +123,15 @@ describe('importRecipe', () => {
   }
   const chili = { id: 'r9', household_id: 'hh', name: 'Chili', created_at: '2026-03-01T00:00:00Z' }
   const mockParse = (body) => authFetch.mockResolvedValue({ ok: true, status: 200, json: async () => body })
+
+  it('importing a recipe whose name is already in the cookbook returns that one instead of a copy', async () => {
+    mockParse({ ...parsed, name: 'Soup' })
+    const { result } = await renderLoaded()
+    let res
+    await act(async () => { res = await result.current.importRecipe('https://blog.test/soup', 'u1') })
+    expect(res).toMatchObject({ data: { id: 'r2' }, duplicate: true })
+    expect(supabase.callsFor('recipes', 'insert')).toHaveLength(0)
+  })
 
   it('writes the resolved source, a whole-number serving with the yield in notes, and qty_text on every row', async () => {
     mockParse(parsed)
