@@ -29,6 +29,18 @@ describe('Toast', () => {
     expect(screen.queryByText('Rice removed')).not.toBeInTheDocument()
   })
 
+  it('renders a secondary action before the main one; either runs its handler and dismisses', () => {
+    const add = vi.fn()
+    const undo = vi.fn()
+    render(<ToastProvider><div /></ToastProvider>)
+    act(() => { toast({ message: 'Milk is out', action: { label: 'Undo', onClick: undo }, secondaryAction: { label: 'Add to list', onClick: add } }) })
+    expect(screen.getAllByRole('button').map(b => b.textContent)).toEqual(['Add to list', 'Undo'])
+    fireEvent.click(screen.getByRole('button', { name: 'Add to list' }))
+    expect(add).toHaveBeenCalledTimes(1)
+    expect(undo).not.toHaveBeenCalled()
+    expect(screen.queryByText('Milk is out')).not.toBeInTheDocument()
+  })
+
   it('keeps at most two toasts, dropping the oldest', () => {
     render(<ToastProvider><div /></ToastProvider>)
     act(() => {

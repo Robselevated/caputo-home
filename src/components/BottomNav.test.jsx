@@ -34,4 +34,14 @@ describe('BottomNav', () => {
     renderAt('/kitchen/pantry')
     expect(screen.getByRole('link', { name: 'Kitchen' })).toHaveClass('text-loc-pantry-ink')
   })
+
+  it('shows the Fridge / Freezer / Pantry switcher above the tabs on kitchen pages only', () => {
+    const { unmount } = renderAt('/kitchen/freezer')
+    expect(screen.getByRole('tab', { name: 'Freezer' })).toHaveAttribute('aria-selected', 'true')
+    expect(document.documentElement.style.getPropertyValue('--nav-extra')).toBe('3.5rem')
+    unmount()
+    renderAt('/planning')
+    expect(screen.queryByRole('tablist', { name: 'Location' })).not.toBeInTheDocument()
+    expect(document.documentElement.style.getPropertyValue('--nav-extra')).toBe('0px')
+  })
 })

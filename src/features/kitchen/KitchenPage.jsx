@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { DndContext, closestCenter } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -12,7 +11,6 @@ import { useScanSession } from '../../hooks/useScanSession'
 import { useCategoryOrder } from '../../hooks/useCategoryOrder'
 import { useDeleteWithUndo } from '../../hooks/useDeleteWithUndo'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { SegmentedControl } from '../../components/ui/SegmentedControl'
 import { IconButton } from '../../components/ui/IconButton'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { ListSkeleton } from '../../components/ui/Skeleton'
@@ -25,11 +23,11 @@ import { useFreshness } from './useFreshness'
 import { FreshnessCard } from './FreshnessCard'
 import { FreshnessSheet } from './FreshnessSheet'
 import { Button } from '../../components/ui/Button'
-import { LOCATIONS, LOCATION_LABELS, locationTheme } from './locationTheme'
+import { LOCATION_LABELS, locationTheme } from './locationTheme'
 
-// Segment labels use the location ink, not the accent: the pantry amber is a
-// graphics colour and fails text contrast on white.
-const SEGMENTS = LOCATIONS.map(l => ({ value: l, label: LOCATION_LABELS[l], activeClass: locationTheme(l).ink }))
+// The Kitchen lists only what we have: a row that reaches zero is deleted (with
+// Undo), and anything still stored at zero stays out of sight.
+const inStock = (item) => (item.qty ?? 0) > 0
 
 function SortableCategory(props) {
   const { setNodeRef, listeners, transform, transition, isDragging } = useSortable({ id: props.category, disabled: props.dragDisabled })
@@ -42,7 +40,6 @@ function SortableCategory(props) {
 }
 
 export default function KitchenPage({ location }) {
-  const navigate = useNavigate()
   const theme = locationTheme(location)
   const label = LOCATION_LABELS[location]
   const lower = label.toLowerCase()
@@ -50,10 +47,15 @@ export default function KitchenPage({ location }) {
   const householdId = profile?.household_id
   const userId = user?.id
   const { items, allItems, loading, addItem, updateQty, updateItem, deleteItem, addToGroceryList } = useInventory(householdId, location)
-  const fresh = useFreshness({ allItems, updateItem, updateQty, userId })
+  const fresh = useFreshness({ allItems, updateItem, deleteItem, userId })
   const { scanning, results, error: scanError, uploadAndScan, confirmItems, cancelScan } = useScanSession(householdId)
   const { orderedCategories, reorder } = useCategoryOrder(location)
-  const { requestDelete, hiddenIds } = useDeleteWithUndo(deleteItem, { message: (item) => `${item.name} removed from ${label}` })
+  const { requestDelete, hiddenIds: removing } = useDeleteWithUndo(deleteItem, { message: (item) => `${item.name} removed from ${label}` })
+  const { requestDelete: requestOut, hiddenIds: runningOut } = useDeleteWithUndo(deleteItem, {
+    message: (item) => `${item.name} is out, removed from ${label}`,
+    secondaryAction: (item) => ({ label: 'Add to list', onClick: () => handleBuy(item) }),
+  })
+  const hidden = (item) => removing.has(item.id) || runningOut.has(item.id)
 
   const [search, setSearch] = useState('')
   const [adding, setAdding] = useState(false)
@@ -64,8 +66,8 @@ export default function KitchenPage({ location }) {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return items.filter(i => !hiddenIds.has(i.id) && (!q || i.name.toLowerCase().includes(q)))
-  }, [items, hiddenIds, search])
+    return items.filter(i => inStock(i) && !removing.has(i.id) && !runningOut.has(i.id) && (!q || i.name.toLowerCase().includes(q)))
+  }, [items, removing, runningOut, search])
 
   const grouped = useMemo(() => {
     const map = new Map()
@@ -79,17 +81,24 @@ export default function KitchenPage({ location }) {
     return [...known, ...extra].map(c => [c, map.get(c)])
   }, [visible, orderedCategories])
 
-  const total = items.filter(i => !hiddenIds.has(i.id)).length
-  const outCount = items.filter(i => !hiddenIds.has(i.id) && i.qty === 0).length
+  const total = items.filter(i => inStock(i) && !hidden(i)).length
   const subtitle = loading && items.length === 0
     ? 'Loading'
     : total === 0
       ? `Nothing in the ${lower} yet`
-      : `${label}, ${total} item${total === 1 ? '' : 's'}${outCount ? `, ${outCount} out` : ''}`
+      : `${label}, ${total} item${total === 1 ? '' : 's'}`
 
-  const handleQty = (item, delta) => updateQty(item.id, (item.qty ?? 0) + delta, userId)
-  const handleSave = (id, changes) => updateItem(id, changes, userId)
-  const handleBuy = async (item) => {
+  const handleQty = (item, delta) => {
+    const next = (item.qty ?? 0) + delta
+    if (next <= 0) requestOut(item)
+    else updateQty(item.id, next, userId)
+  }
+  const handleSave = (id, changes) => {
+    const item = changes.qty === 0 && items.find(i => i.id === id)
+    if (item) requestOut(item)
+    else updateItem(id, changes, userId)
+  }
+  async function handleBuy(item) {
     const res = await addToGroceryList(item, userId)
     if (!res?.error) toast({ message: `${item.name} added to the grocery list` })
   }
@@ -125,8 +134,6 @@ export default function KitchenPage({ location }) {
           onDismiss={fresh.dismiss}
         />
       )}
-
-      <SegmentedControl label="Location" options={SEGMENTS} value={location} onChange={(loc) => navigate(`/kitchen/${loc}`)} />
 
       <div className="flex items-center gap-2 rounded-tile bg-surface py-1.5 pl-4 pr-1.5 shadow-soft">
         <Search size={20} aria-hidden="true" className="shrink-0 text-ink-3" />
@@ -166,8 +173,6 @@ export default function KitchenPage({ location }) {
                   dragDisabled={dragDisabled}
                   onQty={handleQty}
                   onOpen={setEditing}
-                  onBuy={handleBuy}
-                  onRemove={requestDelete}
                 />
               ))}
             </div>

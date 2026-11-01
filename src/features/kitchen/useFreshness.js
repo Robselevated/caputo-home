@@ -22,19 +22,19 @@ export function namesLine(suspects, max = 3) {
 }
 
 // Items past their usual shelf life across the whole kitchen, plus the
-// answers. Toss is deferred behind an Undo toast so an undo never raises the
-// quantity (which would reset the stock clock in the database).
-export function useFreshness({ allItems, updateItem, updateQty, userId }) {
+// answers. Toss deletes the item (the Kitchen only lists what we have), deferred
+// behind an Undo toast so Undo never has to recreate the row.
+export function useFreshness({ allItems, updateItem, deleteItem, userId }) {
   const [dismissedDay, setDismissedDay] = useState(readDismissed)
   const [open, setOpen] = useState(false)
   const toastIds = useRef(new Map())
   const fns = useRef({})
-  fns.current = { updateItem, updateQty, userId }
+  fns.current = { updateItem, deleteItem, userId }
 
   const { schedule, cancel, pendingKeys } = usePendingAction((item) => {
     const tid = toastIds.current.get(item.id)
     if (tid != null) { toast.dismiss(tid); toastIds.current.delete(item.id) }
-    fns.current.updateQty(item.id, 0, fns.current.userId)
+    fns.current.deleteItem(item.id)
   }, { delayMs: TOSS_UNDO_MS })
 
   // The new columns arrive with the SQL; until then there is no clock to trust.
@@ -57,7 +57,7 @@ export function useFreshness({ allItems, updateItem, updateQty, userId }) {
   const toss = useCallback((item) => {
     schedule(item.id, item)
     const tid = toast({
-      message: `${item.name} marked out`,
+      message: `${item.name} tossed`,
       durationMs: TOSS_UNDO_MS,
       action: { label: 'Undo', onClick: () => { cancel(item.id); toastIds.current.delete(item.id) } },
     })

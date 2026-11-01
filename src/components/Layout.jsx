@@ -29,7 +29,7 @@ export default function Layout({ children }) {
   return (
     <RealtimeProvider householdId={householdId}>
       <div className="min-h-screen bg-ground">
-        <main className="mx-auto max-w-md pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-[calc(6rem+env(safe-area-inset-bottom,0px))]">
+        <main className="mx-auto max-w-md pt-[max(env(safe-area-inset-top,0px),0.75rem)] pb-[calc(6rem+var(--nav-extra,0px)+env(safe-area-inset-bottom,0px))]">
           <OfflineIndicator isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} onSync={syncNow} />
           {children}
         </main>

@@ -5,10 +5,14 @@ import { toast } from '../components/ui/Toast'
 // Optimistic delete with an undo window: the row disappears at once, a toast
 // offers Undo, and the real delete only runs when the window closes (or the
 // page is left). Replaces a confirm dialog without making mistakes permanent.
-export function useDeleteWithUndo(deleteItem, { delayMs = 4000, message } = {}) {
+// `secondaryAction(item)` adds a second toast button; tapping it closes the
+// toast but the delete still runs when the window ends.
+export function useDeleteWithUndo(deleteItem, { delayMs = 4000, message, secondaryAction } = {}) {
   const toastIds = useRef(new Map())
   const messageRef = useRef(message)
   messageRef.current = message
+  const secondaryRef = useRef(secondaryAction)
+  secondaryRef.current = secondaryAction
 
   const { schedule, cancel, isPending, pendingKeys } = usePendingAction((item) => {
     const tid = toastIds.current.get(item.id)
@@ -25,6 +29,7 @@ export function useDeleteWithUndo(deleteItem, { delayMs = 4000, message } = {}) 
     const tid = toast({
       message: text,
       durationMs: delayMs,
+      secondaryAction: secondaryRef.current ? secondaryRef.current(item) : null,
       action: {
         label: 'Undo',
         onClick: () => {

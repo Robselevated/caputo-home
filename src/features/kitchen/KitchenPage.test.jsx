@@ -16,6 +16,7 @@ import { createWrapper } from '../../test/queryWrapper'
 import { ToastProvider } from '../../components/ui/Toast'
 import { kitchenRoutes } from './routes'
 import { KITCHEN_LAST_KEY } from './locationTheme'
+import BottomNav from '../../components/BottomNav'
 
 const d = '2026-10-01T00:00:00Z'
 const rows = [
@@ -30,7 +31,7 @@ function renderAt(path) {
   const wrapper = ({ children }) => (
     <QueryWrapper><ToastProvider><MemoryRouter initialEntries={[path]}>{children}</MemoryRouter></ToastProvider></QueryWrapper>
   )
-  return render(<Routes>{kitchenRoutes()}</Routes>, { wrapper })
+  return render(<><Routes>{kitchenRoutes()}</Routes><BottomNav /></>, { wrapper })
 }
 
 describe('Kitchen', () => {
@@ -66,14 +67,21 @@ describe('Kitchen', () => {
     expect(await screen.findByRole('tab', { name: 'Freezer' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('an item at zero shows Out with Buy and Remove; Remove hides it behind an undo toast', async () => {
+  it('an item stored at zero is not listed or counted', async () => {
     renderAt('/kitchen/pantry')
-    await screen.findByText('Orzo')
-    expect(screen.getByText('Out')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add Orzo to grocery list' })).toBeInTheDocument()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Remove Orzo' })) })
+    await screen.findByText('Spaghetti')
     expect(screen.queryByText('Orzo')).not.toBeInTheDocument()
-    expect(screen.getByText('Orzo removed from Pantry')).toBeInTheDocument()
+    expect(screen.queryByText('Out')).not.toBeInTheDocument()
+    expect(screen.getByText('Pantry, 2 items')).toBeInTheDocument()
+  })
+
+  it('the edit sheet Delete hides the row behind an undo toast', async () => {
+    renderAt('/kitchen/pantry')
+    fireEvent.click(await screen.findByRole('button', { name: 'More options for Black beans' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit item' })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' })) })
+    expect(screen.queryByText('Black beans')).not.toBeInTheDocument()
+    expect(screen.getByText('Black beans removed from Pantry')).toBeInTheDocument()
     expect(supabase.callsFor('inventory_items', 'delete')).toHaveLength(0)
   })
 
@@ -132,13 +140,34 @@ describe('Kitchen', () => {
     expect(document.activeElement).not.toBe(within(edit).getByLabelText('Name'))
   })
 
-  it('stepper taps write the new quantity and a row that reaches zero shows Out', async () => {
-    renderAt('/kitchen/pantry')
+  it('stepper taps write the new quantity; reaching zero removes the row with Undo and Add to list', async () => {
+    supabase.setResult('grocery_items', 'select', { data: [], error: null })
+    supabase.setResult('grocery_items', 'insert', { data: [], error: null })
+    const { unmount } = renderAt('/kitchen/pantry')
     await screen.findByText('Spaghetti')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Fewer Spaghetti' })) })
     expect(supabase.callsFor('inventory_items', 'update')[0].chain[0][1]).toMatchObject({ qty: 1 })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Fewer Spaghetti' })) })
-    expect(await screen.findByRole('button', { name: 'Remove Spaghetti' })).toBeInTheDocument()
+    expect(supabase.callsFor('inventory_items', 'update')).toHaveLength(1)
+    expect(screen.queryByText('Spaghetti')).not.toBeInTheDocument()
+    const toastEl = screen.getByText('Spaghetti is out, removed from Pantry').closest('[role="status"]')
+    expect(within(toastEl).getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    await act(async () => { fireEvent.click(within(toastEl).getByRole('button', { name: 'Add to list' })) })
+    expect(await screen.findByText('Spaghetti added to the grocery list')).toBeInTheDocument()
+    await act(async () => { unmount() })
+    await waitFor(() => expect(supabase.callsFor('inventory_items', 'delete')).toHaveLength(1))
+  })
+
+  it('Undo on a row that reached zero brings it back without writing', async () => {
+    renderAt('/kitchen/fridge')
+    await screen.findByText('Milk')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Fewer Milk' })) })
+    expect(screen.queryByText('Milk')).not.toBeInTheDocument()
+    const toastEl = screen.getByText('Milk is out, removed from Fridge').closest('[role="status"]')
+    await act(async () => { fireEvent.click(within(toastEl).getByRole('button', { name: 'Undo' })) })
+    expect(screen.getByText('Milk')).toBeInTheDocument()
+    expect(supabase.callsFor('inventory_items', 'update')).toHaveLength(0)
+    expect(supabase.callsFor('inventory_items', 'delete')).toHaveLength(0)
   })
 
   it('a tile heading is a real heading that contains the disclosure button', async () => {
@@ -164,6 +193,7 @@ describe('freshness check', () => {
     supabase.reset()
     localStorage.clear()
     supabase.setResult('inventory_items', 'update', { data: [{ id: 'm' }], error: null })
+    supabase.setResult('inventory_items', 'delete', { data: [{ id: 'c' }], error: null })
   })
   const seed = (data) => supabase.setResult('inventory_items', 'select', { data, error: null })
 
@@ -213,21 +243,20 @@ describe('freshness check', () => {
     expect(within(dialog).queryByText('Milk')).not.toBeInTheDocument()
   })
 
-  it('Toss it waits for the undo window, Undo keeps the item, leaving marks it out', async () => {
+  it('Toss it waits for the undo window, Undo keeps the item, leaving deletes it', async () => {
     seed(stale)
     const { unmount } = renderAt('/kitchen/fridge')
     fireEvent.click(within(await screen.findByRole('region', { name: 'Freshness check' })).getByRole('button', { name: 'Review' }))
     const dialog = await screen.findByRole('dialog', { name: 'Still have these?' })
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Toss Milk' })) })
-    expect(supabase.callsFor('inventory_items', 'update')).toHaveLength(0)
-    const toastEl = (await screen.findByText('Milk marked out')).closest('[role="status"]')
+    expect(supabase.callsFor('inventory_items', 'delete')).toHaveLength(0)
+    const toastEl = (await screen.findByText('Milk tossed')).closest('[role="status"]')
     await act(async () => { fireEvent.click(within(toastEl).getByRole('button', { name: 'Undo' })) })
     expect(within(dialog).getByText('Milk')).toBeInTheDocument()
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Toss Chicken thighs' })) })
     await act(async () => { unmount() })
-    await waitFor(() => expect(supabase.callsFor('inventory_items', 'update')).toHaveLength(1))
-    const update = supabase.callsFor('inventory_items', 'update')[0]
-    expect(update.chain[0][1]).toMatchObject({ qty: 0 })
-    expect(update.chain).toEqual(expect.arrayContaining([['eq', 'id', 'c']]))
+    await waitFor(() => expect(supabase.callsFor('inventory_items', 'delete')).toHaveLength(1))
+    expect(supabase.callsFor('inventory_items', 'update')).toHaveLength(0)
+    expect(supabase.callsFor('inventory_items', 'delete')[0].chain).toEqual(expect.arrayContaining([['eq', 'id', 'c']]))
   })
 })

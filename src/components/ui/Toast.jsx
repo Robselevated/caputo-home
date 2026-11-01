@@ -19,9 +19,10 @@ export function evictionIndex(list) {
   return list.length > MAX_WITH_ACTIONS ? 0 : -1
 }
 
-export function toast({ message, action = null, durationMs = 4000, tone = 'default' }) {
+// `secondaryAction` sits before `action` (e.g. "Add to list" before "Undo").
+export function toast({ message, action = null, secondaryAction = null, durationMs = 4000, tone = 'default' }) {
   const id = nextId++
-  const entry = { id, message, action, durationMs, tone }
+  const entry = { id, message, action, secondaryAction, durationMs, tone }
   for (const listener of listeners) listener({ type: 'add', toast: entry })
   return id
 }
@@ -80,7 +81,7 @@ export function ToastProvider({ children }) {
       {children}
       <div
         aria-live="polite"
-        className="fixed left-0 right-0 z-[70] flex flex-col items-center gap-2 px-5 pointer-events-none bottom-[calc(76px+env(safe-area-inset-bottom,0px))]"
+        className="fixed left-0 right-0 z-[70] flex flex-col items-center gap-2 px-5 pointer-events-none bottom-[calc(76px+var(--nav-extra,0px)+env(safe-area-inset-bottom,0px))]"
       >
         {toasts.map(t => (
           <div
@@ -91,6 +92,15 @@ export function ToastProvider({ children }) {
             }`}
           >
             <span className="flex-1">{t.message}</span>
+            {t.secondaryAction && (
+              <button
+                type="button"
+                onClick={() => { t.secondaryAction.onClick?.(); dismiss(t.id) }}
+                className="shrink-0 h-10 px-3.5 rounded-[10px] bg-white/15 font-semibold active:opacity-70"
+              >
+                {t.secondaryAction.label}
+              </button>
+            )}
             {t.action && (
               <button
                 type="button"
