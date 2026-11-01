@@ -4,7 +4,6 @@ import { BookOpen, Plus, RefreshCw, Search } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useRecipes } from '../../hooks/useRecipes'
 import { useIngredientCoverage } from '../../hooks/useIngredientCoverage'
-import { useMealPicks } from '../../hooks/useMealPicks'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { IconButton } from '../../components/ui/IconButton'
 import { Button } from '../../components/ui/Button'
@@ -14,8 +13,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { toast } from '../../components/ui/Toast'
 import { RecipeGrid, GridSkeleton } from './RecipeGrid'
 import { RecipeShelf } from './RecipeShelf'
-import { MEAL_TYPES, mealTypeOf } from './mealType'
-import { buildShelves, lastMadeByRecipe } from './shelves'
+import { COLLECTIONS, collectionFor, pickCollection } from './shelves'
 import { AddRecipeSheet } from './AddRecipeSheet'
 import { errorText, plural } from './recipeFormat'
 
@@ -26,13 +24,11 @@ export default function CookbookPage() {
   const userId = user?.id
   const { recipes, loading, importRecipe, reimportRecipe, createRecipe } = useRecipes(householdId)
   const coverage = useIngredientCoverage(householdId, recipes)
-  const { picks } = useMealPicks(householdId)
 
-  // The meal type tab lives in the URL so coming back from a recipe lands on
-  // the same tab.
+  // The tab lives in the URL so coming back from a recipe lands on it again.
   const [params, setParams] = useSearchParams()
-  const type = MEAL_TYPES.some(t => t.key === params.get('type')) ? params.get('type') : 'all'
-  const setType = (key) => setParams(key === 'all' ? {} : { type: key }, { replace: true })
+  const tab = collectionFor(params.get('tab'))
+  const setTab = (key) => setParams(key ? { tab: key } : {}, { replace: true })
 
   const [search, setSearch] = useState('')
   const [adding, setAdding] = useState(false)
@@ -46,30 +42,23 @@ export default function CookbookPage() {
     [recipes, coverage]
   )
 
-  const typeCounts = useMemo(() => {
-    const counts = Object.fromEntries(MEAL_TYPES.map(t => [t.key, 0]))
-    for (const r of recipes) counts[mealTypeOf(r)]++
-    return counts
-  }, [recipes])
+  // Every tab's recipes, for the counts on the bar and the swipe row.
+  const collections = useMemo(() => {
+    const today = new Date()
+    return new Map(COLLECTIONS.map(c => [c.key, pickCollection(c.key, recipes, { readyIds, today })]))
+  }, [recipes, readyIds])
 
-  // Search looks through every recipe; otherwise the tab picks the set.
+  // All (and search, across everything) is the grid; a tab is one swipe row.
   const query = search.trim().toLowerCase()
-  const inTab = useMemo(() => {
-    const list = query
-      ? recipes.filter(r => r.name.toLowerCase().includes(query))
-      : recipes.filter(r => type === 'all' || mealTypeOf(r) === type)
-    return [...list].sort((a, b) => a.name.localeCompare(b.name))
-  }, [recipes, query, type])
-
-  const lastMade = useMemo(() => lastMadeByRecipe(picks), [picks])
-  const shelves = useMemo(
-    () => (query ? [] : buildShelves(inTab, { readyIds, lastMade })),
-    [query, inTab, readyIds, lastMade]
+  const gridRecipes = useMemo(
+    () => recipes.filter(r => !query || r.name.toLowerCase().includes(query)).sort((a, b) => a.name.localeCompare(b.name)),
+    [recipes, query]
   )
+  const showTab = tab && !query
+  const tabRecipes = showTab ? collections.get(tab.key) : []
 
-  const tabLabel = type === 'all' ? 'recipes' : MEAL_TYPES.find(t => t.key === type).label.toLowerCase()
   const linked = useMemo(() => recipes.filter(r => r.source_url), [recipes])
-  const filtering = query.length > 0 || type !== 'all'
+  const filtering = query.length > 0 || !!tab
   const booting = loading && recipes.length === 0
 
   const subtitle = booting
@@ -160,11 +149,11 @@ export default function CookbookPage() {
       </div>
 
       {recipes.length > 0 && !query && (
-        <div role="group" aria-label="Meal type" className="-mx-5 flex gap-1.5 overflow-x-auto px-5 no-scrollbar">
-          <Pill active={type === 'all'} activeClass="bg-accent-cookbook text-white" onClick={() => setType('all')}>All</Pill>
-          {MEAL_TYPES.map(t => (
-            <Pill key={t.key} active={type === t.key} activeClass="bg-accent-cookbook text-white" onClick={() => setType(t.key)}>
-              {t.label} <span className="opacity-70">{typeCounts[t.key]}</span>
+        <div role="group" aria-label="Recipe tabs" className="-mx-5 flex gap-1.5 overflow-x-auto px-5 no-scrollbar">
+          <Pill active={!tab} activeClass="bg-accent-cookbook text-white" onClick={() => setTab(null)}>All</Pill>
+          {COLLECTIONS.map(c => (
+            <Pill key={c.key} active={tab?.key === c.key} activeClass="bg-accent-cookbook text-white" onClick={() => setTab(c.key)}>
+              {c.label} <span className="opacity-70">{collections.get(c.key).length}</span>
             </Pill>
           ))}
         </div>
@@ -172,27 +161,22 @@ export default function CookbookPage() {
 
       {booting ? (
         <GridSkeleton />
-      ) : inTab.length === 0 ? (
+      ) : showTab ? (
+        tabRecipes.length === 0 ? (
+          <EmptyState icon={BookOpen} title={`Nothing in ${tab.label} yet`} hint={tab.empty ?? 'Add a recipe and it will show up here'} />
+        ) : (
+          <RecipeShelf title={tab.title ?? tab.label} recipes={tabRecipes} coverage={coverage} refreshingId={refreshingId} onOpen={(r) => navigate(`/cookbook/${r.id}`)} onRefresh={handleRefresh} />
+        )
+      ) : gridRecipes.length === 0 ? (
         <EmptyState
           icon={BookOpen}
-          title={query ? 'No recipes match' : recipes.length ? `No ${tabLabel} yet` : 'No recipes yet'}
-          hint={query ? 'Try a shorter word' : recipes.length ? 'Set a recipe\'s meal type on its edit page' : 'Tap + to add one from a link, by typing, or from a photo'}
+          title={query ? 'No recipes match' : 'No recipes yet'}
+          hint={query ? 'Try a shorter word' : 'Tap + to add one from a link, by typing, or from a photo'}
         />
       ) : (
-        <>
-          {shelves.map(shelf => (
-            <RecipeShelf key={shelf.key} title={shelf.title} recipes={shelf.recipes} coverage={coverage} refreshingId={refreshingId} onOpen={(r) => navigate(`/cookbook/${r.id}`)} onRefresh={handleRefresh} />
-          ))}
-          <section aria-label={query ? 'Search results' : `All ${tabLabel}`} className="flex flex-col gap-2">
-            {!query && (
-              <h2 className="flex items-baseline justify-between gap-2 font-heading text-[17px] font-bold text-ink">
-                {`All ${tabLabel}`}
-                <span className="text-[13px] font-semibold text-ink-2">{inTab.length}</span>
-              </h2>
-            )}
-            <RecipeGrid recipes={inTab} coverage={coverage} refreshingId={refreshingId} onOpen={(r) => navigate(`/cookbook/${r.id}`)} onRefresh={handleRefresh} />
-          </section>
-        </>
+        <section aria-label={query ? 'Search results' : 'All recipes'}>
+          <RecipeGrid recipes={gridRecipes} coverage={coverage} refreshingId={refreshingId} onOpen={(r) => navigate(`/cookbook/${r.id}`)} onRefresh={handleRefresh} />
+        </section>
       )}
 
       {linked.length > 0 && !filtering && (

@@ -1,10 +1,10 @@
 import { RecipeCard } from './RecipeCard'
 
-// Cards that fit on screen before swiping load eagerly.
-const EAGER_CARDS = 3
+// The card on screen and the one peeking in load eagerly.
+const EAGER_CARDS = 2
 
-// One swipe row: a heading and a sideways-scrolling run of recipe cards that
-// snaps card by card and bleeds to the screen edges.
+// One tab's recipes as a swipe row: big cards that snap one at a time, with
+// the next card peeking in from the edge so it reads as swipeable.
 export function RecipeShelf({ title, recipes, coverage, refreshingId, onOpen, onRefresh }) {
   return (
     <section aria-label={title} className="flex flex-col gap-2">
@@ -14,9 +14,10 @@ export function RecipeShelf({ title, recipes, coverage, refreshingId, onOpen, on
       </h2>
       <div className="-mx-5 flex snap-x snap-mandatory scroll-px-5 gap-3 overflow-x-auto px-5 pb-1 no-scrollbar">
         {recipes.map((recipe, i) => (
-          <div key={recipe.id} className="w-[44%] shrink-0 snap-start">
+          <div key={recipe.id} className="w-[80%] shrink-0 snap-start">
             <RecipeCard
               recipe={recipe}
+              photoSize={800}
               coverage={coverage[recipe.id]}
               refreshing={refreshingId === recipe.id}
               eager={i < EAGER_CARDS}

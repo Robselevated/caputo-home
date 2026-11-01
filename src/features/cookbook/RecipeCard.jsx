@@ -6,7 +6,7 @@ import { coverageLabel, recipeMeta } from './recipeFormat'
 // One grid card: photo, name, a meta line and the ingredient coverage pill.
 // A linked recipe without a photo gets a refresh control to fetch one. The
 // first rows load eagerly so coming back to the tab paints them at once.
-export function RecipeCard({ recipe, coverage, refreshing, eager = false, onOpen, onRefresh }) {
+export function RecipeCard({ recipe, coverage, refreshing, eager = false, photoSize = 480, onOpen, onRefresh }) {
   const meta = recipeMeta(recipe)
   const pill = coverageLabel(coverage)
   const complete = pill === 'Have it all'
@@ -20,7 +20,7 @@ export function RecipeCard({ recipe, coverage, refreshing, eager = false, onOpen
   return (
     <div className="relative flex flex-col">
       <button type="button" onClick={() => onOpen(recipe)} className="flex flex-col gap-1.5 text-left active:opacity-80">
-        <Photo src={recipe.image_url} size={480} fallback={placeholder} alt="" loading={eager ? 'eager' : 'lazy'} width="400" height="300" className="aspect-[4/3] w-full rounded-tile bg-control object-cover" />
+        <Photo src={recipe.image_url} size={photoSize} fallback={placeholder} alt="" loading={eager ? 'eager' : 'lazy'} width="400" height="300" className="aspect-[4/3] w-full rounded-tile bg-control object-cover" />
         <span className="line-clamp-2 px-0.5 font-heading text-[15px] font-bold leading-snug text-ink">{recipe.name}</span>
         {(meta || pill) && (
           <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-0.5 text-[13px] text-ink-2">

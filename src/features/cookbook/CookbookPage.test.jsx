@@ -59,37 +59,47 @@ describe('CookbookPage', () => {
     expect(within(allRecipes()).getByText('1 to buy')).toBeInTheDocument()
   })
 
-  it('search shows one flat list of matches across every meal type, without shelves', async () => {
+  it('All shows the grid with no swipe rows; search narrows it', async () => {
     renderPage()
     await within(allRecipes()).findByText('Tacos')
-    fireEvent.click(screen.getByRole('button', { name: /^Sides & Apps/ }))
+    expect(screen.getByRole('button', { name: 'All', pressed: true })).toBeInTheDocument()
+    expect(screen.getAllByText('Tacos')).toHaveLength(1)
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search recipes' }), { target: { value: 'tac' } })
     const results = screen.getByRole('region', { name: 'Search results' })
     expect(within(results).getByText('Tacos')).toBeInTheDocument()
     expect(screen.queryByText('Soup')).not.toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Ready to cook' })).not.toBeInTheDocument()
   })
 
-  it('shows shelves above the full grid; a recipe can sit on several', async () => {
-    renderPage()
-    const ready = await screen.findByRole('region', { name: 'Ready to cook' })
-    expect(within(ready).getByText('Tacos')).toBeInTheDocument()
-    const quick = screen.getByRole('region', { name: 'Quick, 30 min or less' })
-    expect(within(quick).getByText('Tacos')).toBeInTheDocument()
-    expect(within(quick).getByText('Soup')).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Slow cooker' })).not.toBeInTheDocument()
-  })
-
-  it('a meal type tab narrows the shelves and grid to that type', async () => {
+  it('the tab bar runs All, the collections, then the meal types, with counts', async () => {
     renderPage()
     await within(allRecipes()).findByText('Tacos')
-    expect(screen.getByRole('button', { name: 'Dinners 1' })).toBeInTheDocument()
+    const bar = screen.getByRole('group', { name: 'Recipe tabs' })
+    expect(within(bar).getAllByRole('button').map(b => b.textContent)).toEqual([
+      'All', 'Ready to cook 1', 'Quick 30 min 2', 'Slow cooker 0', 'New this month 0', 'Breakfast 0', 'Dinners 1', 'Sides & Apps 1', 'Desserts 0',
+    ])
+  })
+
+  it('a tab swaps the grid for one swipe row of its recipes; All brings the grid back', async () => {
+    renderPage()
+    await within(allRecipes()).findByText('Tacos')
+    fireEvent.click(screen.getByRole('button', { name: 'Quick 30 min 2' }))
+    expect(screen.queryByRole('region', { name: 'All recipes' })).not.toBeInTheDocument()
+    const row = screen.getByRole('region', { name: 'Quick, 30 min or less' })
+    expect(within(row).getAllByRole('heading', { level: 2 })[0]).toHaveTextContent('Quick, 30 min or less2')
+    expect(within(row).getByText('Tacos')).toBeInTheDocument()
+    expect(within(row).getByText('Soup')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Sides & Apps 1' }))
-    const sides = screen.getByRole('region', { name: 'All sides & apps' })
-    expect(within(sides).getByText('Soup')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Sides & Apps' })).getByText('Soup')).toBeInTheDocument()
     expect(screen.queryByText('Tacos')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Desserts 0' }))
-    expect(screen.getByText('No desserts yet')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+    expect(within(allRecipes()).getByText('Tacos')).toBeInTheDocument()
+  })
+
+  it('an empty tab says so', async () => {
+    renderPage()
+    await within(allRecipes()).findByText('Tacos')
+    fireEvent.click(screen.getByRole('button', { name: 'Slow cooker 0' }))
+    expect(screen.getByText('Nothing in Slow cooker yet')).toBeInTheDocument()
   })
 
   it('the + button opens the add sheet with Link, Type it, Photo and Paste modes', async () => {
