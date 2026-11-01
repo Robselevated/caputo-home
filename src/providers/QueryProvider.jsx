@@ -25,6 +25,11 @@ export function QueryProvider({ children, client = queryClient, persister }) {
           shouldDehydrateQuery: shouldPersistQuery,
         },
       }}
+      // Every optimistic write bumps the snapshot's dataUpdatedAt, so a quick
+      // force-close and reopen would otherwise paint it as fresh and never ask
+      // the server (a row stuck "checked" after a failed check-off). Once the
+      // snapshot is restored, mark it all stale so mounted queries refetch.
+      onSuccess={() => client.invalidateQueries()}
     >
       {children}
     </PersistQueryClientProvider>

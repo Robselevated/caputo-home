@@ -10,6 +10,11 @@ function Probe() {
   return <div>{isPending ? 'pending' : JSON.stringify(data)}</div>
 }
 
+function LiveProbe() {
+  const { data, isPending } = useQuery({ queryKey: ['grocery_items', 'hh'], queryFn: () => Promise.resolve(['fresh']) })
+  return <div>{isPending ? 'pending' : JSON.stringify(data)}</div>
+}
+
 describe('QueryProvider', () => {
   it('restores the last session\'s cache from IndexedDB so the first paint has data', async () => {
     const storage = createIdbStorage({ dbName: 'qp-test-1' })
@@ -28,6 +33,22 @@ describe('QueryProvider', () => {
     })
     render(<QueryProvider client={new QueryClient()} persister={persister}><Probe /></QueryProvider>)
     await waitFor(() => expect(screen.getByText('["from-disk"]')).toBeInTheDocument())
+  })
+
+  // Every optimistic write bumps dataUpdatedAt, so a force-close and reopen
+  // within staleTime used to paint the restored snapshot and never ask the
+  // server. A cold open always refetches once the snapshot is restored.
+  it('refetches a restored query on boot even when the snapshot looks fresh', async () => {
+    const storage = createIdbStorage({ dbName: 'qp-test-3' })
+    const persister = createQueryPersister({ storage, throttleTime: 0 })
+    await persister.persistClient({
+      timestamp: Date.now(),
+      buster: PERSIST_BUSTER,
+      clientState: { mutations: [], queries: [{ queryKey: ['grocery_items', 'hh'], queryHash: JSON.stringify(['grocery_items', 'hh']), state: { data: ['from-disk'], dataUpdateCount: 1, dataUpdatedAt: Date.now(), error: null, errorUpdateCount: 0, errorUpdatedAt: 0, fetchFailureCount: 0, fetchFailureReason: null, fetchMeta: null, isInvalidated: false, status: 'success', fetchStatus: 'idle' } }] },
+    })
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30 * 1000 } } })
+    render(<QueryProvider client={client} persister={persister}><LiveProbe /></QueryProvider>)
+    await waitFor(() => expect(screen.getByText('["fresh"]')).toBeInTheDocument())
   })
 
   it('ignores a snapshot written by an older cache version (buster mismatch)', async () => {

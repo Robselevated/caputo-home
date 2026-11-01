@@ -101,8 +101,15 @@ export function useGroceryList(householdId) {
     const { error } = await checkOffGroceryItem(supabase, { item, householdId, userId })
     if (error) {
       console.error('Check-off failed:', error)
-      putBack(prevRow)
-      toast({ message: `Couldn't check off ${item.name}`, tone: 'error' })
+      // Back as an open row, not the checked one that was tapped: a checked row
+      // with no undo window would uncheck on the next tap instead of retrying.
+      putBack({ ...prevRow, checked: false, checked_at: null })
+      toast({
+        message: `Couldn't check off ${item.name}`,
+        tone: 'error',
+        durationMs: 8000,
+        action: { label: 'Retry', onClick: () => checkItem({ ...item, checked: false, checked_at: null }, userId) },
+      })
       return { error }
     }
     // The RPC wrote recently_bought + item_history + a kitchen row; realtime

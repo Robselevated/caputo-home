@@ -10,10 +10,12 @@ vi.mock('../lib/db', () => ({
 }))
 
 vi.mock('../lib/offlineToasts', () => ({ toastNotQueued: vi.fn(), toastWriteDropped: vi.fn() }))
+vi.mock('../components/ui/Toast', () => ({ toast: Object.assign(vi.fn(() => 1), { dismiss: vi.fn() }) }))
 
 import { supabase } from '../lib/supabase'
 import { queueWrite } from '../lib/db'
 import { toastNotQueued } from '../lib/offlineToasts'
+import { toast } from '../components/ui/Toast'
 import { useGroceryList } from './useGroceryList'
 import { createWrapper } from '../test/queryWrapper'
 
@@ -66,6 +68,29 @@ describe('useGroceryList.checkItem', () => {
       category: 'Dairy',
       unit: 'gallon',
     }))
+  })
+
+  // A failed check-off used to put the row back exactly as tapped: checked, but
+  // no longer pending, so the next tap unchecked it instead of trying again and
+  // the only sign of failure was a 4s toast. The row comes back unchecked (a tap
+  // retries) and the toast offers Retry.
+  it('a failed check-off puts the row back unchecked and the toast offers Retry', async () => {
+    supabase.setResult('rpc', 'check_off_grocery_item', { data: null, error: { code: '42501', message: 'denied' } })
+    const { result } = await renderLoaded()
+    const tapped = { ...milk, checked: true, checked_at: '2026-11-01T00:10:00Z' }
+    await act(async () => { result.current.markChecked('g1') })
+    await act(async () => { await result.current.checkItem(tapped, 'u1') })
+    expect(result.current.items).toHaveLength(1)
+    expect(result.current.items[0]).toMatchObject({ id: 'g1', checked: false, checked_at: null })
+    const call = toast.mock.calls.find(([arg]) => /Couldn't check off Milk/.test(arg.message))
+    expect(call).toBeTruthy()
+    expect(call[0].tone).toBe('error')
+    expect(call[0].action?.label).toBe('Retry')
+
+    supabase.setResult('rpc', 'check_off_grocery_item', { data: { status: 'ok' }, error: null })
+    await act(async () => { await call[0].action.onClick() })
+    expect(supabase.rpc).toHaveBeenCalledTimes(2)
+    expect(result.current.items).toHaveLength(0)
   })
 
   it('fetches the list without the unused users joins', async () => {
