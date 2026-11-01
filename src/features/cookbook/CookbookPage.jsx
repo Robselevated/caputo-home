@@ -48,7 +48,8 @@ export default function CookbookPage() {
     return new Map(COLLECTIONS.map(c => [c.key, pickCollection(c.key, recipes, { readyIds, today })]))
   }, [recipes, readyIds])
 
-  // All (and search, across everything) is the grid; a tab is one swipe row.
+  // All (and search, across everything) is the grid; a tab is a swipe row
+  // with the same recipes as a grid underneath, for scrolling instead.
   const query = search.trim().toLowerCase()
   const gridRecipes = useMemo(
     () => recipes.filter(r => !query || r.name.toLowerCase().includes(query)).sort((a, b) => a.name.localeCompare(b.name)),
@@ -165,7 +166,12 @@ export default function CookbookPage() {
         tabRecipes.length === 0 ? (
           <EmptyState icon={BookOpen} title={`Nothing in ${tab.label} yet`} hint={tab.empty ?? 'Add a recipe and it will show up here'} />
         ) : (
-          <RecipeShelf title={tab.title ?? tab.label} recipes={tabRecipes} coverage={coverage} refreshingId={refreshingId} onOpen={(r) => navigate(`/cookbook/${r.id}`)} onRefresh={handleRefresh} />
+          <>
+            <RecipeShelf title={tab.title ?? tab.label} recipes={tabRecipes} coverage={coverage} refreshingId={refreshingId} onOpen={(r) => navigate(`/cookbook/${r.id}`)} onRefresh={handleRefresh} />
+            <section aria-label={`Every ${tab.label} recipe`} className="pt-2">
+              <RecipeGrid recipes={tabRecipes} coverage={coverage} refreshingId={refreshingId} onOpen={(r) => navigate(`/cookbook/${r.id}`)} onRefresh={handleRefresh} />
+            </section>
+          </>
         )
       ) : gridRecipes.length === 0 ? (
         <EmptyState

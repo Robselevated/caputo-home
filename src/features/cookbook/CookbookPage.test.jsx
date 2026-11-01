@@ -79,7 +79,7 @@ describe('CookbookPage', () => {
     ])
   })
 
-  it('a tab swaps the grid for one swipe row of its recipes; All brings the grid back', async () => {
+  it('a tab shows a swipe row of its recipes with the same recipes as a grid below; All brings the full grid back', async () => {
     renderPage()
     await within(allRecipes()).findByText('Tacos')
     fireEvent.click(screen.getByRole('button', { name: 'Quick 30 min 2' }))
@@ -88,8 +88,12 @@ describe('CookbookPage', () => {
     expect(within(row).getAllByRole('heading', { level: 2 })[0]).toHaveTextContent('Quick, 30 min or less2')
     expect(within(row).getByText('Tacos')).toBeInTheDocument()
     expect(within(row).getByText('Soup')).toBeInTheDocument()
+    const grid = screen.getByRole('region', { name: 'Every Quick 30 min recipe' })
+    expect(within(grid).getByText('Tacos')).toBeInTheDocument()
+    expect(within(grid).getByText('Soup')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Sides & Apps 1' }))
     expect(within(screen.getByRole('region', { name: 'Sides & Apps' })).getByText('Soup')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Every Sides & Apps recipe' })).getByText('Soup')).toBeInTheDocument()
     expect(screen.queryByText('Tacos')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'All' }))
     expect(within(allRecipes()).getByText('Tacos')).toBeInTheDocument()
