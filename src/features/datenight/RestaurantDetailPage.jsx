@@ -11,6 +11,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { ListSkeleton } from '../../components/ui/Skeleton'
 import { BackLink } from '../cookbook/BackLink'
 import { mapsLink } from './placesSearch'
+import { PlaceDetailsCard } from './PlaceDetailsCard'
 
 const visitDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 
@@ -132,6 +133,9 @@ export default function RestaurantDetailPage() {
   const archived = restaurant.status === 'archived'
   const subtitle = [restaurant.cuisine, archived && restaurant.visited_at ? `Went ${visitDate(restaurant.visited_at)}` : null].filter(Boolean).join(' · ')
 
+  // Google's profile leads for a place still to try; for one we've been to, our scores and notes come first.
+  const googleProfile = <PlaceDetailsCard placeId={restaurant.place_id} />
+
   const submitNote = async (e) => {
     e.preventDefault()
     if (!draft.trim()) return
@@ -174,6 +178,7 @@ export default function RestaurantDetailPage() {
         </a>
       </div>
       {archived && <p className="-mt-2 text-[13px] text-ink-2">Let's go back puts it on Up next again. Scores and notes stay.</p>}
+      {!archived && googleProfile}
 
       {archived && (
         <Card
@@ -219,6 +224,8 @@ export default function RestaurantDetailPage() {
           <Button type="submit" className="bg-accent-datenight" disabled={!draft.trim()}>Add</Button>
         </form>
       </Card>
+
+      {archived && googleProfile}
 
       <Button variant={confirmRemove ? 'danger' : 'ghost'} onClick={handleRemove} onBlur={() => setConfirmRemove(false)}>
         {confirmRemove ? 'Tap again to remove' : 'Remove from Date Night'}

@@ -14,6 +14,10 @@ vi.mock('./placesSearch', async (orig) => ({
   getPlace: vi.fn(async () => ({ placeId: 'place-new', name: 'Wild Sage', cuisine: 'American Restaurant', address: 'Spokane', mapsUrl: 'https://maps.google.com/?cid=9' })),
 }))
 
+vi.mock('./PlaceDetailsCard', () => ({
+  PlaceDetailsCard: ({ placeId }) => <div data-testid="google-profile" data-place={placeId} />,
+}))
+
 vi.mock('./RestaurantMap', () => ({
   RestaurantMap: ({ restaurants, color }) => <div data-testid="map" data-color={color} data-names={restaurants.map(r => r.name).join(',')} />,
 }))
@@ -117,6 +121,21 @@ describe('RestaurantDetailPage', () => {
     const buttons = screen.getAllByRole('button').concat(screen.getAllByRole('link')).map(el => el.textContent)
     expect(buttons).toContain("Let's go back")
     expect(screen.queryByText(/Back to list/)).not.toBeInTheDocument()
+  })
+
+  it('shows the Google profile for the place, after our scores for Been there and first for Up next', async () => {
+    const { unmount } = renderAt('/date-night/z')
+    await screen.findByRole('heading', { name: 'Inland Pacific Kitchen' })
+    const been = screen.getByTestId('google-profile')
+    expect(been).toHaveAttribute('data-place', 'pz')
+    expect(screen.getByText('Notes').compareDocumentPosition(been) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    unmount()
+
+    renderAt('/date-night/a')
+    await screen.findByRole('heading', { name: 'Clover' })
+    const next = screen.getByTestId('google-profile')
+    expect(next).toHaveAttribute('data-place', 'pa')
+    expect(next.compareDocumentPosition(screen.getByText('Notes')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('types 97 as 9.7 without a dot and saves it on blur for that person', async () => {
