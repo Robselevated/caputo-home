@@ -86,6 +86,26 @@ describe('DateNightPage', () => {
       vi.useRealTimers()
     }
   })
+
+  it('offers Try again when search fails, and searches again on tap', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      searchPlaces.mockRejectedValueOnce(new Error("Couldn't connect. Check your signal and try again."))
+      renderAt('/date-night')
+      await screen.findByText('Clover')
+      fireEvent.click(screen.getByRole('button', { name: 'Add a restaurant' }))
+      fireEvent.change(screen.getByRole('searchbox', { name: 'Search restaurants' }), { target: { value: 'wild sage' } })
+      await act(async () => { await vi.advanceTimersByTimeAsync(350) })
+      expect(await screen.findByText("Couldn't connect. Check your signal and try again.")).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      await act(async () => { await vi.advanceTimersByTimeAsync(350) })
+      expect(searchPlaces).toHaveBeenCalledTimes(2)
+      expect(await screen.findByRole('button', { name: 'Add Wild Sage' })).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('DateNightPage map', () => {

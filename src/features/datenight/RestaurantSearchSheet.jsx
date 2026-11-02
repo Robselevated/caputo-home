@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Search, MapPin, Plus } from 'lucide-react'
 import { Sheet } from '../../components/ui/Sheet'
 import { EmptyState } from '../../components/ui/EmptyState'
+import { Button } from '../../components/ui/Button'
 import { toast } from '../../components/ui/Toast'
 import { searchPlaces, getPlace, newSessionToken, currentCoords } from './placesSearch'
 
@@ -14,6 +15,7 @@ function SearchForm({ onAdd, onClose }) {
   const [status, setStatus] = useState('idle') // idle | searching | done | error
   const [error, setError] = useState('')
   const [adding, setAdding] = useState(null)
+  const [attempt, setAttempt] = useState(0) // bumped by Try again to rerun the search
   const session = useRef(newSessionToken())
   const coords = useRef(undefined)
 
@@ -38,7 +40,7 @@ function SearchForm({ onAdd, onClose }) {
       }
     }, DEBOUNCE_MS)
     return () => { clearTimeout(timer); controller.abort() }
-  }, [query])
+  }, [query, attempt])
 
   const pick = async (result) => {
     setAdding(result.placeId)
@@ -73,7 +75,10 @@ function SearchForm({ onAdd, onClose }) {
       </div>
 
       {status === 'error' ? (
-        <EmptyState icon={Search} title="Search isn't working" hint={error} className="py-8" />
+        <div className="flex flex-col items-center pb-6">
+          <EmptyState icon={Search} title="Search isn't working" hint={error} className="pb-4 pt-8" />
+          <Button variant="secondary" size="sm" onClick={() => setAttempt(n => n + 1)}>Try again</Button>
+        </div>
       ) : status === 'done' && results.length === 0 ? (
         <EmptyState icon={Search} title="No matches" hint="Try the name plus the city" className="py-8" />
       ) : status === 'idle' ? (

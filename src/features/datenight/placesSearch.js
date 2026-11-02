@@ -6,8 +6,31 @@ const ENDPOINT = '/.netlify/functions/places'
 // which Google bills as a single details lookup.
 export const newSessionToken = () => crypto.randomUUID()
 
+const RETRY_DELAY_MS = 600
+export const NETWORK_ERROR = "Couldn't connect. Check your signal and try again."
+
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+// A request that never got an answer rejects with a TypeError ("Load failed"
+// in Safari). That happens when the home screen app wakes up on weak cell
+// signal, so try once more before giving up with words a person can act on.
+async function send(init) {
+  try {
+    return await authFetch(ENDPOINT, init)
+  } catch (e) {
+    if (!(e instanceof TypeError) || init.signal?.aborted) throw e
+  }
+  await wait(RETRY_DELAY_MS)
+  try {
+    return await authFetch(ENDPOINT, init)
+  } catch (e) {
+    if (e instanceof TypeError) throw new Error(NETWORK_ERROR)
+    throw e
+  }
+}
+
 async function post(body, signal) {
-  const res = await authFetch(ENDPOINT, {
+  const res = await send({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
